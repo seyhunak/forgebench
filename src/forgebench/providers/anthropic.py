@@ -64,11 +64,7 @@ class AnthropicProvider:
         timeout_seconds: float = 30.0,
         max_tokens: int | None = 4096,
     ) -> None:
-        key = (
-            api_key
-            or os.environ.get("ANTHROPIC_API_KEY")
-            or get_value("ANTHROPIC_API_KEY")
-        )
+        key = api_key or os.environ.get("ANTHROPIC_API_KEY") or get_value("ANTHROPIC_API_KEY")
         if not key:
             raise ProviderError(
                 "ANTHROPIC_API_KEY is not set. Export ANTHROPIC_API_KEY or save it with "
@@ -136,9 +132,7 @@ class AnthropicProvider:
                 )
                 usage = getattr(response, "usage", None)
                 input_tokens = getattr(usage, "input_tokens", None) if usage else None
-                output_tokens = (
-                    getattr(usage, "output_tokens", None) if usage else None
-                )
+                output_tokens = getattr(usage, "output_tokens", None) if usage else None
                 return ProviderResponse(
                     content=content,
                     latency_ms=latency_ms,

@@ -504,9 +504,7 @@ def get_run(run_id: str) -> dict[str, Any]:
 @app.post("/api/compare")
 def compare_runs(payload: CompareRequest) -> dict[str, str]:
     if len(payload.run_dirs) < 2:
-        raise HTTPException(
-            status_code=400, detail="compare needs at least two run directories"
-        )
+        raise HTTPException(status_code=400, detail="compare needs at least two run directories")
     entries = []
     for rd in payload.run_dirs:
         d = REPO_ROOT / rd
@@ -521,9 +519,7 @@ def compare_runs(payload: CompareRequest) -> dict[str, str]:
 def compare_runs_structured(payload: CompareRequest) -> dict[str, Any]:
     """Return structured comparison data for UI table rendering."""
     if len(payload.run_dirs) < 2:
-        raise HTTPException(
-            status_code=400, detail="compare needs at least two run directories"
-        )
+        raise HTTPException(status_code=400, detail="compare needs at least two run directories")
     entries = []
     for rd in payload.run_dirs:
         d = REPO_ROOT / rd

@@ -156,9 +156,7 @@ class ScoringRule(BaseModel):
     field: str = Field(description="Output field name this rule applies to.")
     method: str = Field(
         pattern=r"^(exact_match|f1|contains|boolean|llm_judge)$",
-        description=(
-            "Scoring method: exact_match, f1, contains, boolean, or llm_judge."
-        ),
+        description=("Scoring method: exact_match, f1, contains, boolean, or llm_judge."),
     )
     weight: float = Field(default=1.0, ge=0.0, le=10.0)
     threshold: float | None = Field(
@@ -176,9 +174,7 @@ class TaskCase(BaseModel):
 
     id: str = Field(pattern=r"^[A-Z]{2,4}-\d{4}$", description="Stable case id.")
     input: dict[str, Any] = Field(description="Field values visible to the model.")
-    expected: dict[str, Any] = Field(
-        description="Ground-truth values matching the output schema."
-    )
+    expected: dict[str, Any] = Field(description="Ground-truth values matching the output schema.")
 
 
 class TaskDefinition(BaseModel):

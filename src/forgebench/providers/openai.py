@@ -115,9 +115,7 @@ class OpenAIProvider:
                 content = response.choices[0].message.content or ""
                 usage = getattr(response, "usage", None)
                 input_tokens = getattr(usage, "prompt_tokens", None) if usage else None
-                output_tokens = (
-                    getattr(usage, "completion_tokens", None) if usage else None
-                )
+                output_tokens = getattr(usage, "completion_tokens", None) if usage else None
                 return ProviderResponse(
                     content=content,
                     latency_ms=latency_ms,

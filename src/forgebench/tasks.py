@@ -135,9 +135,7 @@ def validate_task(name: str, root: Path | None = None) -> tuple[TaskInfo, TaskVa
     for rule in task.scoring_rules:
         if rule.field not in output_field_names:
             report.ok = False
-            report.problems.append(
-                f"scoring rule references unknown output field '{rule.field}'"
-            )
+            report.problems.append(f"scoring rule references unknown output field '{rule.field}'")
 
     # Validate splits and cases
     seen_ids: dict[str, str] = {}
@@ -156,16 +154,12 @@ def validate_task(name: str, root: Path | None = None) -> tuple[TaskInfo, TaskVa
             missing_inputs = [f for f in task.input_fields if f not in case.input]
             if missing_inputs:
                 report.ok = False
-                report.problems.append(
-                    f"{case.id}: missing input fields {missing_inputs}"
-                )
+                report.problems.append(f"{case.id}: missing input fields {missing_inputs}")
             expected_names = {f.name for f in task.output_schema}
             missing_expected = [f for f in expected_names if f not in case.expected]
             if missing_expected:
                 report.ok = False
-                report.problems.append(
-                    f"{case.id}: missing expected fields {missing_expected}"
-                )
+                report.problems.append(f"{case.id}: missing expected fields {missing_expected}")
             if case.id in seen_ids:
                 report.ok = False
                 report.problems.append(

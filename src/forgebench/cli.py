@@ -231,9 +231,7 @@ def task_list_cmd(
     for name in tasks:
         try:
             task = load_task(name, tasks_root)
-            typer.echo(
-                f"  {name} (v{task.version}) — {task.description or '(no description)'}"
-            )
+            typer.echo(f"  {name} (v{task.version}) — {task.description or '(no description)'}")
         except Exception as exc:
             typer.echo(f"  {name} — error loading: {exc}", err=True)
 
@@ -329,38 +327,42 @@ def task_run_cmd(
             else:
                 response = provider_inst.predict_text(prompt, output_schema)  # type: ignore[attr-defined]
         except Exception as exc:
-            records.append(PredictionRecord(
-                case_id=case.id,
-                scenario_family="custom",
-                ok=False,
-                category=None,
-                requires_review=None,
-                expected_category=Category.MATCHED,
-                expected_requires_review=False,
-                correct=None,
-                raw_content=str(exc),
-                error_kind="provider_error",
-                error=str(exc),
-                latency_ms=0.0,
-            ))
+            records.append(
+                PredictionRecord(
+                    case_id=case.id,
+                    scenario_family="custom",
+                    ok=False,
+                    category=None,
+                    requires_review=None,
+                    expected_category=Category.MATCHED,
+                    expected_requires_review=False,
+                    correct=None,
+                    raw_content=str(exc),
+                    error_kind="provider_error",
+                    error=str(exc),
+                    latency_ms=0.0,
+                )
+            )
         else:
             score_result = _score_task_output(task, case.expected, response.content)
-            records.append(PredictionRecord(
-                case_id=case.id,
-                scenario_family="custom",
-                ok=score_result["ok"],
-                category=None,
-                requires_review=None,
-                expected_category=Category.MATCHED,
-                expected_requires_review=False,
-                correct=score_result["ok"],
-                raw_content=response.content,
-                error_kind=None,
-                error=None,
-                latency_ms=response.latency_ms,
-                input_tokens=response.input_tokens,
-                output_tokens=response.output_tokens,
-            ))
+            records.append(
+                PredictionRecord(
+                    case_id=case.id,
+                    scenario_family="custom",
+                    ok=score_result["ok"],
+                    category=None,
+                    requires_review=None,
+                    expected_category=Category.MATCHED,
+                    expected_requires_review=False,
+                    correct=score_result["ok"],
+                    raw_content=response.content,
+                    error_kind=None,
+                    error=None,
+                    latency_ms=response.latency_ms,
+                    input_tokens=response.input_tokens,
+                    output_tokens=response.output_tokens,
+                )
+            )
         if index % 25 == 0 or index == len(cases):
             typer.echo(f"  {index}/{len(cases)} cases")
 
@@ -371,12 +373,11 @@ def task_run_cmd(
     run_dir.mkdir(parents=True, exist_ok=True)
 
     import json
+
     (run_dir / "predictions.jsonl").write_text(
         "".join(r.model_dump_json() + "\n" for r in records), encoding="utf-8"
     )
-    (run_dir / "metrics.json").write_text(
-        json.dumps(metrics, indent=2), encoding="utf-8"
-    )
+    (run_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     manifest = {
         "run_id": run_id,
         "task": task.name,
@@ -387,9 +388,7 @@ def task_run_cmd(
         "created_at_utc": created_at.isoformat(timespec="seconds"),
         "duration_seconds": round(time.perf_counter() - start, 3),
     }
-    (run_dir / "manifest.json").write_text(
-        json.dumps(manifest, indent=2), encoding="utf-8"
-    )
+    (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     typer.echo(f"\nRun: {run_id}")
     typer.echo(f"Cases: {metrics['n_cases']} ({metrics['n_valid']} valid)")
     typer.echo(f"Artifacts: {run_dir.resolve()}")
@@ -513,9 +512,7 @@ def _build_task_prompt(task: TaskDefinition, case: TaskCase) -> str:
     lines: list[str] = []
     if task.system_prompt:
         lines.append(f"System: {task.system_prompt}")
-    lines.append(
-        "Task: Evaluate the following input and return JSON matching the output schema."
-    )
+    lines.append("Task: Evaluate the following input and return JSON matching the output schema.")
     lines.append("")
     lines.append("Input fields:")
     for field in task.input_fields:
@@ -524,12 +521,8 @@ def _build_task_prompt(task: TaskDefinition, case: TaskCase) -> str:
     lines.append("")
     lines.append("Output schema:")
     for field in task.output_schema:
-        enum_info = (
-            f" (enum: {', '.join(field.enum_values)})" if field.enum_values else ""
-        )
-        lines.append(
-            f"  {field.name} ({field.type}){enum_info}: {field.description}"
-        )
+        enum_info = f" (enum: {', '.join(field.enum_values)})" if field.enum_values else ""
+        lines.append(f"  {field.name} ({field.type}){enum_info}: {field.description}")
     lines.append("")
     lines.append("Scoring rules:")
     for rule in task.scoring_rules:
@@ -539,9 +532,7 @@ def _build_task_prompt(task: TaskDefinition, case: TaskCase) -> str:
     return "\n".join(lines)
 
 
-def _score_task_output(
-    task: TaskDefinition, expected: dict, raw_output: str
-) -> dict:
+def _score_task_output(task: TaskDefinition, expected: dict, raw_output: str) -> dict:
     """Score a raw model output against expected values using scoring rules."""
     import json
 
@@ -559,9 +550,7 @@ def _score_task_output(
     return {"ok": all_pass}
 
 
-def _apply_scoring_rule(
-    method: str, expected: Any, actual: Any, threshold: float | None
-) -> bool:
+def _apply_scoring_rule(method: str, expected: Any, actual: Any, threshold: float | None) -> bool:
     if method == "exact_match":
         return expected == actual
     if method == "boolean":

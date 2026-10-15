@@ -14,10 +14,10 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ModelPrice:
-    provider: str          # titleized provider name (e.g. "OpenAI")
-    model_id: str          # model identifier (e.g. "gpt-4o")
+    provider: str  # titleized provider name (e.g. "OpenAI")
+    model_id: str  # model identifier (e.g. "gpt-4o")
     input_per_mtok: float  # USD per million input tokens
-    output_per_mtok: float # USD per million output tokens
+    output_per_mtok: float  # USD per million output tokens
     cache_read_per_mtok: float | None  # USD per million cached-read tokens, or None
     as_of: str
     note: str = ""

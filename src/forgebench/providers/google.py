@@ -64,11 +64,7 @@ class GoogleProvider:
         timeout_seconds: float = 30.0,
         max_tokens: int | None = 4096,
     ) -> None:
-        key = (
-            api_key
-            or os.environ.get("GOOGLE_API_KEY")
-            or get_value("GOOGLE_API_KEY")
-        )
+        key = api_key or os.environ.get("GOOGLE_API_KEY") or get_value("GOOGLE_API_KEY")
         if not key:
             raise ProviderError(
                 "GOOGLE_API_KEY is not set. Export GOOGLE_API_KEY or save it with "
@@ -147,12 +143,8 @@ class GoogleProvider:
                 content = response.text or ""
                 # Gemini usage metadata may not always be present.
                 usage = getattr(response, "usage_metadata", None)
-                input_tokens = (
-                    getattr(usage, "prompt_token_count", None) if usage else None
-                )
-                output_tokens = (
-                    getattr(usage, "candidates_token_count", None) if usage else None
-                )
+                input_tokens = getattr(usage, "prompt_token_count", None) if usage else None
+                output_tokens = getattr(usage, "candidates_token_count", None) if usage else None
                 return ProviderResponse(
                     content=content,
                     latency_ms=latency_ms,
