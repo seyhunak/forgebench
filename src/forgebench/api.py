@@ -20,7 +20,6 @@ from pydantic import BaseModel
 
 from . import __version__
 from .config import ExperimentConfig, load_config
-from .dashboard import list_configs as _list_configs, list_runs as _list_runs
 from .credentials import (
     delete_value,
     find_env_file,
@@ -30,10 +29,11 @@ from .credentials import (
     set_value,
     source_of,
 )
+from .dashboard import list_configs as _list_configs
+from .dashboard import list_runs as _list_runs
 from .registry import default_datasets_root, list_datasets, load_dataset, load_split
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
-from .schemas import BenchmarkCase, PredictionRecord
 
 _run_state: dict[str, dict[str, Any]] = {}
 
@@ -254,7 +254,6 @@ def list_providers() -> list[dict[str, Any]]:
 @app.get("/api/models")
 def list_models() -> dict[str, Any]:
     """All providers and models from https://models.dev/api.json."""
-    import json
 
     models_path = STATIC_DIR / "models.json"
     if not models_path.exists():
@@ -266,7 +265,6 @@ def list_models() -> dict[str, Any]:
 @app.get("/api/models/{provider_id}")
 def list_provider_models(provider_id: str) -> dict[str, Any]:
     """Models for a specific provider from models.dev."""
-    import json
 
     models_path = STATIC_DIR / "models.json"
     if not models_path.exists():
@@ -361,7 +359,10 @@ def save_config(config_path: str, payload: dict[str, Any]) -> dict[str, str]:
         ExperimentConfig.model_validate(payload)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    full.write_text(yaml.dump(payload, default_flow_style=False, sort_keys=False) + "\n", encoding="utf-8")
+    full.write_text(
+        yaml.dump(payload, default_flow_style=False, sort_keys=False) + "\n",
+        encoding="utf-8",
+    )
     return {"saved": config_path}
 
 
@@ -433,7 +434,6 @@ def run_progress(run_id: str) -> dict[str, Any]:
 @app.get("/api/runs")
 def list_runs() -> list[dict[str, Any]]:
     """Run directories that have a manifest, newest first."""
-    from .dashboard import list_runs as _list_runs
 
     paths = _list_runs()
     out = []
@@ -580,7 +580,7 @@ def compare_runs_structured(payload: CompareRequest) -> dict[str, Any]:
         return float(value) if isinstance(value, (int, float)) else None
 
     # Build metric rows with deltas vs baseline (first run)
-    baseline = entries[0]
+    entries[0]
     metric_rows = []
     for key in scalar_keys + latency_keys + cost_keys:
         values = [resolve(entry, key) for entry in entries]

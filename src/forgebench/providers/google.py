@@ -109,7 +109,8 @@ class GoogleProvider:
                     "parts": [
                         {
                             "text": (
-                                "Classify this reconciliation case. Answer with the JSON object only.\\n\\n"
+                                "Classify this reconciliation case. "
+                                "Answer with the JSON object only.\n\n"
                                 f"{json.dumps(example['input'], indent=2)}"
                             )
                         }

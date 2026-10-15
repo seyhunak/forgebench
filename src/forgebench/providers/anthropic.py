@@ -109,7 +109,8 @@ class AnthropicProvider:
                         {
                             "role": "user",
                             "content": (
-                                "Classify this reconciliation case. Answer with the JSON object only.\\n\\n"
+                                "Classify this reconciliation case. "
+                                "Answer with the JSON object only.\n\n"
                                 f"{json.dumps(example['input'], indent=2)}"
                             ),
                         }

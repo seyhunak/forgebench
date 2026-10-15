@@ -23,6 +23,7 @@ from typing import Any
 
 from ..schemas import BenchmarkCase, Category, ProviderResponse
 from .base import ProviderError
+
 _DEFAULT_SYSTEM_PROMPT = (
     "You are a deterministic rule engine. (Prompt variants only affect real providers.)"
 )
@@ -168,7 +169,11 @@ class MockProvider:
 
     # -- custom task support --------------------------------------------------
 
-    def predict_text(self, prompt: str, output_schema: list[dict] | None = None) -> ProviderResponse:
+    def predict_text(
+        self,
+        prompt: str,
+        output_schema: list[dict] | None = None,
+    ) -> ProviderResponse:
         """Generate a deterministic mock response for custom task evaluation.
 
         Inspects the output schema and produces plausible JSON values for each

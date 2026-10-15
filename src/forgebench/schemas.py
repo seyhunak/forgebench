@@ -55,7 +55,10 @@ class BenchmarkCase(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    id: str = Field(pattern=r"^[A-Z]{2,4}-\d{4}$", description="Stable case id, e.g. FIN-0001, HC-0001.")
+    id: str = Field(
+        pattern=r"^[A-Z]{2,4}-\d{4}$",
+        description="Stable case id, e.g. FIN-0001, HC-0001.",
+    )
     task: str = "exception_classification"
     input: dict[str, str] = Field(description="Fields visible to the model, all values strings.")
     expected: Expected

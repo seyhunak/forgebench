@@ -9,18 +9,14 @@ rules. Any domain can be evaluated without writing code.
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import yaml
 
 from .schemas import (
-    ScoringRule,
     TaskCase,
     TaskDefinition,
-    TaskOutputField,
 )
 
 

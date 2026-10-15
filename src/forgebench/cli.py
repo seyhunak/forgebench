@@ -11,11 +11,10 @@ Commands (each is implemented and tested before being documented):
 
 from __future__ import annotations
 
-import json
-import subprocess
-import sys
 import asyncio
+import json
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -35,7 +34,12 @@ from .registry import default_datasets_root, list_datasets, validate_dataset
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
 from .schemas import PredictionRecord, TaskCase, TaskDefinition
-from .tasks import default_tasks_root, list_tasks, load_task, load_cases, load_task_with_cases, validate_task
+from .tasks import (
+    list_tasks,
+    load_task,
+    load_task_with_cases,
+    validate_task,
+)
 
 # CLI convenience: read the nearest .env walking up from the working directory,
 # without overriding variables already present in the environment.
@@ -150,12 +154,13 @@ def dashboard_cmd(
     """Launch the local dashboard: BYOK key entry, benchmark runs, result comparison."""
     try:
         import uvicorn  # noqa: F401, PLC0415
+
         from .api import app as api_app  # noqa: F401, PLC0415
     except ImportError as exc:
         typer.echo('error: the UI extra is not installed. Run: pip install -e ".[ui]"', err=True)
         raise typer.Exit(code=1) from exc
 
-    repo_root = Path(__file__).resolve().parents[2]
+    Path(__file__).resolve().parents[2]
     typer.echo(f"Starting ForgeBench dashboard at http://{host}:{port}  (Ctrl-C to stop)")
 
     config = uvicorn.Config(
@@ -245,7 +250,7 @@ def task_validate_cmd(
         info, report = validate_task(name, tasks_root)
     except FileNotFoundError as exc:
         typer.echo(f"error: {exc}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     typer.echo(f"Task: {info.name} v{info.version}")
     typer.echo(f"Description: {info.description or '(none)'}")
@@ -266,18 +271,28 @@ def task_validate_cmd(
 def task_run_cmd(
     name: str = typer.Argument(..., help="Task name to run."),
     split: str = typer.Option("test", "--split", help="Dataset split to evaluate."),
-    provider: str = typer.Option("mock", "--provider", help="Provider name (mock, mistral, openai, anthropic, google)."),
+    provider: str = typer.Option(
+        "mock",
+        "--provider",
+        help="Provider name (mock, mistral, openai, anthropic, google).",
+    ),
     model: str = typer.Option("", "--model", help="Model ID (overrides provider default)."),
-    limit: int | None = typer.Option(None, "--limit", min=1, help="Evaluate only the first N cases."),
-    tasks_root: Path | None = typer.Option(None, "--tasks-root", help="Override task directory location."),
-    output_root: Path | None = typer.Option(None, "--output-root", help="Where to write run artifacts."),
+    limit: int | None = typer.Option(
+        None, "--limit", min=1, help="Evaluate only the first N cases."
+    ),
+    tasks_root: Path | None = typer.Option(
+        None, "--tasks-root", help="Override task directory location."
+    ),
+    output_root: Path | None = typer.Option(
+        None, "--output-root", help="Where to write run artifacts."
+    ),
 ) -> None:
     """Run a custom task evaluation end-to-end."""
     try:
         task, cases = load_task_with_cases(name, split, tasks_root)
     except FileNotFoundError as exc:
         typer.echo(f"error: {exc}", err=True)
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     if limit is not None:
         cases = cases[:limit]
@@ -286,10 +301,11 @@ def task_run_cmd(
     typer.echo(f"Split: {split} ({len(cases)} cases)")
     typer.echo(f"Provider: {provider}")
 
-    from .providers import build_provider
-    from .schemas import PredictionRecord, Category
     import time
     from datetime import UTC, datetime
+
+    from .providers import build_provider
+    from .schemas import Category, PredictionRecord
 
     provider_inst = build_provider(
         provider,
