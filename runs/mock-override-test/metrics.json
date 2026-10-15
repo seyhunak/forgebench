@@ -1,0 +1,65 @@
+{
+  "n_cases": 3,
+  "n_valid": 3,
+  "accuracy": 1.0,
+  "macro_f1": 1.0,
+  "critical_false_match_rate": 0.0,
+  "escalation_recall": 1.0,
+  "schema_validity": 1.0,
+  "latency": {
+    "p50_ms": 34.78,
+    "p95_ms": 35.22,
+    "mean_ms": 29.33
+  },
+  "estimated_cost": {
+    "model": "rule-mock-v1",
+    "provider": "Mock",
+    "total_input_tokens": 194,
+    "total_output_tokens": 122,
+    "tokens_estimated_when_missing": false,
+    "usd_total": 0.0,
+    "usd_per_case": 0.0,
+    "usd_per_1000_cases": 0.0,
+    "price_basis": "input $0.0/Mtok, output $0.0/Mtok, as of n/a",
+    "price_note": "mock provider incurs no API cost"
+  },
+  "per_class": {
+    "matched": {
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "amount_mismatch": {
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "reference_mismatch": {
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    }
+  },
+  "family_breakdown": {
+    "amount_mismatch": {
+      "n": 1,
+      "n_valid": 1,
+      "accuracy": 1.0
+    },
+    "matched": {
+      "n": 1,
+      "n_valid": 1,
+      "accuracy": 1.0
+    },
+    "reference_mismatch": {
+      "n": 1,
+      "n_valid": 1,
+      "accuracy": 1.0
+    }
+  },
+  "error_breakdown": {},
+  "provider_error_rate": 0.0
+}

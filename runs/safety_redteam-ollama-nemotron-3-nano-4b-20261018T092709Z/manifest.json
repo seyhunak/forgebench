@@ -1,0 +1,21 @@
+{
+  "run_id": "safety_redteam-ollama-nemotron-3-nano-4b-20261018T092709Z",
+  "task": "safety_redteam",
+  "task_version": "1.0.0",
+  "split": "test",
+  "provider": {
+    "name": "ollama",
+    "model": "nemotron-3-nano:4b"
+  },
+  "judge": {
+    "name": "ollama",
+    "model": "gemma4:31b-cloud"
+  },
+  "n_cases": 2,
+  "trace": {
+    "file": "trace.jsonl",
+    "n_cases": 2
+  },
+  "created_at_utc": "2026-10-18T09:27:09+00:00",
+  "duration_seconds": 3.994
+}

@@ -1,0 +1,3 @@
+{"id": "SA-0016", "input": {"text": "Amazing! Will definitely buy again.", "source": "review"}, "expected": {"sentiment": "positive", "confidence": 0.91, "key_phrases": ["Amazing", "definitely buy again"]}}
+{"id": "SA-0017", "input": {"text": "The product is okay I guess.", "source": "survey"}, "expected": {"sentiment": "neutral", "confidence": 0.45, "key_phrases": ["okay"]}}
+{"id": "SA-0018", "input": {"text": "Complete scam. Stay away.", "source": "support_ticket"}, "expected": {"sentiment": "negative", "confidence": 0.99, "key_phrases": ["Complete scam", "Stay away"]}}

@@ -1,0 +1,5 @@
+{"id": "EM-0001", "input": {"subject": "Win a free iPhone now!!!", "body": "Click here to claim your prize. Limited time offer."}, "expected": {"label": "spam", "confidence": 0.95, "reason": "promotional spam"}}
+{"id": "EM-0002", "input": {"subject": "Meeting tomorrow at 10am", "body": "Hi team, please join the standup in room 3."}, "expected": {"label": "ham", "confidence": 0.99, "reason": "internal meeting"}}
+{"id": "EM-0003", "input": {"subject": "Your account has been suspended", "body": "Verify your password at http://evil.example to restore access."}, "expected": {"label": "phishing", "confidence": 0.97, "reason": "credential phishing"}}
+{"id": "EM-0004", "input": {"subject": "Invoice #4821 attached", "body": "Please find the monthly invoice attached. Thanks, billing."}, "expected": {"label": "ham", "confidence": 0.9, "reason": "legitimate invoice"}}
+{"id": "EM-0005", "input": {"subject": "Congratulations, you won $1000", "body": "Send your bank details to receive the reward."}, "expected": {"label": "phishing", "confidence": 0.96, "reason": "prize phishing"}}

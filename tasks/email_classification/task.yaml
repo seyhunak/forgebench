@@ -1,0 +1,33 @@
+name: email_classification
+version: "1.0.0"
+description: "Classify an email as spam, ham, or phishing based on its subject and body."
+input_fields:
+  - subject
+  - body
+output_schema:
+  - name: label
+    type: enum
+    enum_values: ["spam", "ham", "phishing"]
+    description: "Predicted email category."
+  - name: confidence
+    type: number
+    description: "Confidence score from 0.0 to 1.0."
+  - name: reason
+    type: string
+    description: "Short justification for the label."
+scoring_rules:
+  - field: label
+    method: exact_match
+    weight: 2.0
+  - field: confidence
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+  - field: reason
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+system_prompt: |
+  You are an email security classifier. Classify the given email as spam, ham,
+  or phishing. Return a confidence score and a short reason. Output must be
+  valid JSON matching the schema.

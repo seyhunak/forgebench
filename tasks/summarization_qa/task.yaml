@@ -1,0 +1,31 @@
+name: summarization_qa
+version: "1.0.0"
+description: "Evaluate whether a summary accurately captures key facts from a source document."
+input_fields:
+  - document
+  - summary
+output_schema:
+  - name: accurate
+    type: boolean
+    description: "Whether the summary is factually accurate."
+  - name: completeness
+    type: enum
+    enum_values: ["complete", "partial", "missing"]
+    description: "How much of the key information is captured."
+  - name: hallucinations
+    type: list[string]
+    description: "Claims in the summary not supported by the document."
+scoring_rules:
+  - field: accurate
+    method: boolean
+    weight: 2.0
+  - field: completeness
+    method: exact_match
+    weight: 1.5
+  - field: hallucinations
+    method: f1
+    weight: 1.0
+system_prompt: |
+  You are a fact-checking expert. Compare the summary against the source
+  document. Determine if it is accurate, rate completeness, and list any
+  hallucinated claims. Output valid JSON matching the schema.

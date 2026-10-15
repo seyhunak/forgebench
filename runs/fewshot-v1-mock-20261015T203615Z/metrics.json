@@ -1,0 +1,98 @@
+{
+  "n_cases": 60,
+  "n_valid": 60,
+  "accuracy": 0.8666666666666667,
+  "macro_f1": 0.7776021080368906,
+  "critical_false_match_rate": 0.06666666666666667,
+  "escalation_recall": 0.9333333333333333,
+  "schema_validity": 1.0,
+  "latency": {
+    "p50_ms": 26.53,
+    "p95_ms": 40.57,
+    "mean_ms": 26.44
+  },
+  "estimated_cost": {
+    "model": "rule-mock-v1",
+    "provider": "Mock",
+    "total_input_tokens": 3976,
+    "total_output_tokens": 2443,
+    "tokens_estimated_when_missing": false,
+    "usd_total": 0.0,
+    "usd_per_case": 0.0,
+    "usd_per_1000_cases": 0.0,
+    "price_basis": "input $0.0/Mtok, output $0.0/Mtok, as of n/a",
+    "price_note": "mock provider incurs no API cost"
+  },
+  "per_class": {
+    "matched": {
+      "support": 15,
+      "precision": 0.8333333333333334,
+      "recall": 1.0,
+      "f1": 0.9090909090909091
+    },
+    "amount_mismatch": {
+      "support": 12,
+      "precision": 1.0,
+      "recall": 0.9166666666666666,
+      "f1": 0.9565217391304348
+    },
+    "date_mismatch": {
+      "support": 10,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "reference_mismatch": {
+      "support": 10,
+      "precision": 0.6666666666666666,
+      "recall": 1.0,
+      "f1": 0.8
+    },
+    "duplicate": {
+      "support": 6,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "ambiguous": {
+      "support": 7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
+  },
+  "family_breakdown": {
+    "ambiguous": {
+      "n": 7,
+      "n_valid": 7,
+      "accuracy": 0.0
+    },
+    "amount_mismatch": {
+      "n": 12,
+      "n_valid": 12,
+      "accuracy": 0.9166666666666666
+    },
+    "date_mismatch": {
+      "n": 10,
+      "n_valid": 10,
+      "accuracy": 1.0
+    },
+    "duplicate": {
+      "n": 6,
+      "n_valid": 6,
+      "accuracy": 1.0
+    },
+    "matched": {
+      "n": 15,
+      "n_valid": 15,
+      "accuracy": 1.0
+    },
+    "reference_mismatch": {
+      "n": 10,
+      "n_valid": 10,
+      "accuracy": 1.0
+    }
+  },
+  "error_breakdown": {},
+  "provider_error_rate": 0.0
+}

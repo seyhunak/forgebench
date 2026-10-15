@@ -1,0 +1,74 @@
+{
+  "run_id": "subscriptions-baseline-mistral-20261018T093118Z",
+  "experiment_name": "subscriptions-baseline",
+  "created_at_utc": "2026-10-18T09:31:18+00:00",
+  "duration_seconds": 152.112,
+  "provider": {
+    "name": "mistral",
+    "model": "openai/gpt-4o-mini"
+  },
+  "dataset": {
+    "name": "subscriptions_v1",
+    "version": "1.0.0",
+    "split": "test",
+    "split_sha256": "a97f0c3dccd1ef3d86c518c973d34929c026489c125a373087fc7333ed3e3ec1",
+    "n_cases": 42
+  },
+  "config": {
+    "experiment": {
+      "name": "subscriptions-baseline",
+      "dataset": "subscriptions_v1",
+      "dataset_version": "1.0.0",
+      "split": "test",
+      "seed": 42
+    },
+    "provider": {
+      "name": "mistral",
+      "model": "openai/gpt-4o-mini",
+      "options": {
+        "temperature": 0
+      }
+    },
+    "inference": {
+      "temperature": 0.0,
+      "max_retries": 2,
+      "timeout_seconds": 30.0,
+      "max_tokens": 1024
+    },
+    "prompt": {
+      "system": null,
+      "name": null,
+      "version": null,
+      "few_shot_count": 0
+    },
+    "evaluation": {
+      "metrics": [
+        "accuracy",
+        "macro_f1",
+        "critical_false_match_rate",
+        "escalation_recall",
+        "schema_validity",
+        "latency",
+        "estimated_cost"
+      ]
+    }
+  },
+  "environment": {
+    "forgebench_version": "0.1.0",
+    "python_version": "3.15.0",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "git_sha": "e8fa0678f8033889706fdaf97e926fa6173b0f3b"
+  },
+  "few_shot_examples": 0,
+  "prompt": {
+    "source": "provider_default",
+    "chars": 987,
+    "effective_sha256": "a6486379f5e7e6db1b6aea28c507c9a0ff4ef77df35f19851af03b127290c029"
+  },
+  "prompt_build_ms": 213.363,
+  "trace": {
+    "file": "trace.jsonl",
+    "n_cases": 42
+  },
+  "command": "/Users/seyhunakyurek/Projects/forgebench/.venv/bin/forgebench dashboard"
+}

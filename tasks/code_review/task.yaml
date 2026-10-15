@@ -1,0 +1,40 @@
+name: code_review
+version: "1.0.0"
+description: "Review Python code for bugs, security issues, and style problems."
+input_fields:
+  - code
+  - language
+output_schema:
+  - name: severity
+    type: enum
+    enum_values: ["info", "low", "medium", "high", "critical"]
+    description: "Severity of the most important issue found."
+  - name: category
+    type: enum
+    enum_values: ["bug", "security", "style", "documentation", "performance"]
+    description: "Category of the primary issue."
+  - name: fix_needed
+    type: boolean
+    description: "Whether a code change is required."
+  - name: suggestion
+    type: string
+    description: "Concrete suggestion for improvement."
+scoring_rules:
+  - field: severity
+    method: exact_match
+    weight: 2.0
+  - field: category
+    method: exact_match
+    weight: 1.5
+  - field: fix_needed
+    method: boolean
+    weight: 1.0
+  - field: suggestion
+    method: contains
+    weight: 0.5
+    threshold: 0.0
+system_prompt: |
+  You are a senior software engineer performing code review. Analyze the provided
+  code for bugs, security vulnerabilities, and style issues. Rate severity,
+  categorize the issue, indicate if a fix is needed, and provide a concrete
+  suggestion. Output valid JSON matching the schema.

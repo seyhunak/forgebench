@@ -1,0 +1,2 @@
+{"id": "EM-0008", "input": {"subject": "Urgent: reset your password", "body": "We detected unusual activity. Click to reset now."}, "expected": {"label": "phishing", "confidence": 0.95, "reason": "account phishing"}}
+{"id": "EM-0009", "input": {"subject": "Your package is waiting", "body": "Track your delivery at the official carrier site."}, "expected": {"label": "ham", "confidence": 0.9, "reason": "legitimate delivery"}}

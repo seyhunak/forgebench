@@ -1,0 +1,26 @@
+name: topic_classification
+version: "1.0.0"
+description: "Classify a short article into a topical category."
+input_fields:
+  - title
+  - text
+output_schema:
+  - name: topic
+    type: enum
+    enum_values: ["technology", "sports", "politics", "health", "business", "entertainment"]
+    description: "Primary topic of the article."
+  - name: confidence
+    type: number
+    description: "Confidence score from 0.0 to 1.0."
+scoring_rules:
+  - field: topic
+    method: exact_match
+    weight: 2.0
+  - field: confidence
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+system_prompt: |
+  You are a topic classifier. Classify the given article into one of the
+  provided topics. Return a confidence score. Output must be valid JSON
+  matching the schema.

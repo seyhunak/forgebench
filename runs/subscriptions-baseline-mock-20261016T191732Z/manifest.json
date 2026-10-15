@@ -1,0 +1,63 @@
+{
+  "run_id": "subscriptions-baseline-mock-20261016T191732Z",
+  "experiment_name": "subscriptions-baseline",
+  "created_at_utc": "2026-10-16T19:17:32+00:00",
+  "duration_seconds": 0.004,
+  "provider": {
+    "name": "mock",
+    "model": "rule-mock-v1"
+  },
+  "dataset": {
+    "name": "subscriptions_v1",
+    "version": "1.0.0",
+    "split": "test",
+    "split_sha256": "a97f0c3dccd1ef3d86c518c973d34929c026489c125a373087fc7333ed3e3ec1",
+    "n_cases": 42
+  },
+  "config": {
+    "experiment": {
+      "name": "subscriptions-baseline",
+      "dataset": "subscriptions_v1",
+      "dataset_version": "1.0.0",
+      "split": "test",
+      "seed": 42
+    },
+    "provider": {
+      "name": "mock",
+      "model": "rule-mock-v1",
+      "options": {
+        "defect_rate": 0.1,
+        "invalid_rate": 0.05
+      }
+    },
+    "inference": {
+      "temperature": 0.0,
+      "max_retries": 2,
+      "timeout_seconds": 30.0,
+      "max_tokens": 1024
+    },
+    "prompt": {
+      "system": null,
+      "few_shot_count": 0
+    },
+    "evaluation": {
+      "metrics": [
+        "accuracy",
+        "macro_f1",
+        "critical_false_match_rate",
+        "escalation_recall",
+        "schema_validity",
+        "latency",
+        "estimated_cost"
+      ]
+    }
+  },
+  "environment": {
+    "forgebench_version": "0.1.0",
+    "python_version": "3.15.0",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "git_sha": "c3e6c0606038840199f25c8c72d524e32c96f871"
+  },
+  "few_shot_examples": 0,
+  "command": ".venv/bin/uvicorn forgebench.api:app --host 127.0.0.1 --port 8001"
+}

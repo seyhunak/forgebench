@@ -1,0 +1,2 @@
+{"id": "TO-0006", "input": {"title": "New movie breaks box office", "text": "The sequel earned $200M opening weekend."}, "expected": {"topic": "entertainment", "confidence": 0.95}}
+{"id": "TO-0007", "input": {"title": "Tech giant announces layoffs", "text": "The company will cut 5% of its workforce."}, "expected": {"topic": "business", "confidence": 0.9}}

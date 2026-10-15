@@ -1,0 +1,25 @@
+# Baseline run against the procurement_v1 dataset using the openrouter provider.
+experiment:
+  name: procurement-baseline
+  dataset: procurement_v1
+  dataset_version: "1.0.0"
+  split: test
+
+provider:
+  name: openrouter
+  model: openai/gpt-4o-mini
+
+inference:
+  temperature: 0
+  max_retries: 2
+  timeout_seconds: 30
+
+evaluation:
+  metrics:
+    - accuracy
+    - macro_f1
+    - critical_false_match_rate
+    - escalation_recall
+    - schema_validity
+    - latency
+    - estimated_cost

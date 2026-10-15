@@ -1,0 +1,5 @@
+{"id": "SA-0011", "input": {"text": "Not bad but not great either. Just okay.", "source": "email"}, "expected": {"sentiment": "neutral", "confidence": 0.58, "key_phrases": ["Not bad", "not great", "Just okay"]}}
+{"id": "SA-0012", "input": {"text": "Horrible quality, broke after one day.", "source": "review"}, "expected": {"sentiment": "negative", "confidence": 0.96, "key_phrases": ["Horrible quality", "broke after one day"]}}
+{"id": "SA-0013", "input": {"text": "Excellent value and fast shipping.", "source": "app_store"}, "expected": {"sentiment": "positive", "confidence": 0.88, "key_phrases": ["Excellent value", "fast shipping"]}}
+{"id": "SA-0014", "input": {"text": "I have mixed feelings about this update.", "source": "survey"}, "expected": {"sentiment": "neutral", "confidence": 0.52, "key_phrases": ["mixed feelings"]}}
+{"id": "SA-0015", "input": {"text": "Worst purchase of the year.", "source": "review"}, "expected": {"sentiment": "negative", "confidence": 0.95, "key_phrases": ["Worst purchase"]}}

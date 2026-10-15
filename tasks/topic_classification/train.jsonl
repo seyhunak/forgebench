@@ -1,0 +1,4 @@
+{"id": "TO-0001", "input": {"title": "New AI model breaks benchmarks", "text": "Researchers released a transformer that tops leaderboards."}, "expected": {"topic": "technology", "confidence": 0.95}}
+{"id": "TO-0002", "input": {"title": "Champions league final recap", "text": "A thrilling match ended 3-2 after extra time."}, "expected": {"topic": "sports", "confidence": 0.97}}
+{"id": "TO-0003", "input": {"title": "Parliament passes new tax bill", "text": "Lawmakers approved the reform after debate."}, "expected": {"topic": "politics", "confidence": 0.93}}
+{"id": "TO-0004", "input": {"title": "Study links sleep to heart health", "text": "Researchers found 7 hours reduces risk."}, "expected": {"topic": "health", "confidence": 0.94}}

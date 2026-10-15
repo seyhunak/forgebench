@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="forgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7aa7ff;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#4f7dff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3f6fe0;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <path d="M16 2c-2.2 0-4.2 1.2-5.4 3.2L9 8H7L5 10H3L1 12H3L5 14H3L1 16H3L5 18H3L1 20H3L5 22H7L9 24H11L13 26H15L17 24H19L21 22H19L17 20H19L15 18H17L15 16H17L15 14H17L13 12H15L13 10H13L11 8H9L11 5.2C12.2 3.2 14.2 2 16 2Z" fill="url(#forgeGradient)"/>
+  <path d="M11 20H13V14H11V20ZM19 20H21V14H19V20Z" fill="#ffffff" opacity="0.9"/>
+</svg>

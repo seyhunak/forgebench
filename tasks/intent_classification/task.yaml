@@ -1,0 +1,33 @@
+name: intent_classification
+version: "1.0.0"
+description: "Classify a customer-support utterance into an intent with a confidence score and extracted entities."
+input_fields:
+  - utterance
+  - channel
+output_schema:
+  - name: intent
+    type: enum
+    enum_values: ["billing", "technical", "account", "cancellation", "general"]
+    description: "Primary customer-support intent of the utterance."
+  - name: confidence
+    type: number
+    description: "Confidence score from 0.0 to 1.0."
+  - name: entities
+    type: list[string]
+    description: "Key entities or topics extracted from the utterance."
+scoring_rules:
+  - field: intent
+    method: exact_match
+    weight: 2.0
+  - field: confidence
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+  - field: entities
+    method: f1
+    weight: 1.0
+system_prompt: |
+  You are a customer-support intent classifier. Given an utterance and the
+  channel it arrived on, choose the single best intent from the allowed set,
+  assign a confidence score between 0.0 and 1.0, and extract the key entities
+  or topics mentioned. Output must be valid JSON matching the schema.

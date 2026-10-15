@@ -1,0 +1,3 @@
+{"id": "QU-0001", "input": {"question": "What is the capital of France?"}, "expected": {"qtype": "factual", "requires_context": false}}
+{"id": "QU-0002", "input": {"question": "Do you think AI will replace jobs?"}, "expected": {"qtype": "opinion", "requires_context": true}}
+{"id": "QU-0003", "input": {"question": "Which is better, React or Vue?"}, "expected": {"qtype": "comparison", "requires_context": true}}

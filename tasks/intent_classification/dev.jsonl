@@ -1,0 +1,4 @@
+{"id": "IC-0009", "input": {"utterance": "The payment didn't go through but my card was still charged.", "channel": "email"}, "expected": {"intent": "billing", "confidence": 0.9, "entities": ["failed payment", "card charged"]}}
+{"id": "IC-0010", "input": {"utterance": "Your site won't load in my browser since this morning.", "channel": "chat"}, "expected": {"intent": "technical", "confidence": 0.84, "entities": ["site not loading", "browser"]}}
+{"id": "IC-0011", "input": {"utterance": "I want to close my account for good. It's not worth the price anymore.", "channel": "phone"}, "expected": {"intent": "cancellation", "confidence": 0.92, "entities": ["account closure", "price"]}}
+{"id": "IC-0012", "input": {"utterance": "Do you offer a student discount for annual plans?", "channel": "email"}, "expected": {"intent": "general", "confidence": 0.68, "entities": ["student discount", "annual plans"]}}

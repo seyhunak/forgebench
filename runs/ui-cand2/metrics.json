@@ -1,0 +1,77 @@
+{
+  "n_cases": 6,
+  "n_valid": 4,
+  "accuracy": 1.0,
+  "macro_f1": 1.0,
+  "critical_false_match_rate": 0.0,
+  "escalation_recall": 0.6666666666666666,
+  "schema_validity": 0.6666666666666666,
+  "latency": {
+    "p50_ms": 19455.41,
+    "p95_ms": 24801.04,
+    "mean_ms": 20089.0
+  },
+  "estimated_cost": {
+    "model": "aven-4b:latest",
+    "provider": "Unknown",
+    "total_input_tokens": 2229,
+    "total_output_tokens": 5403,
+    "tokens_estimated_when_missing": false,
+    "usd_total": 0.0,
+    "usd_per_case": 0.0,
+    "usd_per_1000_cases": 0.0,
+    "price_basis": "input $0.0/Mtok, output $0.0/Mtok, as of unknown",
+    "price_note": "no price table entry; cost reported as 0 with a warning"
+  },
+  "per_class": {
+    "matched": {
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "amount_mismatch": {
+      "support": 2,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "duplicate": {
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    }
+  },
+  "family_breakdown": {
+    "ambiguous": {
+      "n": 1,
+      "n_valid": 0,
+      "accuracy": 0.0
+    },
+    "amount_mismatch": {
+      "n": 2,
+      "n_valid": 2,
+      "accuracy": 1.0
+    },
+    "duplicate": {
+      "n": 1,
+      "n_valid": 1,
+      "accuracy": 1.0
+    },
+    "matched": {
+      "n": 1,
+      "n_valid": 1,
+      "accuracy": 1.0
+    },
+    "reference_mismatch": {
+      "n": 1,
+      "n_valid": 0,
+      "accuracy": 0.0
+    }
+  },
+  "error_breakdown": {
+    "empty_response": 2
+  },
+  "provider_error_rate": 0.0
+}

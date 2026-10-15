@@ -1,0 +1,74 @@
+{
+  "run_id": "ui-base",
+  "experiment_name": "baseline",
+  "created_at_utc": "2026-10-17T09:06:31+00:00",
+  "duration_seconds": 28.255,
+  "provider": {
+    "name": "ollama",
+    "model": "nemotron-3-nano:4b"
+  },
+  "dataset": {
+    "name": "finance_v1",
+    "version": "1.0.0",
+    "split": "test",
+    "split_sha256": "be681ada35cb8c2b709d3fd432418f10eb695821b83474c72c4cb54f0fbca555",
+    "n_cases": 6
+  },
+  "config": {
+    "experiment": {
+      "name": "baseline",
+      "dataset": "finance_v1",
+      "dataset_version": "1.0.0",
+      "split": "test",
+      "seed": 42
+    },
+    "provider": {
+      "name": "ollama",
+      "model": "nemotron-3-nano:4b",
+      "options": {
+        "temperature": 0.0
+      }
+    },
+    "inference": {
+      "temperature": 0.0,
+      "max_retries": 2,
+      "timeout_seconds": 30.0,
+      "max_tokens": 1024
+    },
+    "prompt": {
+      "system": null,
+      "name": null,
+      "version": null,
+      "few_shot_count": 0
+    },
+    "evaluation": {
+      "metrics": [
+        "accuracy",
+        "macro_f1",
+        "critical_false_match_rate",
+        "escalation_recall",
+        "schema_validity",
+        "latency",
+        "estimated_cost"
+      ]
+    }
+  },
+  "environment": {
+    "forgebench_version": "0.1.0",
+    "python_version": "3.15.0",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "git_sha": "b34c154f8a05bf42ac2388313450df2f9c83bd7c"
+  },
+  "few_shot_examples": 0,
+  "prompt": {
+    "source": "provider_default",
+    "chars": 995,
+    "effective_sha256": "617fcd8930a2b0a931c8ca91a08f026e01bfd0b166ca014d96991265a2ff3cb9"
+  },
+  "prompt_build_ms": 0.021,
+  "trace": {
+    "file": "trace.jsonl",
+    "n_cases": 6
+  },
+  "command": ".venv/bin/forgebench run --config configs/baseline.yaml --provider ollama --model nemotron-3-nano:4b --limit 6 --run-id ui-base"
+}

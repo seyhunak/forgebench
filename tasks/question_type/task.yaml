@@ -1,0 +1,24 @@
+name: question_type
+version: "1.0.0"
+description: "Classify a user question by its intent type."
+input_fields:
+  - question
+output_schema:
+  - name: qtype
+    type: enum
+    enum_values: ["factual", "opinion", "comparison", "procedural", "definition"]
+    description: "Type of the question."
+  - name: requires_context
+    type: boolean
+    description: "Whether answering requires external context."
+scoring_rules:
+  - field: qtype
+    method: exact_match
+    weight: 2.0
+  - field: requires_context
+    method: boolean
+    weight: 1.0
+system_prompt: |
+  You are a question classifier. Classify the given question by type and
+  decide whether it requires external context. Output must be valid JSON
+  matching the schema.

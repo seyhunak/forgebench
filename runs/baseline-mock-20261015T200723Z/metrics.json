@@ -1,0 +1,101 @@
+{
+  "n_cases": 60,
+  "n_valid": 56,
+  "accuracy": 0.8214285714285714,
+  "macro_f1": 0.733375420875421,
+  "critical_false_match_rate": 0.09523809523809523,
+  "escalation_recall": 0.9047619047619048,
+  "schema_validity": 0.9333333333333333,
+  "latency": {
+    "p50_ms": 26.53,
+    "p95_ms": 40.57,
+    "mean_ms": 26.44
+  },
+  "estimated_cost": {
+    "model": "rule-mock-v1",
+    "provider": "Mock",
+    "total_input_tokens": 3976,
+    "total_output_tokens": 2366,
+    "tokens_estimated_when_missing": false,
+    "usd_total": 0.0,
+    "usd_per_case": 0.0,
+    "usd_per_1000_cases": 0.0,
+    "price_basis": "input $0.0/Mtok, output $0.0/Mtok, as of n/a",
+    "price_note": "mock provider incurs no API cost"
+  },
+  "per_class": {
+    "matched": {
+      "support": 14,
+      "precision": 0.7777777777777778,
+      "recall": 1.0,
+      "f1": 0.8750000000000001
+    },
+    "amount_mismatch": {
+      "support": 11,
+      "precision": 0.9090909090909091,
+      "recall": 0.9090909090909091,
+      "f1": 0.9090909090909091
+    },
+    "date_mismatch": {
+      "support": 10,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "reference_mismatch": {
+      "support": 9,
+      "precision": 0.6153846153846154,
+      "recall": 0.8888888888888888,
+      "f1": 0.7272727272727274
+    },
+    "duplicate": {
+      "support": 5,
+      "precision": 1.0,
+      "recall": 0.8,
+      "f1": 0.888888888888889
+    },
+    "ambiguous": {
+      "support": 7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
+  },
+  "family_breakdown": {
+    "ambiguous": {
+      "n": 7,
+      "n_valid": 7,
+      "accuracy": 0.0
+    },
+    "amount_mismatch": {
+      "n": 12,
+      "n_valid": 11,
+      "accuracy": 0.9090909090909091
+    },
+    "date_mismatch": {
+      "n": 10,
+      "n_valid": 10,
+      "accuracy": 1.0
+    },
+    "duplicate": {
+      "n": 6,
+      "n_valid": 5,
+      "accuracy": 0.8
+    },
+    "matched": {
+      "n": 15,
+      "n_valid": 14,
+      "accuracy": 1.0
+    },
+    "reference_mismatch": {
+      "n": 10,
+      "n_valid": 9,
+      "accuracy": 0.8888888888888888
+    }
+  },
+  "error_breakdown": {
+    "malformed_json": 3,
+    "unknown_evidence_field": 1
+  },
+  "provider_error_rate": 0.0
+}

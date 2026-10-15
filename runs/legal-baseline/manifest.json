@@ -1,0 +1,63 @@
+{
+  "run_id": "legal-baseline",
+  "experiment_name": "legal-baseline",
+  "created_at_utc": "2026-10-16T09:30:09+00:00",
+  "duration_seconds": 0.004,
+  "provider": {
+    "name": "mock",
+    "model": "rule-mock-v1"
+  },
+  "dataset": {
+    "name": "legal_v1",
+    "version": "1.0.0",
+    "split": "test",
+    "split_sha256": "8442441055bf35e3fbabf3e763204f92f826a512e6272c2d52b6b468e3204c06",
+    "n_cases": 42
+  },
+  "config": {
+    "experiment": {
+      "name": "legal-baseline",
+      "dataset": "legal_v1",
+      "dataset_version": "1.0.0",
+      "split": "test",
+      "seed": 42
+    },
+    "provider": {
+      "name": "mock",
+      "model": "rule-mock-v1",
+      "options": {
+        "defect_rate": 0.1,
+        "invalid_rate": 0.05
+      }
+    },
+    "inference": {
+      "temperature": 0.0,
+      "max_retries": 2,
+      "timeout_seconds": 30.0,
+      "max_tokens": 1024
+    },
+    "prompt": {
+      "system": null,
+      "few_shot_count": 0
+    },
+    "evaluation": {
+      "metrics": [
+        "accuracy",
+        "macro_f1",
+        "critical_false_match_rate",
+        "escalation_recall",
+        "schema_validity",
+        "latency",
+        "estimated_cost"
+      ]
+    }
+  },
+  "environment": {
+    "forgebench_version": "0.1.0",
+    "python_version": "3.15.0",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "git_sha": "e87c2e5304138a640c7e9e02fd39a347387cccb7"
+  },
+  "few_shot_examples": 0,
+  "command": "/Users/seyhunakyurek/Projects/forgebench/.venv/bin/forgebench run --config configs/legal_baseline.yaml --run-id legal-baseline"
+}

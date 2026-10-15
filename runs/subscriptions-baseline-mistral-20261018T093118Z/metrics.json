@@ -1,0 +1,63 @@
+{
+  "n_cases": 42,
+  "n_valid": 0,
+  "accuracy": 0.0,
+  "macro_f1": 0.0,
+  "critical_false_match_rate": 0.0,
+  "escalation_recall": 0.0,
+  "schema_validity": 0.0,
+  "latency": {
+    "p50_ms": 0.0,
+    "p95_ms": 0.0,
+    "mean_ms": 0.0
+  },
+  "estimated_cost": {
+    "model": "openai/gpt-4o-mini",
+    "provider": "Unknown",
+    "total_input_tokens": 0,
+    "total_output_tokens": 42,
+    "tokens_estimated_when_missing": true,
+    "usd_total": 0.0,
+    "usd_per_case": 0.0,
+    "usd_per_1000_cases": 0.0,
+    "price_basis": "input $0.0/Mtok, output $0.0/Mtok, as of unknown",
+    "price_note": "no price table entry; cost reported as 0 with a warning"
+  },
+  "per_class": {},
+  "family_breakdown": {
+    "ambiguous": {
+      "n": 5,
+      "n_valid": 0,
+      "accuracy": 0.0
+    },
+    "amount_mismatch": {
+      "n": 9,
+      "n_valid": 0,
+      "accuracy": 0.0
+    },
+    "date_mismatch": {
+      "n": 3,
+      "n_valid": 0,
+      "accuracy": 0.0
+    },
+    "duplicate": {
+      "n": 5,
+      "n_valid": 0,
+      "accuracy": 0.0
+    },
+    "matched": {
+      "n": 14,
+      "n_valid": 0,
+      "accuracy": 0.0
+    },
+    "reference_mismatch": {
+      "n": 6,
+      "n_valid": 0,
+      "accuracy": 0.0
+    }
+  },
+  "error_breakdown": {
+    "provider_error": 42
+  },
+  "provider_error_rate": 1.0
+}

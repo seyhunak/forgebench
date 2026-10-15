@@ -1,0 +1,32 @@
+# Reference baseline for the openrouter provider.
+#
+# Uses a real provider to run benchmark cases through OpenRouter. The
+# defect_rate/invalid_rate knob is removed because it is specific to the
+# Real providers are configured via the provider model and
+# options in the environment.
+experiment:
+  name: baseline
+  dataset: finance_v1
+  dataset_version: "1.0.0"
+  split: test
+
+provider:
+  name: openrouter
+  model: openai/gpt-4o-mini
+  options:
+    temperature: 0.0
+
+inference:
+  temperature: 0
+  max_retries: 2
+  timeout_seconds: 30
+
+evaluation:
+  metrics:
+    - accuracy
+    - macro_f1
+    - critical_false_match_rate
+    - escalation_recall
+    - schema_validity
+    - latency
+    - estimated_cost

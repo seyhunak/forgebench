@@ -1,0 +1,33 @@
+name: contract_clause_detection
+version: "1.0.0"
+description: "Detect the governing clause type in a contract snippet and assess its risk level."
+input_fields:
+  - clause_text
+  - contract_type
+output_schema:
+  - name: clause_type
+    type: enum
+    enum_values: ["termination", "liability", "payment", "confidentiality", "governing_law", "none"]
+    description: "The dominant clause category of the snippet."
+  - name: risk_level
+    type: enum
+    enum_values: ["low", "medium", "high"]
+    description: "Risk exposure implied by the clause."
+  - name: requires_counsel
+    type: boolean
+    description: "Whether the clause warrants review by legal counsel."
+scoring_rules:
+  - field: clause_type
+    method: exact_match
+    weight: 2.0
+  - field: risk_level
+    method: exact_match
+    weight: 1.0
+  - field: requires_counsel
+    method: boolean
+    weight: 1.0
+system_prompt: |
+  You are a contracts analyst. Given a clause snippet and the contract type,
+  identify the governing clause category, rate its risk level, and decide
+  whether it requires legal counsel review. Output must be valid JSON matching
+  the schema.

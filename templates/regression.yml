@@ -1,0 +1,96 @@
+# Regression-on-PR template for ForgeBench (copy into .github/workflows/).
+#
+# Two gates, both offline by default:
+#   1. offline-gate      — lint, tests, dataset reproducibility.
+#   2. task-regression   — a pinned baseline run compared against a fresh
+#                          candidate run. Works without API keys when the
+#                          baseline and candidate use the same task; swap the
+#                          provider to a hosted one once secrets exist.
+#
+# Tune PINNED_RUN to a run id your repo tracks under runs/ (runs/ is committed
+# in ForgeBench repos so pinned baselines survive across branches).
+
+name: forgebench-regression
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  offline-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install .[dev]
+      - name: Lint
+        run: |
+          ruff check src tests scripts examples
+          ruff format --check src tests scripts examples
+      - name: Tests
+        run: pytest -q
+      - name: Dataset reproducibility
+        run: |
+          python scripts/generate_dataset.py --seed 42 --train 100 --dev 40 --test 60 --out /tmp/regen
+          diff -r datasets/finance_v1 /tmp/regen
+
+  task-regression:
+    needs: offline-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install .[dev]
+      - name: Materialize pinned baseline runs from main
+        run: git checkout origin/main -- runs/ || echo "no tracked runs yet"
+      - name: Candidate run (offline mock provider)
+        run: |
+          forgebench task-run sentiment_analysis --provider mock --split test \
+            --limit 20 --output-root runs/pr-candidate
+      - name: Compare candidate against pinned baseline
+        env:
+          # CHANGE: task name + pinned run id (a directory under runs/ on main)
+          TASK_NAME: sentiment_analysis
+          PINNED_RUN: ""
+        run: |
+          python - <<'EOF'
+          import json, os, sys
+          from pathlib import Path
+
+          task = os.environ["TASK_NAME"]
+          runs = sorted(
+              Path("runs/pr-candidate").glob(f"{task}-*"),
+              key=lambda p: p.stat().st_mtime,
+          )
+          if not runs:
+              sys.exit("no candidate run produced")
+          candidate = json.loads((runs[-1] / "metrics.json").read_text())
+
+          pinned = os.environ.get("PINNED_RUN", "").strip()
+          if not pinned:
+              print("No pinned run set — candidate metrics:")
+              print(json.dumps(candidate, indent=2))
+              sys.exit(0)
+
+          baseline = json.loads(Path("runs") / pinned / "metrics.json" and
+                                (Path("runs") / pinned / "metrics.json").read_text())
+          print(f"baseline: {baseline.get('accuracy')}")
+          print(f"candidate: {candidate.get('accuracy')}")
+          delta = candidate.get("accuracy", 0) - baseline.get("accuracy", 0)
+          print(f"delta: {delta:+.4f}")
+          # Fail the PR when accuracy drops more than 0.05 — tune to taste.
+          if delta < -0.05:
+              sys.exit("regression: candidate accuracy dropped beyond tolerance")
+          EOF

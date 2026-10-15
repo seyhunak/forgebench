@@ -1,0 +1,2 @@
+{"id": "EM-0006", "input": {"subject": "Weekly newsletter", "body": "Top stories this week: AI, markets, and sports."}, "expected": {"label": "ham", "confidence": 0.98, "reason": "newsletter"}}
+{"id": "EM-0007", "input": {"subject": "Buy cheap meds online", "body": "Discount pharmacy, no prescription needed."}, "expected": {"label": "spam", "confidence": 0.94, "reason": "drug spam"}}

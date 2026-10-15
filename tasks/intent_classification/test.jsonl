@@ -1,0 +1,6 @@
+{"id": "IC-0013", "input": {"utterance": "I've been overcharged on my last three statements. Please fix this.", "channel": "email"}, "expected": {"intent": "billing", "confidence": 0.94, "entities": ["overcharge", "statements"]}}
+{"id": "IC-0014", "input": {"utterance": "Two-factor authentication codes never arrive on my phone.", "channel": "chat"}, "expected": {"intent": "technical", "confidence": 0.89, "entities": ["two-factor authentication", "phone"]}}
+{"id": "IC-0015", "input": {"utterance": "I need to change my billing address to a new country.", "channel": "phone"}, "expected": {"intent": "billing", "confidence": 0.82, "entities": ["billing address"]}}
+{"id": "IC-0016", "input": {"utterance": "Please terminate my membership at the end of this billing cycle.", "channel": "email"}, "expected": {"intent": "cancellation", "confidence": 0.93, "entities": ["membership termination", "billing cycle"]}}
+{"id": "IC-0017", "input": {"utterance": "Is there a mobile app for Android devices?", "channel": "chat"}, "expected": {"intent": "general", "confidence": 0.75, "entities": ["mobile app", "Android"]}}
+{"id": "IC-0018", "input": {"utterance": "Someone changed my security question without my permission.", "channel": "phone"}, "expected": {"intent": "account", "confidence": 0.87, "entities": ["security question", "unauthorized change"]}}

@@ -1,0 +1,3 @@
+{"id": "QU-0005", "input": {"question": "Define machine learning."}, "expected": {"qtype": "definition", "requires_context": false}}
+{"id": "QU-0006", "input": {"question": "What causes rain?"}, "expected": {"qtype": "factual", "requires_context": true}}
+{"id": "QU-0007", "input": {"question": "Compare SQL and NoSQL databases."}, "expected": {"qtype": "comparison", "requires_context": true}}
