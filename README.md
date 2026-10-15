@@ -67,6 +67,18 @@ forgebench run --config configs/mistral_baseline.yaml --run-id mistral-baseline
 An exported `MISTRAL_API_KEY` in your shell still works and takes precedence
 over `.env`. Config references like `${MISTRAL_MODEL}` resolve from either.
 
+### Local dashboard (optional UI)
+
+```bash
+pip install -e ".[ui]"     # installs Streamlit once
+forgebench dashboard       # opens http://127.0.0.1:8501
+```
+
+Three tabs: **API key** (paste, save, verify, remove — same `.env` storage as
+`set-key`), **Run** (pick a config, optional case limit, live progress), and
+**Results** (single-run report or N-way comparison). The UI calls the exact
+same runner and reporting code as the CLI, so artifacts are identical.
+
 ## CLI
 
 | Command | What it does |
@@ -75,6 +87,7 @@ over `.env`. Config references like `${MISTRAL_MODEL}` resolve from either.
 | `forgebench validate-dataset NAME` | Schema, id, split, family, and class checks |
 | `forgebench run --config CFG` | Run one experiment, write all artifacts |
 | `forgebench set-key` | Save/show/clear a Mistral API key in the git-ignored `.env` |
+| `forgebench dashboard` | Local web UI: paste key, run benchmarks, compare results |
 | `forgebench compare RUN_A RUN_B` | Metric table with deltas vs. a baseline run |
 | `forgebench report RUN` | (Re)generate the Markdown report for a run |
 

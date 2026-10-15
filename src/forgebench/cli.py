@@ -12,14 +12,23 @@ Commands (each is implemented and tested before being documented):
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import typer
-from dotenv import find_dotenv, load_dotenv
 
 from . import __version__
 from .config import load_config
-from .credentials import delete_value, find_env_file, get_value, mask, set_value, source_of
+from .credentials import (
+    delete_value,
+    find_env_file,
+    get_value,
+    load_env_files,
+    mask,
+    set_value,
+    source_of,
+)
 from .providers.mistral import verify_api_key
 from .registry import default_datasets_root, list_datasets, validate_dataset
 from .reporting import load_run, render_comparison, render_report
@@ -28,9 +37,7 @@ from .schemas import PredictionRecord
 
 # CLI convenience: read the nearest .env walking up from the working directory,
 # without overriding variables already present in the environment.
-_env_file = find_dotenv(usecwd=True)
-if _env_file:
-    load_dotenv(_env_file)
+load_env_files()
 
 app = typer.Typer(
     name="forgebench",
@@ -114,6 +121,42 @@ def set_key_cmd(
         "Run a smoke test: forgebench run --config configs/mistral_baseline.yaml "
         "--limit 5 --run-id mistral-smoke"
     )
+
+
+@app.command("dashboard")
+def dashboard_cmd(
+    port: int = typer.Option(8501, "--port", min=1, max=65535, help="Port to serve on."),
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address (local only by default)."),
+    open_browser: bool = typer.Option(
+        True, "--open/--no-open", help="Open the dashboard in your default browser."
+    ),
+) -> None:
+    """Launch the local dashboard: BYOK key entry, benchmark runs, result comparison."""
+    try:
+        import streamlit  # noqa: F401, PLC0415
+    except ImportError as exc:
+        typer.echo('error: the UI extra is not installed. Run: pip install -e ".[ui]"', err=True)
+        raise typer.Exit(code=1) from exc
+
+    app_path = Path(__file__).with_name("dashboard.py")
+    command = [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(app_path),
+        "--server.port",
+        str(port),
+        "--server.address",
+        host,
+        "--server.headless",
+        "false" if open_browser else "true",
+        "--browser.gatherUsageStats",
+        "false",
+    ]
+    repo_root = Path(__file__).resolve().parents[2]
+    typer.echo(f"Starting ForgeBench dashboard at http://{host}:{port}  (Ctrl-C to stop)")
+    raise typer.Exit(code=subprocess.call(command, cwd=str(repo_root)))
 
 
 @app.command("list-datasets")

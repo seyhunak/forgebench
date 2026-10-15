@@ -1,4 +1,4 @@
-.PHONY: install test lint format data demo clean
+.PHONY: install test lint format data demo dashboard clean
 
 install:
 	python -m pip install -e ".[dev]"
@@ -22,6 +22,10 @@ demo:
 	forgebench run --config configs/baseline.yaml --run-id baseline-v1-mock
 	forgebench run --config configs/experiments/prompt_v1.yaml --run-id prompt-v1-mock
 	forgebench compare runs/baseline-v1-mock runs/prompt-v1-mock
+
+# Local web UI (BYOK key field, run launcher, results viewer).
+dashboard:
+	forgebench dashboard
 
 clean:
 	rm -rf build dist *.egg-info .pytest_cache .ruff_cache

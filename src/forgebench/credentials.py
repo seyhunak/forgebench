@@ -95,6 +95,21 @@ def source_of(name: str) -> str:
     return "not set"
 
 
+def load_env_files() -> Path | None:
+    """Load the nearest ``.env`` (working directory upward) into the environment.
+
+    Variables already present in the process environment win. Used by both the
+    CLI and the dashboard so credentials behave identically in each.
+    """
+    from dotenv import find_dotenv, load_dotenv  # local import keeps module light
+
+    path = find_dotenv(usecwd=True)
+    if path:
+        load_dotenv(path)
+        return Path(path)
+    return None
+
+
 def get_value(name: str) -> str | None:
     """Environment first, then the nearest ``.env``."""
     value = os.environ.get(name)
