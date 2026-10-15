@@ -1,0 +1,35 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check src tests scripts examples
+      - name: Format check
+        run: ruff format --check src tests scripts examples
+      - name: Test (offline; mock provider only)
+        run: pytest
+      - name: Dataset must be reproducible
+        run: |
+          python scripts/generate_dataset.py --seed 42 --train 100 --dev 40 --test 60 --out /tmp/regen
+          diff -r datasets/finance_v1 /tmp/regen
+      - name: End-to-end demo
+        run: |
+          forgebench run --config configs/baseline.yaml --run-id ci-baseline
+          forgebench run --config configs/experiments/prompt_v1.yaml --run-id ci-prompt
+          forgebench compare runs/ci-baseline runs/ci-prompt

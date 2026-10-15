@@ -1,0 +1,36 @@
+# Prompt-variant experiment (mock provider).
+#
+# Same pipeline as baseline with a lower simulated defect rate, so
+# `forgebench compare` has two honest-looking, fully offline runs to diff.
+# With a real provider this is where you would put the improved system prompt:
+#
+#   prompt:
+#     system: |
+#       <your improved instructions>
+experiment:
+  name: prompt-v1
+  dataset: finance_v1
+  dataset_version: "1.0.0"
+  split: test
+
+provider:
+  name: mock
+  model: rule-mock-v1
+  options:
+    defect_rate: 0.04
+    invalid_rate: 0.0
+
+inference:
+  temperature: 0
+  max_retries: 2
+  timeout_seconds: 30
+
+evaluation:
+  metrics:
+    - accuracy
+    - macro_f1
+    - critical_false_match_rate
+    - escalation_recall
+    - schema_validity
+    - latency
+    - estimated_cost

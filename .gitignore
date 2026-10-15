@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Secrets and local env
+.env
+*.key
+
+# Run artifacts: raw model outputs can be large; keep them out of Git by default.
+# Delete this line if you want to commit reference runs.
+runs/
+
+# OS
+.DS_Store

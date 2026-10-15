@@ -1,0 +1,33 @@
+# Reference baseline for the mock provider.
+#
+# The mock is a deterministic rule engine, not a model. defect_rate/invalid_rate
+# inject seeded imperfections so the validity metrics and the comparison
+# workflow are demonstrable offline. Numbers from this config validate the
+# pipeline; they say nothing about model quality.
+experiment:
+  name: baseline
+  dataset: finance_v1
+  dataset_version: "1.0.0"
+  split: test
+
+provider:
+  name: mock
+  model: rule-mock-v1
+  options:
+    defect_rate: 0.10
+    invalid_rate: 0.05
+
+inference:
+  temperature: 0
+  max_retries: 2
+  timeout_seconds: 30
+
+evaluation:
+  metrics:
+    - accuracy
+    - macro_f1
+    - critical_false_match_rate
+    - escalation_recall
+    - schema_validity
+    - latency
+    - estimated_cost

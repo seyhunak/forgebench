@@ -1,0 +1,33 @@
+# Baseline run against a real Mistral model.
+#
+# Requires credentials, kept outside the repository:
+#   export MISTRAL_API_KEY="..."
+#   export MISTRAL_MODEL="open-mistral-7b"   # verify current models + license first
+#
+# Start with a smoke test before the full run:
+#   forgebench run --config configs/mistral_baseline.yaml --limit 5 --run-id mistral-smoke
+experiment:
+  name: mistral-baseline
+  dataset: finance_v1
+  dataset_version: "1.0.0"
+  split: test
+
+provider:
+  name: mistral
+  model: "${MISTRAL_MODEL}"
+
+inference:
+  temperature: 0
+  max_retries: 2
+  timeout_seconds: 30
+  max_tokens: 1024
+
+evaluation:
+  metrics:
+    - accuracy
+    - macro_f1
+    - critical_false_match_rate
+    - escalation_recall
+    - schema_validity
+    - latency
+    - estimated_cost
