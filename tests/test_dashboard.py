@@ -73,7 +73,7 @@ def test_streamlit_is_optional_at_import_time() -> None:
     assert result.returncode == 0, result.stderr
 
 
-def test_dashboard_command_fails_helpfully_without_streamlit(
+def test_dashboard_command_fails_helpfully_without_ui_deps(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from typer.testing import CliRunner
@@ -83,8 +83,8 @@ def test_dashboard_command_fails_helpfully_without_streamlit(
     real_import = __import__
 
     def fake_import(name: str, *args, **kwargs):
-        if name == "streamlit":
-            raise ImportError("streamlit disabled for test")
+        if name == "uvicorn":
+            raise ImportError("uvicorn disabled for test")
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr("builtins.__import__", fake_import)
