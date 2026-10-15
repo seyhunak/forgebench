@@ -1,0 +1,876 @@
+/* ForgeBench · Hallmark UI · frontend logic */
+
+const API = "";
+
+// ---------- Error handling ----------
+window.onerror = function(msg, url, line, col, error) {
+  const extra = !error ? '' : '\n\nStack: ' + (error.stack || '').substring(0, 500);
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;top:1rem;left:1rem;right:1rem;background:#dc2626;color:#fff;padding:1rem;border-radius:6px;z-index:9999;font-family:monospace;font-size:0.875rem;';
+  div.innerHTML = '<strong>ForgeBench JS Error:</strong> ' + msg + '<br>' + url + ':' + line + ':' + col + '<br><small>' + extra + '</small>';
+  document.body.insertBefore(div, document.body.firstChild);
+  console.error('JS Error:', msg, url, line, col, error);
+  return false;
+};
+
+
+// Global cache for models.dev data
+let modelsData = null;
+let theme = localStorage.getItem("fb-theme") || "dark";
+
+// DOM elements
+const els = {
+  keyProvider: document.getElementById("key-provider"),
+  keyInput: document.getElementById("key-input"),
+  modelSelect: document.getElementById("model-select"),
+  modelDetails: document.getElementById("model-details"),
+  btnSaveKey: document.getElementById("btn-save-key"),
+  btnVerifyKey: document.getElementById("btn-verify-key"),
+  btnRemoveKey: document.getElementById("btn-remove-key"),
+  keyMessage: document.getElementById("key-message"),
+  statusKey: document.getElementById("status-key"),
+  statusSource: document.getElementById("status-source"),
+  statusModel: document.getElementById("status-model"),
+  statusFile: document.getElementById("status-file"),
+  configSelect: document.getElementById("config-select"),
+  runLimit: document.getElementById("run-limit"),
+  runId: document.getElementById("run-id"),
+  btnRun: document.getElementById("btn-run"),
+  runMessage: document.getElementById("run-message"),
+  runProgress: document.getElementById("run-progress"),
+  progressText: document.getElementById("progress-text"),
+  progressCounter: document.getElementById("progress-counter"),
+  progressFill: document.getElementById("progress-fill"),
+  runResult: document.getElementById("run-result"),
+  resRunId: document.getElementById("res-run-id"),
+  resAccuracy: document.getElementById("res-accuracy"),
+  resMacroF1: document.getElementById("res-macro-f1"),
+  resSchemaValidity: document.getElementById("res-schema-validity"),
+  btnOpenRun: document.getElementById("btn-open-run"),
+  runsGrid: document.getElementById("runs-grid"),
+  runReportView: document.getElementById("run-report-view"),
+  btnBackToRuns: document.getElementById("btn-back-to-runs"),
+  runReportContent: document.getElementById("run-report-content"),
+  btnDownloadReport: document.getElementById("btn-download-report"),
+  btnViewPredictions: document.getElementById("btn-view-predictions"),
+  modeSingle: document.getElementById("mode-single"),
+  modeCompare: document.getElementById("mode-compare"),
+  singleView: document.getElementById("single-view"),
+  compareView: document.getElementById("compare-view"),
+  compareSelect: document.getElementById("compare-select"),
+  btnCompare: document.getElementById("btn-compare"),
+  compareViewContainer: document.getElementById("compare-view-container"),
+  btnThemeToggle: document.getElementById("btn-theme-toggle"),
+  // Dataset panel
+  datasetSelect: document.getElementById("dataset-select"),
+  datasetSplit: document.getElementById("dataset-split"),
+  datasetInfo: document.getElementById("dataset-info"),
+  datasetCasesContainer: document.getElementById("dataset-cases-container"),
+  datasetTableBody: document.getElementById("dataset-table-body"),
+  btnDownloadDataset: document.getElementById("btn-download-dataset"),
+  datasetMessage: document.getElementById("dataset-message"),
+  // Config panel
+  configEditorSelect: document.getElementById("config-editor-select"),
+  configEditor: document.getElementById("config-editor"),
+  configEditorLoading: document.getElementById("config-editor-loading"),
+  btnSaveConfig: document.getElementById("btn-save-config"),
+  btnResetConfig: document.getElementById("btn-reset-config"),
+  configMessage: document.getElementById("config-message"),
+  // Run predictions view
+  runPredictionsView: document.getElementById("run-predictions-view"),
+  btnBackToReport: document.getElementById("btn-back-to-report"),
+  btnDownloadPredictions: document.getElementById("btn-download-predictions"),
+};
+
+// ---------- Theme ----------
+
+function applyTheme() {
+  if (theme === "light") {
+    document.documentElement.classList.add("theme-light");
+    els.btnThemeToggle.textContent = "☀️";
+  } else {
+    document.documentElement.classList.remove("theme-light");
+    els.btnThemeToggle.textContent = "🌙";
+  }
+}
+
+els.btnThemeToggle.addEventListener("click", () => {
+  theme = theme === "dark" ? "light" : "dark";
+  localStorage.setItem("fb-theme", theme);
+  applyTheme();
+});
+
+// ---------- Helpers ----------
+
+
+function safeInnerHTML(el, html) {
+  if (!el) return;
+  el.innerHTML = html;
+}
+
+function safeText(el, text) {
+  if (!el) return;
+  el.textContent = text;
+}
+
+function show(el, cls = "") {
+  el.style.display = "";
+  el.className = el.className.replace(/\bmessage--\w+\b/g, "").trim();
+  if (cls) el.classList.add(cls);
+  el.classList.remove("hidden");
+}
+
+function hide(el) {
+  el.classList.add("hidden");
+}
+
+function setMessage(el, text, type = "info") {
+  el.textContent = text;
+  el.className = `message message--${type}`;
+  show(el);
+}
+
+async function fetchJSON(path, opts = {}) {
+  const res = await fetch(`${API}${path}`, {
+    headers: { "Content-Type": "application/json", ...opts.headers },
+    ...opts,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+function escapeHtml(text) {
+  if (!text) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ---------- Providers & Models (from models.dev) ----------
+
+async function loadProvidersAndModels() {
+  try {
+    const [providers, models] = await Promise.all([
+      fetchJSON("/api/providers"),
+      fetchJSON("/api/models"),
+    ]);
+    modelsData = models;
+
+    const providerList = [
+      { id: "mock", name: "Mock", env: [], models: { "rule-mock-v1": { id: "rule-mock-v1", name: "Rule Mock v1" } } },
+      ...providers.map(p => ({ ...p, models: (modelsData[p.id] && modelsData[p.id].models) || {} })),
+    ];
+
+    safeInnerHTML(els.keyProvider, providerList
+      .map(p => `<option value="${p.id}">${p.name}</option>`)
+      .join(""));
+
+    populateModels(providerList[0].id);
+  } catch (err) {
+    setMessage(els.keyMessage, `Failed to load providers: ${err.message}`, "error");
+  }
+}
+
+function populateModels(providerId) {
+  const provider = modelsData ? modelsData[providerId] : null;
+  let models = {};
+
+  if (providerId === "mock") {
+    models = { "rule-mock-v1": { id: "rule-mock-v1", name: "Rule Mock v1" } };
+  } else if (provider) {
+    models = provider.models || {};
+  }
+
+  safeInnerHTML(els.modelSelect, Object.values(models)
+    .map(m => `<option value="${m.id}">${m.name || m.id}</option>`)
+    .join(""));
+
+  showModelDetails(providerId, els.modelSelect.value);
+}
+
+function showModelDetails(providerId, modelId) {
+  const details = document.getElementById("model-details");
+  if (!details) return;
+
+  let model = null;
+  let provider = null;
+
+  if (providerId === "mock") {
+    model = { id: "rule-mock-v1", name: "Rule Mock v1", cost: { input: 0, output: 0 } };
+    provider = { name: "Mock", env: [] };
+  } else if (modelsData && modelsData[providerId]) {
+    provider = modelsData[providerId];
+    model = provider.models && provider.models[modelId];
+  }
+
+  if (!model) {
+    details.innerHTML = "<p>No model details available.</p>";
+    return;
+  }
+
+  const cost = model.cost || {};
+  const limit = model.limit || {};
+  const modalities = model.modalities || {};
+
+  details.innerHTML = `
+    <p><strong>Provider:</strong> ${provider ? provider.name : "Mock"}</p>
+    <p><strong>Model ID:</strong> <code>${model.id}</code></p>
+    ${model.description ? `<p>${model.description}</p>` : ""}
+    <div class="price-row">
+      <div class="price-item"><span class="label">Input</span><br>$${(cost.input || 0).toFixed(2)}/M</div>
+      <div class="price-item"><span class="label">Output</span><br>$${(cost.output || 0).toFixed(2)}/M</div>
+      ${cost.cache_read != null ? `<div class="price-item"><span class="label">Cache Read</span><br>$${cost.cache_read.toFixed(2)}/M</div>` : ""}
+    </div>
+    <p><strong>Context:</strong> ${limit.context ? limit.context.toLocaleString() : "N/A"} tokens</p>
+    <p><strong>Max Output:</strong> ${limit.output ? limit.output.toLocaleString() : "N/A"} tokens</p>
+    <p><strong>Modalities:</strong> ${(modalities.input || []).join(", ")} → ${(modalities.output || []).join(", ")}</p>
+    ${model.reasoning ? "<p><strong>Reasoning:</strong> Yes</p>" : ""}
+    ${model.tool_call ? "<p><strong>Tool Calling:</strong> Yes</p>" : ""}
+    ${model.structured_output ? "<p><strong>Structured Output:</strong> Yes</p>" : ""}
+  `;
+}
+
+// ---------- Credentials ----------
+
+async function loadCredentialStatus() {
+  try {
+    const data = await fetchJSON("/api/credentials");
+    els.statusKey.textContent = data.key_masked || "(not set)";
+    els.statusSource.textContent = data.source || "—";
+    els.statusModel.textContent = data.model || "(not set)";
+    els.statusFile.textContent = data.env_file || "—";
+
+    const source = data.source || "";
+    if (source.includes("OPENAI")) els.keyProvider.value = "openai";
+    else if (source.includes("ANTHROPIC")) els.keyProvider.value = "anthropic";
+    else if (source.includes("GOOGLE")) els.keyProvider.value = "google";
+    else if (source.includes("MISTRAL")) els.keyProvider.value = "mistral";
+    populateModels(els.keyProvider.value);
+  } catch (err) {
+    setMessage(els.keyMessage, `Failed to load status: ${err.message}`, "error");
+  }
+}
+
+els.keyProvider.addEventListener("change", () => {
+  populateModels(els.keyProvider.value);
+});
+
+els.modelSelect.addEventListener("change", () => {
+  showModelDetails(els.keyProvider.value, els.modelSelect.value);
+});
+
+els.btnSaveKey.addEventListener("click", async () => {
+  const provider = els.keyProvider.value;
+  const key = els.keyInput.value.trim();
+  const model = els.modelSelect.value.trim();
+  if (!key) {
+    setMessage(els.keyMessage, "Paste a key first.", "error");
+    return;
+  }
+  try {
+    await fetchJSON("/api/credentials", {
+      method: "POST",
+      body: JSON.stringify({ key, model: model || undefined, provider }),
+    });
+    setMessage(els.keyMessage, "Saved to .env (chmod 600).", "ok");
+    els.keyInput.value = "";
+    await loadCredentialStatus();
+    dlog('Credential status loaded');
+  } catch (err) {
+    setMessage(els.keyMessage, `Save failed: ${err.message}`, "error");
+  }
+});
+
+els.btnVerifyKey.addEventListener("click", async () => {
+  const provider = els.keyProvider.value;
+  try {
+    const data = await fetchJSON("/api/credentials/verify", {
+      method: "POST",
+      body: JSON.stringify({ provider }),
+    });
+    if (data.accepted === true) {
+      setMessage(els.keyMessage, `Key OK — ${data.detail}`, "ok");
+    } else if (data.accepted === false) {
+      setMessage(els.keyMessage, `Key rejected — ${data.detail}`, "error");
+    } else {
+      setMessage(els.keyMessage, `Could not verify — ${data.detail}`, "info");
+    }
+  } catch (err) {
+    setMessage(els.keyMessage, `Verify failed: ${err.message}`, "error");
+  }
+});
+
+els.btnRemoveKey.addEventListener("click", async () => {
+  try {
+    await fetchJSON("/api/credentials", { method: "DELETE" });
+    setMessage(els.keyMessage, "Key removed.", "ok");
+    await loadCredentialStatus();
+    dlog('Credential status loaded');
+  } catch (err) {
+    setMessage(els.keyMessage, `Remove failed: ${err.message}`, "error");
+  }
+});
+
+// ---------- Configs ----------
+
+async function loadConfigs() {
+  try {
+    const configs = await fetchJSON("/api/configs");
+    safeInnerHTML(els.configSelect, configs.map(c => `<option value="${c.path}">${c.name}</option>`).join(""));
+    safeInnerHTML(els.configEditorSelect, configs.map(c => `<option value="${c.path}">${c.name}</option>`).join(""));
+  } catch (err) {
+    setMessage(els.runMessage, `Failed to load configs: ${err.message}`, "error");
+  }
+}
+
+// ---------- Datasets ----------
+
+async function loadDatasets() {
+  try {
+    const datasets = await fetchJSON("/api/datasets");
+    safeInnerHTML(els.datasetSelect, datasets.map(d => `<option value="${d}">${d}</option>`).join(""));
+    if (datasets.length > 0) {
+      await loadDatasetDetails(datasets[0], "test");
+    }
+  } catch (err) {
+    setMessage(els.datasetMessage, `Failed to load datasets: ${err.message}`, "error");
+  }
+}
+
+els.datasetSelect.addEventListener("change", () => {
+  loadDatasetDetails(els.datasetSelect.value, els.datasetSplit.value);
+});
+
+els.datasetSplit.addEventListener("change", () => {
+  loadDatasetDetails(els.datasetSelect.value, els.datasetSplit.value);
+});
+
+async function loadDatasetDetails(name, split) {
+  try {
+    hide(els.datasetCasesContainer);
+    hide(els.datasetMessage);
+
+    const [info, splitData] = await Promise.all([
+      fetchJSON(`/api/datasets/${name}`),
+      fetchJSON(`/api/datasets/${name}/splits/${split}`),
+    ]);
+
+    // Show info
+    safeInnerHTML(els.datasetInfo,  `
+      <h3>${escapeHtml(info.name)}</h3>
+      <p><strong>Version:</strong> ${escapeHtml(info.version)} &nbsp;|&nbsp; <strong>Task:</strong> ${escapeHtml(info.task)} &nbsp;|&nbsp; <strong>License:</strong> ${escapeHtml(info.license)}</p>
+      <p><strong>Families:</strong> ${info.families.map(f => `<span style="background:var(--bg-input);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.75rem;border:1px solid var(--border);">${escapeHtml(f)}</span>`).join(" ")}</p>
+      <p><strong>Splits:</strong> ${Object.entries(info.splits).map(([s, c]) => `${escapeHtml(s)}: ${c}`).join(", ")}</p>
+    `);
+
+    // Show cases table
+    const cases = splitData.cases || [];
+    safeInnerHTML(els.datasetTableBody,  cases.map(c => {
+      const input = c.input || {};
+      return `
+        <tr>
+          <td class="code-mono">${escapeHtml(c.id)}</td>
+          <td>${escapeHtml(c.scenario_family || "—")}</td>
+          <td><span style="background:var(--bg-input);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.75rem;border:1px solid var(--border);">${escapeHtml(c.expected?.category || "—")}</span></td>
+          <td class="code-mono">${escapeHtml(input.bank_amount || "—")}</td>
+          <td class="code-mono">${escapeHtml(input.ledger_amount || "—")}</td>
+          <td class="code-mono">${escapeHtml(input.bank_reference || "—")}</td>
+          <td class="code-mono">${escapeHtml(input.ledger_reference || "—")}</td>
+          <td class="code-mono">${escapeHtml(input.bank_date || "—")}</td>
+          <td class="code-mono">${escapeHtml(input.ledger_date || "—")}</td>
+        </tr>
+      `;
+    }).join(""));
+
+    show(els.datasetCasesContainer);
+    els.btnDownloadDataset.onclick = () => {
+      const blob = new Blob([JSON.stringify(splitData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${name}-${split}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  } catch (err) {
+    setMessage(els.datasetMessage, `Failed to load dataset: ${err.message}`, "error");
+  }
+}
+
+// ---------- Config Editor ----------
+
+let currentConfigPath = null;
+let currentConfigContent = null;
+
+els.configEditorSelect.addEventListener("change", async () => {
+  currentConfigPath = els.configEditorSelect.value;
+  await loadConfigEditor(currentConfigPath);
+});
+
+async function loadConfigEditor(path) {
+  if (!path) return;
+  show(els.configEditorLoading);
+  hide(els.configEditor);
+  hide(els.configMessage);
+
+  try {
+    const data = await fetchJSON(`/api/configs/${path}`);
+    currentConfigContent = JSON.stringify(data, null, 2);
+    els.configEditor.value = currentConfigContent;
+    hide(els.configEditorLoading);
+    show(els.configEditor);
+  } catch (err) {
+    hide(els.configEditorLoading);
+    setMessage(els.configMessage, `Failed to load config: ${err.message}`, "error");
+  }
+}
+
+els.btnResetConfig.addEventListener("click", () => {
+  if (currentConfigContent !== null) {
+    els.configEditor.value = currentConfigContent;
+    setMessage(els.configMessage, "Reset to original.", "info");
+  }
+});
+
+els.btnSaveConfig.addEventListener("click", async () => {
+  if (!currentConfigPath) return;
+  try {
+    const payload = JSON.parse(els.configEditor.value);
+    await fetchJSON(`/api/configs/${currentConfigPath}`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    currentConfigContent = els.configEditor.value;
+    setMessage(els.configMessage, "Config saved successfully.", "ok");
+    await loadConfigs();
+    dlog('Configs loaded');
+  } catch (err) {
+    setMessage(els.configMessage, `Save failed: ${err.message}`, "error");
+  }
+});
+
+// ---------- Runs (card-based UI) ----------
+
+async function loadRuns() {
+  try {
+    const runs = await fetchJSON("/api/runs");
+    renderRunsGrid(runs);
+    populateCompareSelect(runs);
+  } catch (err) {
+    console.error("Failed to load runs:", err);
+  }
+}
+
+function renderRunsGrid(runs) {
+  if (!runs || runs.length === 0) {
+    safeInnerHTML(els.runsGrid, `<p style="color: var(--fg-muted); grid-column: 1/-1; text-align:center; padding: 2rem;">No runs yet. Start one in the <strong>Run</strong> tab.</p>`);
+    return;
+  }
+
+  safeInnerHTML(els.runsGrid,  runs.map(run => {
+    const m = run.metrics || {};
+    const acc = m.accuracy != null ? (m.accuracy * 100).toFixed(1) : "—";
+    const f1 = m.macro_f1 != null ? (m.macro_f1 * 100).toFixed(1) : "—";
+    const valid = m.schema_validity != null ? (m.schema_validity * 100).toFixed(1) : "—";
+    const provider = run.provider || {};
+    const dataset = run.dataset || {};
+
+    return `
+      <article class="run-card" onclick="viewRunReport('${escapeHtml(run.path)}')">
+        <div class="run-card--actions">
+          <button class="btn-delete-run" title="Delete run" onclick="event.stopPropagation(); deleteRun('${escapeHtml(run.path)}')">🗑️</button>
+        </div>
+        <div class="run-card--header">
+          <div class="run-card--id">${escapeHtml(run.run_id)}</div>
+          <span style="font-size:0.75rem;color:var(--fg-muted);">${escapeHtml(provider.name || 'unknown')}</span>
+        </div>
+        <div class="run-card--meta">
+          <div>${escapeHtml(provider.model || 'unknown')}</div>
+          <div>${escapeHtml(dataset.name || 'unknown')} v${escapeHtml(dataset.version || '?')}</div>
+          <div>${run.created_at || '—'}</div>
+        </div>
+        <div class="run-card--metrics">
+          <div class="metric-item"><div class="metric-item--value">${acc}</div><div class="metric-item--label">Accuracy</div></div>
+          <div class="metric-item"><div class="metric-item--value">${f1}</div><div class="metric-item--label">Macro-F1</div></div>
+          <div class="metric-item"><div class="metric-item--value">${valid}</div><div class="metric-item--label">Schema Valid</div></div>
+        </div>
+      </article>
+    `;
+  }).join(""));
+}
+
+window.deleteRun = async (runPath) => {
+  if (!confirm(`Delete run "${escapeHtml(runPath)}"? This cannot be undone.`)) return;
+  try {
+    await fetchJSON(`/api/runs/${runPath}`, { method: "DELETE" });
+    setMessage(els.runMessage, "Run deleted.", "ok");
+    await loadRuns();
+    dlog('Runs loaded');
+  } catch (err) {
+    setMessage(els.runMessage, `Delete failed: ${err.message}`, "error");
+  }
+};
+
+function populateCompareSelect(runs) {
+  safeInnerHTML(els.compareSelect, runs.map(r => `<option value="${r.path}">${r.run_id}</option>`).join(""));
+}
+
+window.viewRunReport = async (runPath) => {
+  try {
+    const data = await fetchJSON(`/api/runs/${runPath}/report`);
+    els.runReportContent.textContent = data.markdown;
+    hide(els.runsGrid);
+    show(els.runReportView);
+    els.btnDownloadReport.onclick = () => {
+      const blob = new Blob([data.markdown], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${runPath.replace(/\//g, "-")}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  } catch (err) {
+    setMessage(els.runMessage, `Failed to load report: ${err.message}`, "error");
+  }
+};
+
+els.btnBackToRuns.addEventListener("click", () => {
+  hide(els.runReportView);
+  show(els.runsGrid);
+});
+
+// ---------- Predictions viewer ----------
+
+els.btnViewPredictions.addEventListener("click", async () => {
+  const runPath = els.btnOpenRun.onclick.toString().match(/\/api\/runs\/([^\/]+)\/report/);
+  if (!runPath) return;
+  try {
+    hide(els.runReportView);
+    const data = await fetchJSON(`/api/runs/${runPath[1]}/predictions`);
+    renderPredictionsTable(data);
+    show(els.runPredictionsView);
+  } catch (err) {
+    setMessage(els.runMessage, `Failed to load predictions: ${err.message}`, "error");
+    show(els.runReportView);
+  }
+});
+
+els.btnBackToReport.addEventListener("click", () => {
+  hide(els.runPredictionsView);
+  show(els.runReportView);
+});
+
+els.btnDownloadPredictions.addEventListener("click", async () => {
+  const runPath = els.btnOpenRun.onclick.toString().match(/\/api\/runs\/([^\/]+)\/report/);
+  if (!runPath) return;
+  try {
+    const data = await fetchJSON(`/api/runs/${runPath[1]}/predictions`);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${runPath[1].replace(/\//g, "-")}-predictions.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    setMessage(els.runMessage, `Download failed: ${err.message}`, "error");
+  }
+});
+
+function renderPredictionsTable(records) {
+  const container = document.getElementById("run-predictions-content");
+  if (!records || records.length === 0) {
+    container.innerHTML = `<p style="color: var(--fg-muted); text-align:center; padding: 2rem;">No predictions found.</p>`;
+    return;
+  }
+
+  let html = `<table class="data-table">
+    <thead>
+      <tr>
+        <th>Case ID</th>
+        <th>Family</th>
+        <th>Expected</th>
+        <th>Predicted</th>
+        <th>Correct</th>
+        <th>OK</th>
+        <th>Latency</th>
+        <th>Error</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  for (const r of records) {
+    const correct = r.correct === true ? "✅" : r.correct === false ? "❌" : "—";
+    const ok = r.ok === true ? "✅" : "❌";
+    const error = r.error_kind || "—";
+    html += `
+      <tr>
+        <td class="code-mono">${escapeHtml(r.case_id)}</td>
+        <td>${escapeHtml(r.scenario_family || "—")}</td>
+        <td>${escapeHtml(r.expected_category || "—")}</td>
+        <td>${escapeHtml(r.category || "—")}</td>
+        <td>${correct}</td>
+        <td>${ok}</td>
+        <td class="code-mono">${r.latency_ms != null ? r.latency_ms.toFixed(1) + " ms" : "—"}</td>
+        <td class="code-mono" style="color: var(--danger);">${escapeHtml(error)}</td>
+      </tr>
+    `;
+  }
+
+  html += `    </tbody>
+  </table>`;
+  container.innerHTML = html;
+}
+
+// ---------- Run ----------
+
+let progressInterval = null;
+
+els.btnRun.addEventListener("click", async () => {
+  const config = els.configSelect.value;
+  const limit = parseInt(els.runLimit.value, 10) || undefined;
+  const runId = els.runId.value.trim() || undefined;
+
+  if (!config) {
+    setMessage(els.runMessage, "Select a config first.", "error");
+    return;
+  }
+
+  try {
+    hide(els.runResult);
+    hide(els.runProgress);
+    hide(els.runMessage);
+    els.btnRun.disabled = true;
+    els.btnRun.textContent = "Running…";
+
+    const data = await fetchJSON("/api/run", {
+      method: "POST",
+      body: JSON.stringify({ config, limit, run_id: runId }),
+    });
+
+    const runIdRes = data.run_id;
+    show(els.runProgress);
+    els.progressText.textContent = "Starting…";
+    els.progressCounter.textContent = "0 / 0";
+    els.progressFill.style.width = "0%";
+
+    progressInterval = setInterval(async () => {
+      try {
+        const state = await fetchJSON(`/api/run/${runIdRes}/progress`);
+        els.progressText.textContent = state.status === "running" ? "Running…" : "Processing…";
+        const p = state.progress;
+        if (p && p.total > 0) {
+          els.progressCounter.textContent = `${p.done} / ${p.total}`;
+          els.progressFill.style.width = `${(p.done / p.total) * 100}%`;
+        }
+        if (state.status === "done") {
+          clearInterval(progressInterval);
+          hide(els.runProgress);
+          showRunResult(state.result);
+          els.btnRun.disabled = false;
+          els.btnRun.textContent = "Run benchmark";
+          await loadRuns();
+    dlog('Runs loaded');
+        } else if (state.status === "error") {
+          clearInterval(progressInterval);
+          hide(els.runProgress);
+          setMessage(els.runMessage, `Run failed: ${state.error}`, "error");
+          els.btnRun.disabled = false;
+          els.btnRun.textContent = "Run benchmark";
+        }
+      } catch (err) {
+        // ignore polling errors
+      }
+    }, 1000);
+  } catch (err) {
+    setMessage(els.runMessage, `Run failed: ${err.message}`, "error");
+    els.btnRun.disabled = false;
+    els.btnRun.textContent = "Run benchmark";
+  }
+});
+
+function showRunResult(result) {
+  show(els.runResult);
+  els.resRunId.textContent = result.run_id;
+  const m = result.metrics || {};
+  els.resAccuracy.textContent = m.accuracy != null ? (m.accuracy * 100).toFixed(1) + "%" : "—";
+  els.resMacroF1.textContent = m.macro_f1 != null ? (m.macro_f1 * 100).toFixed(1) + "%" : "—";
+  els.resSchemaValidity.textContent = m.schema_validity != null ? (m.schema_validity * 100).toFixed(1) + "%" : "—";
+  els.btnOpenRun.onclick = () => {
+    window.location.href = `/api/runs/${result.run_id}/report`;
+  };
+}
+
+// ---------- Mode toggle ----------
+
+els.modeSingle.addEventListener("click", () => {
+  els.modeSingle.classList.add("mode-button--active");
+  els.modeCompare.classList.remove("mode-button--active");
+  els.singleView.style.display = "";
+  els.compareView.style.display = "none";
+});
+
+els.modeCompare.addEventListener("click", () => {
+  els.modeCompare.classList.add("mode-button--active");
+  els.modeSingle.classList.remove("mode-button--active");
+  els.singleView.style.display = "none";
+  els.compareView.style.display = "";
+});
+
+// ---------- Compare (HTML table) ----------
+
+els.btnCompare.addEventListener("click", async () => {
+  const selected = Array.from(els.compareSelect.selectedOptions).map(o => o.value);
+  if (selected.length < 2) {
+    setMessage(els.compareViewContainer.parentElement, "Select at least two runs to compare.", "error");
+    return;
+  }
+  try {
+    const data = await fetchJSON("/api/compare/structured", {
+      method: "POST",
+      body: JSON.stringify({ run_dirs: selected }),
+    });
+    renderComparisonTable(data);
+    show(els.compareViewContainer);
+  } catch (err) {
+    setMessage(els.compareViewContainer.parentElement, `Compare failed: ${err.message}`, "error");
+  }
+});
+
+function renderComparisonTable(data) {
+  const runs = data.runs;
+  const metricRows = data.metric_rows;
+
+  let html = `
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th class="comparison-table--run-col">Metric</th>
+          ${runs.map(r => `<th>${escapeHtml(r.run_id)}</th>`).join("")}
+          <th class="comparison-table--delta-col">Δ vs baseline</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  for (const row of metricRows) {
+    const deltaClass = row.delta > 0 ? "delta-positive" : row.delta < 0 ? "delta-negative" : "delta-neutral";
+    const deltaSign = row.delta > 0 ? "+" : row.delta < 0 ? "" : "";
+    html += `<tr><td><strong>${escapeHtml(row.label)}</strong></td>`;
+    for (const val of row.values) {
+      html += `<td>${val}</td>`;
+    }
+    html += `<td class="${deltaClass}">${deltaSign}${row.delta}</td></tr>`;
+  }
+
+  html += `      </tbody>
+    </table>
+
+    <div style="margin-top: 1rem;">
+      <h4 style="margin-bottom: 0.5rem;">Runs</h4>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Provider / Model</th>
+            <th>Dataset</th>
+            <th>Cases</th>
+            <th>Valid</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${runs.map(r => `
+            <tr>
+              <td class="comparison-table--run-col">${escapeHtml(r.run_id)}</td>
+              <td>${escapeHtml(r.provider_name)} / <code>${escapeHtml(r.provider_model)}</code></td>
+              <td>${escapeHtml(r.dataset_name)} v${escapeHtml(r.dataset_version)}</td>
+              <td>${r.n_cases}</td>
+              <td>${r.n_valid}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="comparison-download">
+      <button class="button button--quiet" onclick="downloadComparison('${runs.map(r => r.path).join(",")}')">Download Markdown</button>
+    </div>
+  `;
+
+  safeInnerHTML(els.compareViewContainer, html);
+}
+
+window.downloadComparison = async (runDirs) => {
+  try {
+    const data = await fetchJSON("/api/compare", {
+      method: "POST",
+      body: JSON.stringify({ run_dirs: runDirs.split(",") }),
+    });
+    const blob = new Blob([data.markdown], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "comparison.md";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    setMessage(els.compareViewContainer.parentElement, `Download failed: ${err.message}`, "error");
+  }
+};
+
+// ---------- Init ----------
+
+async function init() {
+  try {
+    // Debug overlay
+    const debug = document.createElement('div');
+    debug.id = 'fb-debug';
+    debug.style.cssText = 'position:fixed;bottom:1rem;left:1rem;right:1rem;background:#1e293b;color:#e2e8f0;padding:0.75rem;border-radius:6px;z-index:9999;font-family:monospace;font-size:0.75rem;max-height:200px;overflow-y:auto;border:1px solid #334155;';
+    debug.innerHTML = '<strong style="display:flex;justify-content:space-between;align-items:center;"><span>🔧 ForgeBench Debug</span><button onclick="document.getElementById(\'fb-debug\').remove()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:0.75rem;padding:0 0.25rem;">×</button></strong><br>';
+    document.body.appendChild(debug);
+    function dlog(msg) { debug.innerHTML += '<br>▸ ' + msg; console.log('[FB]', msg); }
+
+    dlog('DOM validation starting...');
+    // Verify critical DOM elements exist
+    const critical = ['key-provider', 'key-input', 'model-select', 'model-details',
+      'btn-save-key', 'btn-verify-key', 'btn-remove-key', 'key-message',
+      'config-select', 'run-limit', 'run-id', 'btn-run', 'run-message',
+      'runs-grid', 'run-report-view', 'btn-back-to-runs', 'run-report-content',
+      'mode-single', 'mode-compare', 'single-view', 'compare-view',
+      'compare-select', 'btn-compare', 'compare-view-container',
+      'dataset-select', 'dataset-split', 'dataset-info', 'dataset-cases-container',
+      'dataset-table-body', 'btn-download-dataset', 'dataset-message',
+      'config-editor-select', 'config-editor', 'config-editor-loading',
+      'btn-save-config', 'btn-reset-config', 'config-message',
+      'btn-theme-toggle', 'btn-download-report', 'btn-view-predictions'];
+    const missing = critical.filter(id => !document.getElementById(id));
+    if (missing.length > 0) {
+      throw new Error('Missing DOM elements: ' + missing.join(', '));
+    }
+
+    applyTheme();
+    dlog('Theme applied');
+    await loadProvidersAndModels();
+    dlog('Providers and models loaded');
+    await loadCredentialStatus();
+    dlog('Credential status loaded');
+    await loadConfigs();
+    dlog('Configs loaded');
+    await loadDatasets();
+    dlog('Datasets loaded');
+    await loadRuns();
+    dlog('Runs loaded');
+  } catch (err) {
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'position:fixed;top:1rem;left:1rem;right:1rem;background:#dc2626;color:#fff;padding:1rem;border-radius:6px;z-index:9999;font-family:monospace;font-size:0.875rem;';
+    errEl.innerHTML = '<strong>ForgeBench Error:</strong> ' + err.message + '<br><small>' + (err.stack || '').substring(0, 300) + '</small>';
+    document.body.insertBefore(errEl, document.body.firstChild);
+    console.error('Init failed:', err);
+  }
+}
+
+init();

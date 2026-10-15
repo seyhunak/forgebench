@@ -9,6 +9,16 @@ Launch with ``forgebench dashboard`` (or ``streamlit run`` on this file).
 
 from __future__ import annotations
 
+if __package__ in (None, ""):
+    # Allow running this file directly (e.g. ``streamlit run src/forgebench/dashboard.py``
+    # or ``python src/forgebench/dashboard.py``) by making the parent package
+    # importable so relative imports resolve.
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    __package__ = "forgebench"
+
 from pathlib import Path
 
 from .config import load_config

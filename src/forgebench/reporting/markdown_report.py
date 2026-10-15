@@ -45,7 +45,8 @@ def render_report(
     lines.append(f"# ForgeBench report: {manifest.get('run_id', 'unknown-run')}")
     lines.append("")
     lines.append(f"- **Experiment:** {manifest.get('experiment_name')}")
-    lines.append(f"- **Provider / model:** {provider.get('name')} / `{provider.get('model')}`")
+    provider_name = provider.get("name", "unknown").title()
+    lines.append(f"- **Provider / model:** {provider_name} / `{provider.get('model')}`")
     lines.append(
         f"- **Dataset:** {dataset.get('name')} v{dataset.get('version')} "
         f"(split: {dataset.get('split')}, sha256: `{str(dataset.get('split_sha256', ''))[:12]}…`)"

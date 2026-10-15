@@ -53,8 +53,12 @@ def cost_summary(records: list[PredictionRecord], model: str) -> dict[str, Any]:
     total = (
         input_tokens * price.input_per_mtok + output_tokens * price.output_per_mtok
     ) / 1_000_000
+    cache_part = ""
+    if price.cache_read_per_mtok is not None:
+        cache_part = f", cache_read ${price.cache_read_per_mtok}/Mtok"
     return {
         "model": model,
+        "provider": price.provider,
         "total_input_tokens": input_tokens,
         "total_output_tokens": output_tokens,
         "tokens_estimated_when_missing": usage_estimated,
@@ -63,7 +67,8 @@ def cost_summary(records: list[PredictionRecord], model: str) -> dict[str, Any]:
         "usd_per_1000_cases": round(total / n * 1000, 4) if n else 0.0,
         "price_basis": (
             f"input ${price.input_per_mtok}/Mtok, "
-            f"output ${price.output_per_mtok}/Mtok, as of {price.as_of}"
+            f"output ${price.output_per_mtok}/Mtok{cache_part}, "
+            f"as of {price.as_of}"
         ),
         "price_note": price.note,
     }

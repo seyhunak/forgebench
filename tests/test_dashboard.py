@@ -55,12 +55,22 @@ def test_read_predictions_missing_file(tmp_path: Path) -> None:
 
 
 def test_streamlit_is_optional_at_import_time() -> None:
-    """Importing the dashboard must not require streamlit (helpers are pure)."""
+    """Importing the dashboard must not require or even load streamlit.
+
+    Runs in a subprocess so it cannot be polluted by other tests importing
+    streamlit (e.g. the AppTest integration test below).
+    """
+    import subprocess
     import sys
 
-    import forgebench.dashboard  # noqa: F401
-
-    assert "streamlit" not in sys.modules
+    code = (
+        "import sys, forgebench.dashboard; "
+        "assert 'streamlit' not in sys.modules, 'streamlit was loaded eagerly'"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=60
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_dashboard_command_fails_helpfully_without_streamlit(

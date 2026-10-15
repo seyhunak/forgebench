@@ -85,7 +85,7 @@ class MistralProvider:
             _few_shot_block(examples) if examples else ""
         )
         try:
-            from mistralai import Mistral  # noqa: PLC0415
+            from mistralai.client import Mistral  # noqa: PLC0415
         except ImportError as exc:  # pragma: no cover - depends on environment
             raise ProviderError(
                 "The 'mistralai' package is not installed. Run: pip install mistralai"
@@ -172,11 +172,14 @@ def verify_api_key(api_key: str) -> tuple[bool | None, str]:
     key must not be blocked by a flaky network.
     """
     try:
-        from mistralai import Mistral  # noqa: PLC0415
+        from mistralai.client import Mistral  # noqa: PLC0415
     except ImportError:  # pragma: no cover - depends on environment
         return None, "the 'mistralai' package is not installed"
     try:
-        client = Mistral(api_key=api_key, timeout=15)
+        client = Mistral(api_key=api_key, timeout_ms=15000)
+    except TypeError:  # pragma: no cover - older SDK signatures
+        client = Mistral(api_key=api_key)
+    try:
         client.models.list()
         return True, "accepted by api.mistral.ai"
     except Exception as exc:  # SDK error types vary by version

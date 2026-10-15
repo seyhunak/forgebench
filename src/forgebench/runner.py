@@ -64,7 +64,12 @@ def build_few_shot_examples(train_cases: list[BenchmarkCase], count: int) -> lis
 
 def _make_provider(config: ExperimentConfig, examples: list[dict[str, Any]]) -> ModelProvider:
     options = dict(config.provider.options)
-    if config.provider.name == "mistral":
+    # Mock-specific options must not leak into real providers.
+    MOCK_ONLY = {"defect_rate", "invalid_rate"}
+    if config.provider.name != "mock":
+        for key in MOCK_ONLY:
+            options.pop(key, None)
+        # Common inference settings apply to every real provider (not mock).
         options.setdefault("temperature", config.inference.temperature)
         options.setdefault("max_retries", config.inference.max_retries)
         options.setdefault("timeout_seconds", config.inference.timeout_seconds)
@@ -73,7 +78,7 @@ def _make_provider(config: ExperimentConfig, examples: list[dict[str, Any]]) -> 
             options.setdefault("system_prompt", config.prompt.system)
         if examples:
             options.setdefault("examples", examples)
-    elif config.provider.name == "mock":
+    else:
         options.setdefault("seed", config.experiment.seed)
         if config.prompt.system:
             options.setdefault("system_prompt", config.prompt.system)

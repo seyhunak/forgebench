@@ -1,33 +1,30 @@
-# Few-shot experiment: gold examples drawn from the TRAIN split only.
-# Demonstrates the few-shot plumbing offline; only meaningful end to end with
-# a real provider (the mock ignores prompts by design).
 experiment:
   name: fewshot-v1
   dataset: finance_v1
-  dataset_version: "1.0.0"
+  dataset_version: 1.0.0
   split: test
-
+  seed: 42
 provider:
   name: mock
   model: rule-mock-v1
   options:
     defect_rate: 0.04
-    invalid_rate: 0.0
-
+    invalid_rate: 0
 inference:
   temperature: 0
   max_retries: 2
   timeout_seconds: 30
-
+  max_tokens: 1024
 prompt:
+  system: null
   few_shot_count: 5
-
 evaluation:
   metrics:
-    - accuracy
-    - macro_f1
-    - critical_false_match_rate
-    - escalation_recall
-    - schema_validity
-    - latency
-    - estimated_cost
+  - accuracy
+  - macro_f1
+  - critical_false_match_rate
+  - escalation_recall
+  - schema_validity
+  - latency
+  - estimated_cost
+

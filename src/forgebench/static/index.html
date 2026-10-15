@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForgeBench</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" width="32" height="32" aria-hidden="true">
+        <defs>
+          <linearGradient id="forgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+            <stop offset="50%" style="stop-color:#ef4444;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <path d="M16 2c-2.2 0-4.2 1.2-5.4 3.2L9 8H7L5 10H3L1 12H3L5 14H3L1 16H3L5 18H3L1 20H3L5 22H7L9 24H11L13 26H15L17 24H19L21 22H19L17 20H19L15 18H17L15 16H17L15 14H17L13 12H15L13 10H13L11 8H9L11 5.2C12.2 3.2 14.2 2 16 2Z" fill="url(#forgeGradient)"/>
+        <path d="M11 20H13V14H11V20ZM19 20H21V14H19V20Z" fill="#ffffff" opacity="0.9"/>
+      </svg>
+      <div class="brand-text">
+        <span class="brand-name">ForgeBench</span>
+        <span class="brand-desc">Measure domain adaptation, not just model intelligence.</span>
+        <span class="brand-sub">Reproducible LLM evaluation for domain-specific performance.</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="button button--quiet" id="btn-theme-toggle" title="Toggle dark/light theme">🌓</button>
+      <a href="/docs" class="button button--quiet" target="_blank">API docs</a>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+
+  <!-- ===== API KEY SECTION ===== -->
+  <section class="panel panel--keys" id="keys-panel">
+    <div class="panel-header">
+      <h2>API key</h2>
+      <p class="panel-sub">Provider credentials, saved to a git-ignored <code>.env</code> with owner-only permissions.</p>
+    </div>
+
+    <div class="panel-body">
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="form-label">Provider</label>
+          <select id="key-provider"></select>
+          <span class="field-hint">Choose which provider this key belongs to.</span>
+        </div>
+        <div class="form-field">
+          <label class="form-label">API key</label>
+          <input type="password" id="key-input" placeholder="sk-..." autocomplete="off">
+          <span class="field-hint">Never stored in configs, run artifacts, or Git.</span>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Default model</label>
+          <select id="model-select"></select>
+          <span class="field-hint">Used when config references ${PROVIDER_MODEL}.</span>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Model details</label>
+          <div id="model-details" class="model-details"></div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button class="button button--primary" id="btn-save-key">Save key</button>
+        <button class="button" id="btn-verify-key">Verify key</button>
+        <button class="button button--danger" id="btn-remove-key">Remove key</button>
+      </div>
+
+      <div id="key-message" class="message"></div>
+
+      <div class="credential-status">
+        <h3 class="status-title">Current status</h3>
+        <table class="status-table">
+          <tr><td class="label">Key</td><td class="value" id="status-key">—</td></tr>
+          <tr><td class="label">Source</td><td class="value" id="status-source">—</td></tr>
+          <tr><td class="label">Model</td><td class="value" id="status-model">—</td></tr>
+          <tr><td class="label">File</td><td class="value" id="status-file">—</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== DATASET SECTION ===== -->
+  <section class="panel panel--datasets panel--full" id="datasets-panel">
+    <div class="panel-header">
+      <h2>Datasets</h2>
+      <p class="panel-sub">Browse benchmark datasets and their splits.</p>
+    </div>
+
+    <div class="panel-body">
+      <div class="form-grid">
+        <div class="form-field compact">
+          <label class="form-label">Dataset</label>
+          <select id="dataset-select"></select>
+        </div>
+        <div class="form-field compact">
+          <label class="form-label">Split</label>
+          <select id="dataset-split">
+            <option value="train">Train</option>
+            <option value="dev">Dev</option>
+            <option value="test">Test</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="dataset-info" class="dataset-info"></div>
+
+      <div id="dataset-cases-container" class="table-container" style="display:none;">
+        <div class="table-header">
+          <h3>Cases</h3>
+          <button class="button button--quiet" id="btn-download-dataset">Download JSON</button>
+        </div>
+        <table class="data-table" id="dataset-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Scenario</th>
+              <th>Category</th>
+              <th>Bank Amount</th>
+              <th>Ledger Amount</th>
+              <th>Bank Reference</th>
+              <th>Ledger Reference</th>
+              <th>Bank Date</th>
+              <th>Ledger Date</th>
+            </tr>
+          </thead>
+          <tbody id="dataset-table-body"></tbody>
+        </table>
+      </div>
+
+      <div id="dataset-message" class="message"></div>
+    </div>
+  </section>
+
+  <!-- ===== CONFIG SECTION ===== -->
+  <section class="panel panel--config panel--full" id="config-panel">
+    <div class="panel-header">
+      <h2>Config Editor</h2>
+      <p class="panel-sub">Edit experiment configuration YAML files.</p>
+    </div>
+
+    <div class="panel-body">
+      <div class="form-grid">
+        <div class="form-field compact">
+          <label class="form-label">Config file</label>
+          <select id="config-editor-select"></select>
+        </div>
+      </div>
+
+      <div id="config-editor-loading" class="loading-skeleton" style="display:none;">
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+      </div>
+
+      <textarea id="config-editor" class="code-editor" placeholder="Select a config file to edit…" spellcheck="false"></textarea>
+
+      <div class="button-group" style="margin-top:1rem;">
+        <button class="button button--primary" id="btn-save-config">Save config</button>
+        <button class="button" id="btn-reset-config">Reset</button>
+      </div>
+
+      <div id="config-message" class="message"></div>
+    </div>
+  </section>
+
+  <!-- ===== RUN SECTION ===== -->
+  <section class="panel panel--run" id="run-panel">
+    <div class="panel-header">
+      <h2>Run benchmark</h2>
+      <p class="panel-sub">Execute an experiment config and watch progress live.</p>
+    </div>
+
+    <div class="panel-body">
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="form-label">Experiment config</label>
+          <select id="config-select"></select>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Case limit</label>
+          <input type="number" id="run-limit" placeholder="0 = full split" min="0">
+          <span class="field-hint">Leave 0 for the entire split.</span>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Run id (optional)</label>
+          <input type="text" id="run-id" placeholder="auto-generated">
+          <span class="field-hint">Output directory name.</span>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button class="button button--primary" id="btn-run">Run benchmark</button>
+      </div>
+
+      <div id="run-message" class="message"></div>
+
+      <div class="run-progress" id="run-progress" style="display:none;">
+        <div class="progress-label">
+          <span id="progress-text">Starting…</span>
+          <span id="progress-counter" class="progress-counter">0 / 0</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+
+      <div id="run-result" class="run-result" style="display:none;">
+        <h3 class="result-title">Run complete</h3>
+        <table class="result-table">
+          <tr><td class="label">Run id</td><td class="value" id="res-run-id">—</td></tr>
+          <tr><td class="label">Accuracy</td><td class="value" id="res-accuracy">—</td></tr>
+          <tr><td class="label">Macro-F1</td><td class="value" id="res-macro-f1">—</td></tr>
+          <tr><td class="label">Schema validity</td><td class="value" id="res-schema-validity">—</td></tr>
+          <tr><td class="label">Artifacts</td><td class="value" id="res-artifacts"><button class="button button--quiet" id="btn-open-run">Open run dir</button></td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== RESULTS SECTION ===== -->
+  <section class="panel panel--results panel--full" id="results-panel">
+    <div class="panel-header">
+      <h2>Results</h2>
+      <p class="panel-sub">View single-run reports or compare multiple runs.</p>
+    </div>
+
+    <div class="panel-body">
+      <div class="mode-toggle">
+        <button class="mode-button mode-button--active" id="mode-single">Single run</button>
+        <button class="mode-button" id="mode-compare">Compare runs</button>
+      </div>
+
+      <div id="single-view">
+        <div class="runs-grid" id="runs-grid"></div>
+        <div id="run-report-view" class="report-view" style="display:none;">
+          <div class="report-header">
+            <button class="button button--quiet" id="btn-back-to-runs">← Back to runs</button>
+            <button class="button button--quiet" id="btn-download-report">Download Markdown</button>
+            <button class="button button--quiet" id="btn-view-predictions">View Predictions</button>
+          </div>
+          <div id="run-report-content" class="report-content"></div>
+          <div id="run-predictions-view" class="report-view" style="display:none;">
+            <div class="report-header">
+              <button class="button button--quiet" id="btn-back-to-report">← Back to report</button>
+              <button class="button button--quiet" id="btn-download-predictions">Download JSON</button>
+            </div>
+            <div id="run-predictions-content" class="table-container" style="margin-top:1rem;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="compare-view" style="display:none;">
+        <div class="compare-card">
+          <div class="compare-header">
+            <h3>Compare Runs</h3>
+            <p>Select two or more runs. The first run selected is the baseline.</p>
+          </div>
+          <div class="compare-select-wrap">
+            <label class="form-label">Runs</label>
+            <select id="compare-select" multiple size="4"></select>
+          </div>
+          <button class="button button--primary button--wide" id="btn-compare">
+            Compare Runs
+          </button>
+          <div id="compare-view-container" class="comparison-view" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script src="/static/app.js?v=6"></script>
+</body>
+</html>

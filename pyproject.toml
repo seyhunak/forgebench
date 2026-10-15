@@ -35,6 +35,11 @@ dev = [
 ]
 ui = [
   "streamlit>=1.40",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "openai>=1.0",
+  "anthropic>=0.30",
+  "google-generativeai>=0.5",
 ]
 
 [project.scripts]

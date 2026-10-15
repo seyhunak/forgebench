@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import asyncio
 from pathlib import Path
 
 import typer
@@ -67,7 +68,10 @@ def set_key_cmd(
     key: str = typer.Option(
         "",
         "--key",
-        help="Mistral API key. Prefer the hidden prompt (args land in shell history).",
+        help="API key. Prefer the hidden prompt (args land in shell history).",
+    ),
+    provider: str = typer.Option(
+        "mistral", "--provider", help="Provider: mistral, openai, anthropic, google."
     ),
     model: str = typer.Option(
         "", "--model", help="Also save a default model id (e.g. ministral-8b-2512)."
@@ -78,35 +82,46 @@ def set_key_cmd(
         True, "--verify/--no-verify", help="Check the key against the API after saving."
     ),
 ) -> None:
-    """Bring your own key: save a Mistral API key to the git-ignored .env (mode 0600)."""
+    """Bring your own key: save an API key to the git-ignored .env (mode 0600)."""
+    env_map = {
+        "mistral": "MISTRAL_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "google": "GOOGLE_API_KEY",
+    }
+    env_var = env_map.get(provider)
+    if env_var is None:
+        typer.echo(f"error: unknown provider '{provider}'.", err=True)
+        raise typer.Exit(code=1)
+
     if show:
-        typer.echo(f"key:   {mask(get_value('MISTRAL_API_KEY'))}  [{source_of('MISTRAL_API_KEY')}]")
-        typer.echo(
-            f"model: {get_value('MISTRAL_MODEL') or '(not set)'}  [{source_of('MISTRAL_MODEL')}]"
-        )
+        typer.echo(f"key:   {mask(get_value(env_var))}  [{source_of(env_var)}]")
+        model_var = env_var.replace("_API_KEY", "_MODEL")
+        typer.echo(f"model: {get_value(model_var) or '(not set)'}  [{source_of(model_var)}]")
         env_file = find_env_file()
         typer.echo(f"file:  {env_file or '(none yet; created in the current directory on save)'}")
         return
 
     if clear:
-        removed = delete_value("MISTRAL_API_KEY")
+        removed = delete_value(env_var)
         if removed:
-            typer.echo(f"cleared MISTRAL_API_KEY from {removed}")
+            typer.echo(f"cleared {env_var} from {removed}")
         else:
-            typer.echo("no saved key found; nothing to clear")
+            typer.echo(f"no saved key found for {env_var}; nothing to clear")
         return
 
     if not key:
-        key = typer.prompt("Paste your Mistral API key", hide_input=True).strip()
+        key = typer.prompt(f"Paste your {provider} API key", hide_input=True).strip()
     if not key:
         typer.echo("error: empty key, nothing saved", err=True)
         raise typer.Exit(code=1)
 
-    target = set_value("MISTRAL_API_KEY", key)
-    typer.echo(f"saved MISTRAL_API_KEY to {target} (chmod 600, git-ignored)")
+    target = set_value(env_var, key)
+    typer.echo(f"saved {env_var} to {target} (chmod 600, git-ignored)")
     if model:
-        set_value("MISTRAL_MODEL", model)
-        typer.echo(f"saved MISTRAL_MODEL={model} to {target}")
+        model_var = env_var.replace("_API_KEY", "_MODEL")
+        set_value(model_var, model)
+        typer.echo(f"saved {model_var}={model} to {target}")
 
     if verify:
         typer.echo("verifying against api.mistral.ai ...")
@@ -133,30 +148,29 @@ def dashboard_cmd(
 ) -> None:
     """Launch the local dashboard: BYOK key entry, benchmark runs, result comparison."""
     try:
-        import streamlit  # noqa: F401, PLC0415
+        import uvicorn  # noqa: F401, PLC0415
+        from .api import app as api_app  # noqa: F401, PLC0415
     except ImportError as exc:
         typer.echo('error: the UI extra is not installed. Run: pip install -e ".[ui]"', err=True)
         raise typer.Exit(code=1) from exc
 
-    app_path = Path(__file__).with_name("dashboard.py")
-    command = [
-        sys.executable,
-        "-m",
-        "streamlit",
-        "run",
-        str(app_path),
-        "--server.port",
-        str(port),
-        "--server.address",
-        host,
-        "--server.headless",
-        "false" if open_browser else "true",
-        "--browser.gatherUsageStats",
-        "false",
-    ]
     repo_root = Path(__file__).resolve().parents[2]
     typer.echo(f"Starting ForgeBench dashboard at http://{host}:{port}  (Ctrl-C to stop)")
-    raise typer.Exit(code=subprocess.call(command, cwd=str(repo_root)))
+
+    config = uvicorn.Config(
+        api_app,
+        host=host,
+        port=port,
+        log_level="warning",
+    )
+    server = uvicorn.Server(config)
+
+    if open_browser:
+        import webbrowser
+
+        webbrowser.open(f"http://{host}:{port}/")
+
+    asyncio.run(server.serve())
 
 
 @app.command("list-datasets")
