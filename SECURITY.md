@@ -23,7 +23,12 @@ destination and data flow in the adapter's module docstring and the PR.
 
 ## Secrets hygiene
 
+- Prefer `forgebench set-key`: it writes the key to the git-ignored `.env`
+  with owner-only permissions (0600), verifies it against the API, and shows
+  only a masked form afterwards (`set-key --show`).
 - Never commit `.env`, keys, or raw request/response logs.
+- Keys are read at call time from the environment (precedence) or `.env`;
+  they are never written into configs, manifests, or run artifacts.
 - Run artifacts under `runs/` can contain full model outputs. They are
   git-ignored by default; if you commit reference runs, review them first.
 - `manifest.json` records configuration and versions, not credentials.

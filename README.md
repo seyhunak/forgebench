@@ -50,14 +50,22 @@ forgebench compare runs/baseline runs/prompt-v1
 Each run writes `predictions.jsonl`, `metrics.json`, `manifest.json`, and
 `report.md` under `runs/<run-id>/`.
 
-### Running against a real Mistral model
+### Running against a real Mistral model (bring your own key)
 
 ```bash
-export MISTRAL_API_KEY="..."
-export MISTRAL_MODEL="open-mistral-7b"   # check current models + license first
+# Paste your key at a hidden prompt; it is saved to the git-ignored .env (chmod 600)
+# and verified against api.mistral.ai. Never committed, never in run artifacts.
+forgebench set-key
+forgebench set-key --model ministral-8b-2512   # also save the default model id
+forgebench set-key --show                      # masked status + where it's stored
+forgebench set-key --clear                     # remove it
+
 forgebench run --config configs/mistral_baseline.yaml --limit 5 --run-id smoke
 forgebench run --config configs/mistral_baseline.yaml --run-id mistral-baseline
 ```
+
+An exported `MISTRAL_API_KEY` in your shell still works and takes precedence
+over `.env`. Config references like `${MISTRAL_MODEL}` resolve from either.
 
 ## CLI
 
@@ -66,6 +74,7 @@ forgebench run --config configs/mistral_baseline.yaml --run-id mistral-baseline
 | `forgebench list-datasets` | Show datasets in the registry |
 | `forgebench validate-dataset NAME` | Schema, id, split, family, and class checks |
 | `forgebench run --config CFG` | Run one experiment, write all artifacts |
+| `forgebench set-key` | Save/show/clear a Mistral API key in the git-ignored `.env` |
 | `forgebench compare RUN_A RUN_B` | Metric table with deltas vs. a baseline run |
 | `forgebench report RUN` | (Re)generate the Markdown report for a run |
 

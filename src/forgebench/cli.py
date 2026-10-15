@@ -15,13 +15,22 @@ import json
 from pathlib import Path
 
 import typer
+from dotenv import find_dotenv, load_dotenv
 
 from . import __version__
 from .config import load_config
+from .credentials import delete_value, find_env_file, get_value, mask, set_value, source_of
+from .providers.mistral import verify_api_key
 from .registry import default_datasets_root, list_datasets, validate_dataset
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
 from .schemas import PredictionRecord
+
+# CLI convenience: read the nearest .env walking up from the working directory,
+# without overriding variables already present in the environment.
+_env_file = find_dotenv(usecwd=True)
+if _env_file:
+    load_dotenv(_env_file)
 
 app = typer.Typer(
     name="forgebench",
@@ -44,6 +53,67 @@ def _main() -> None:
 def version_cmd() -> None:
     """Print the installed forgebench version."""
     typer.echo(__version__)
+
+
+@app.command("set-key")
+def set_key_cmd(
+    key: str = typer.Option(
+        "",
+        "--key",
+        help="Mistral API key. Prefer the hidden prompt (args land in shell history).",
+    ),
+    model: str = typer.Option(
+        "", "--model", help="Also save a default model id (e.g. ministral-8b-2512)."
+    ),
+    show: bool = typer.Option(False, "--show", help="Show current key status (masked) and exit."),
+    clear: bool = typer.Option(False, "--clear", help="Delete the saved key and exit."),
+    verify: bool = typer.Option(
+        True, "--verify/--no-verify", help="Check the key against the API after saving."
+    ),
+) -> None:
+    """Bring your own key: save a Mistral API key to the git-ignored .env (mode 0600)."""
+    if show:
+        typer.echo(f"key:   {mask(get_value('MISTRAL_API_KEY'))}  [{source_of('MISTRAL_API_KEY')}]")
+        typer.echo(
+            f"model: {get_value('MISTRAL_MODEL') or '(not set)'}  [{source_of('MISTRAL_MODEL')}]"
+        )
+        env_file = find_env_file()
+        typer.echo(f"file:  {env_file or '(none yet; created in the current directory on save)'}")
+        return
+
+    if clear:
+        removed = delete_value("MISTRAL_API_KEY")
+        if removed:
+            typer.echo(f"cleared MISTRAL_API_KEY from {removed}")
+        else:
+            typer.echo("no saved key found; nothing to clear")
+        return
+
+    if not key:
+        key = typer.prompt("Paste your Mistral API key", hide_input=True).strip()
+    if not key:
+        typer.echo("error: empty key, nothing saved", err=True)
+        raise typer.Exit(code=1)
+
+    target = set_value("MISTRAL_API_KEY", key)
+    typer.echo(f"saved MISTRAL_API_KEY to {target} (chmod 600, git-ignored)")
+    if model:
+        set_value("MISTRAL_MODEL", model)
+        typer.echo(f"saved MISTRAL_MODEL={model} to {target}")
+
+    if verify:
+        typer.echo("verifying against api.mistral.ai ...")
+        accepted, detail = verify_api_key(key)
+        if accepted:
+            typer.echo(f"OK: key {mask(key)} {detail}")
+        elif accepted is False:
+            typer.echo(f"WARNING: key {mask(key)} {detail}", err=True)
+        else:
+            typer.echo(f"NOTE: {detail}", err=True)
+    typer.echo(
+        "Run a smoke test: forgebench run --config configs/mistral_baseline.yaml "
+        "--limit 5 --run-id mistral-smoke"
+    )
 
 
 @app.command("list-datasets")

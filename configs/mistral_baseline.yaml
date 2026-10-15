@@ -1,8 +1,8 @@
 # Baseline run against a real Mistral model.
 #
-# Requires credentials, kept outside the repository:
+# Requires credentials, kept outside the repository (the CLI loads .env):
 #   export MISTRAL_API_KEY="..."
-#   export MISTRAL_MODEL="open-mistral-7b"   # verify current models + license first
+#   export MISTRAL_MODEL="ministral-8b-2512"  # verify current ids + license first
 #
 # Start with a smoke test before the full run:
 #   forgebench run --config configs/mistral_baseline.yaml --limit 5 --run-id mistral-smoke

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from forgebench.cli import app
@@ -86,3 +87,40 @@ def test_run_with_missing_config_fails(tmp_path: Path) -> None:
 def test_compare_needs_two_runs(tmp_path: Path) -> None:
     result = runner.invoke(app, ["compare", str(tmp_path)])
     assert result.exit_code == 2
+
+
+def test_set_key_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """save -> show (masked) -> clear, all inside a throwaway directory."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+
+    saved = runner.invoke(
+        app,
+        ["set-key", "--key", "sk-test-abcdef123456", "--model", "ministral-8b-2512", "--no-verify"],
+    )
+    assert saved.exit_code == 0, saved.output
+    assert "chmod 600" in saved.output
+    assert (tmp_path / ".env").exists()
+    assert "sk-test-abcdef123456" in (tmp_path / ".env").read_text()
+
+    shown = runner.invoke(app, ["set-key", "--show"])
+    assert shown.exit_code == 0
+    assert "sk-test-abcdef123456" not in shown.output  # never the full secret
+    assert "sk-********3456" in shown.output  # masked form keeps prefix + suffix
+    assert "ministral-8b-2512" in shown.output
+
+    cleared = runner.invoke(app, ["set-key", "--clear"])
+    assert cleared.exit_code == 0
+    assert "MISTRAL_API_KEY=" not in (tmp_path / ".env").read_text()
+    assert "cleared" in cleared.output
+
+
+def test_set_key_rejects_empty_input(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    result = runner.invoke(app, ["set-key", "--no-verify"], input="\n")
+    # click aborts an empty hidden prompt; either way exit 1 and nothing saved.
+    assert result.exit_code == 1
+    combined = result.output + (result.stderr or "")
+    assert "empty key" in combined or "Aborted" in combined
+    assert not (tmp_path / ".env").exists()

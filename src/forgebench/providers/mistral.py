@@ -17,6 +17,7 @@ import os
 import time
 from typing import Any
 
+from ..credentials import get_value
 from ..schemas import BenchmarkCase, Category, ProviderResponse
 from .base import ProviderError
 
@@ -69,10 +70,11 @@ class MistralProvider:
         timeout_seconds: float = 30.0,
         max_tokens: int | None = 1024,
     ) -> None:
-        key = api_key or os.environ.get("MISTRAL_API_KEY")
+        key = api_key or os.environ.get("MISTRAL_API_KEY") or get_value("MISTRAL_API_KEY")
         if not key:
             raise ProviderError(
-                "MISTRAL_API_KEY is not set. Export it (or use the mock provider: --provider mock)."
+                "MISTRAL_API_KEY is not set. Run `forgebench set-key` to save one, "
+                "export MISTRAL_API_KEY, or use the mock provider (--provider mock)."
             )
         self.model = model
         self.temperature = temperature
@@ -159,3 +161,26 @@ class MistralProvider:
             output_tokens=output_tokens,
             model=getattr(response, "model", "") or "",
         )
+
+
+def verify_api_key(api_key: str) -> tuple[bool | None, str]:
+    """Check a key against the API with one free, authenticated call.
+
+    Returns ``(True, detail)`` when accepted, ``(False, detail)`` when the API
+    rejected it, and ``(None, detail)`` when validity could not be determined
+    (offline, SDK missing, or an unexpected failure). Never raises: saving a
+    key must not be blocked by a flaky network.
+    """
+    try:
+        from mistralai import Mistral  # noqa: PLC0415
+    except ImportError:  # pragma: no cover - depends on environment
+        return None, "the 'mistralai' package is not installed"
+    try:
+        client = Mistral(api_key=api_key, timeout=15)
+        client.models.list()
+        return True, "accepted by api.mistral.ai"
+    except Exception as exc:  # SDK error types vary by version
+        text = str(exc)
+        if "401" in text or "unauthorized" in text.lower() or "invalid api key" in text.lower():
+            return False, f"rejected: {type(exc).__name__}"
+        return None, f"could not verify ({type(exc).__name__}: {text[:160]})"
