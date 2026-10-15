@@ -1,0 +1,2 @@
+{"id": "SQ-0007", "input": {"document": "The vaccine showed 95% efficacy in Phase 3 trials with 40,000 participants.", "summary": "Vaccine is 95% effective from 40k trial."}, "expected": {"accurate": true, "completeness": "complete", "hallucinations": []}}
+{"id": "SQ-0008", "input": {"document": "She graduated from Harvard with a degree in computer science in 2020.", "summary": "She studied at MIT in 2020."}, "expected": {"accurate": false, "completeness": "partial", "hallucinations": ["studied at MIT"]}}

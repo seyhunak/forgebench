@@ -19,10 +19,10 @@ from __future__ import annotations
 import hashlib
 import json
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 from ..schemas import BenchmarkCase, Category, ProviderResponse
 from .base import ProviderError
-
 _DEFAULT_SYSTEM_PROMPT = (
     "You are a deterministic rule engine. (Prompt variants only affect real providers.)"
 )
@@ -64,6 +64,7 @@ class MockProvider:
         invalid_rate: float = 0.0,
         seed: int = 42,
         system_prompt: str | None = None,
+        **kwargs: Any,
     ) -> None:
         if not 0.0 <= defect_rate <= 1.0:
             raise ProviderError("mock defect_rate must be within [0, 1]")
@@ -75,6 +76,7 @@ class MockProvider:
         self.seed = seed
         # Accepted so mock configs can mirror real experiment configs; ignored.
         self.system_prompt = system_prompt or _DEFAULT_SYSTEM_PROMPT
+        self._extra_options = kwargs
 
     # -- deterministic rules -------------------------------------------------
 
@@ -163,3 +165,45 @@ class MockProvider:
             Category.DUPLICATE: ["bank_occurrences", "ledger_occurrences"],
             Category.AMBIGUOUS: ["bank_reference", "ledger_reference", "bank_date", "ledger_date"],
         }[category]
+
+    # -- custom task support --------------------------------------------------
+
+    def predict_text(self, prompt: str, output_schema: list[dict] | None = None) -> ProviderResponse:
+        """Generate a deterministic mock response for custom task evaluation.
+
+        Inspects the output schema and produces plausible JSON values for each
+        field. Output is deterministic given the prompt text.
+        """
+        import hashlib as _hashlib
+
+        digest = _hashlib.sha256(prompt.encode()).digest()
+        seed_val = int.from_bytes(digest[:4], "big") / 2**32
+
+        result: dict = {}
+        if output_schema:
+            for field in output_schema:
+                fname = field["name"]
+                ftype = field["type"]
+                enum_values = field.get("enum_values")
+
+                if ftype == "enum" and enum_values:
+                    idx = int(seed_val * len(enum_values)) % len(enum_values)
+                    result[fname] = enum_values[idx]
+                elif ftype == "boolean":
+                    result[fname] = seed_val > 0.5
+                elif ftype == "number":
+                    result[fname] = round(0.5 + seed_val, 2)
+                elif ftype == "list[string]":
+                    result[fname] = [f"key_phrase_{i}" for i in range(1, 3)]
+                else:  # string
+                    result[fname] = f"mock_{fname}"
+
+        content = json.dumps(result)
+        latency_ms = 12.0 + seed_val * 30.0
+        return ProviderResponse(
+            content=content,
+            latency_ms=latency_ms,
+            input_tokens=max(1, len(prompt) // 4),
+            output_tokens=max(1, len(content) // 4),
+            model=self.model,
+        )

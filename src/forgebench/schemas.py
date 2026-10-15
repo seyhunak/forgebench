@@ -115,3 +115,94 @@ class PredictionRecord(BaseModel):
     latency_ms: float
     input_tokens: int | None = None
     output_tokens: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# Custom task builder schemas
+# ---------------------------------------------------------------------------
+
+
+class TaskOutputField(BaseModel):
+    """One field in the model's expected output for a custom task."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(
+        pattern=r"^[a-z_][a-z0-9_]*$",
+        description="Output field name, snake_case, e.g. sentiment.",
+    )
+    type: str = Field(
+        pattern=r"^(string|number|boolean|enum|list\[string\])$",
+        description="Value type: string, number, boolean, enum, or list[string].",
+    )
+    enum_values: list[str] | None = Field(
+        default=None,
+        description="Allowed values when type is 'enum'.",
+    )
+    description: str = Field(
+        default="",
+        description="Human-readable description of the field.",
+    )
+
+
+class ScoringRule(BaseModel):
+    """How to score one output field of a custom task."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    field: str = Field(description="Output field name this rule applies to.")
+    method: str = Field(
+        pattern=r"^(exact_match|f1|contains|boolean|llm_judge)$",
+        description=(
+            "Scoring method: exact_match, f1, contains, boolean, or llm_judge."
+        ),
+    )
+    weight: float = Field(default=1.0, ge=0.0, le=10.0)
+    threshold: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Pass threshold for fuzzy methods (contains, llm_judge).",
+    )
+
+
+class TaskCase(BaseModel):
+    """One test case for a custom task."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str = Field(pattern=r"^[A-Z]{2,4}-\d{4}$", description="Stable case id.")
+    input: dict[str, Any] = Field(description="Field values visible to the model.")
+    expected: dict[str, Any] = Field(
+        description="Ground-truth values matching the output schema."
+    )
+
+
+class TaskDefinition(BaseModel):
+    """User-defined evaluation task. Lives in tasks/<name>/task.yaml."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(
+        pattern=r"^[a-z0-9][a-z0-9._-]*$",
+        max_length=60,
+        description="Task identifier, e.g. sentiment_analysis.",
+    )
+    version: str = "1.0.0"
+    description: str = ""
+    input_fields: list[str] = Field(
+        min_length=1,
+        description="Field names the model receives as input.",
+    )
+    output_schema: list[TaskOutputField] = Field(
+        min_length=1,
+        description="Expected output fields and their types.",
+    )
+    scoring_rules: list[ScoringRule] = Field(
+        min_length=1,
+        description="How each output field is scored.",
+    )
+    system_prompt: str | None = Field(
+        default=None,
+        description="System prompt injected for this task.",
+    )

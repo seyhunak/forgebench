@@ -1,0 +1,32 @@
+name: sentiment_analysis
+version: "1.0.0"
+description: "Classify customer feedback sentiment as positive, negative, or neutral, with confidence score."
+input_fields:
+  - text
+  - source
+output_schema:
+  - name: sentiment
+    type: enum
+    enum_values: ["positive", "negative", "neutral"]
+    description: "Overall sentiment of the text."
+  - name: confidence
+    type: number
+    description: "Confidence score from 0.0 to 1.0."
+  - name: key_phrases
+    type: list[string]
+    description: "Short phrases that drove the sentiment decision."
+scoring_rules:
+  - field: sentiment
+    method: exact_match
+    weight: 2.0
+  - field: confidence
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+  - field: key_phrases
+    method: f1
+    weight: 1.0
+system_prompt: |
+  You are a sentiment analysis expert. Classify the given text as positive,
+  negative, or neutral. Return a confidence score and the key phrases that
+  support your classification. Output must be valid JSON matching the schema.

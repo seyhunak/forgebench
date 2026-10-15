@@ -1,0 +1,2 @@
+{"id": "SQ-0005", "input": {"document": "Python 3.12 introduces f-string improvements and better error messages.", "summary": "Python 3.12 has better error messages."}, "expected": {"accurate": true, "completeness": "partial", "hallucinations": []}}
+{"id": "SQ-0006", "input": {"document": "The flight was delayed due to weather and departed 2 hours late.", "summary": "Flight departed on time."}, "expected": {"accurate": false, "completeness": "missing", "hallucinations": ["departed on time"]}}

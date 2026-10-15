@@ -34,7 +34,8 @@ from .providers.mistral import verify_api_key
 from .registry import default_datasets_root, list_datasets, validate_dataset
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
-from .schemas import PredictionRecord
+from .schemas import PredictionRecord, TaskCase, TaskDefinition
+from .tasks import default_tasks_root, list_tasks, load_task, load_cases, load_task_with_cases, validate_task
 
 # CLI convenience: read the nearest .env walking up from the working directory,
 # without overriding variables already present in the environment.
@@ -210,6 +211,174 @@ def validate_dataset_cmd(
     raise typer.Exit(code=1)
 
 
+@app.command("task-list")
+def task_list_cmd(
+    tasks_root: Path | None = typer.Option(
+        None, "--tasks-root", help="Override task directory location."
+    ),
+) -> None:
+    """List available custom task definitions."""
+    tasks = list_tasks(tasks_root)
+    if not tasks:
+        typer.echo("No tasks found. Create tasks under tasks/<name>/task.yaml")
+        return
+    typer.echo("Available tasks:")
+    for name in tasks:
+        try:
+            task = load_task(name, tasks_root)
+            typer.echo(
+                f"  {name} (v{task.version}) — {task.description or '(no description)'}"
+            )
+        except Exception as exc:
+            typer.echo(f"  {name} — error loading: {exc}", err=True)
+
+
+@app.command("task-validate")
+def task_validate_cmd(
+    name: str = typer.Argument(..., help="Task name to validate."),
+    tasks_root: Path | None = typer.Option(
+        None, "--tasks-root", help="Override task directory location."
+    ),
+) -> None:
+    """Validate a custom task definition and its case files."""
+    try:
+        info, report = validate_task(name, tasks_root)
+    except FileNotFoundError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Task: {info.name} v{info.version}")
+    typer.echo(f"Description: {info.description or '(none)'}")
+    typer.echo(f"Input fields: {', '.join(info.input_fields)}")
+    typer.echo(f"Output fields: {', '.join(info.output_fields)}")
+    typer.echo(f"Scoring: {', '.join(info.scoring_methods)}")
+    typer.echo(f"Cases: {info.n_cases}")
+    if report.ok:
+        typer.echo("Status: VALID")
+    else:
+        typer.echo("Status: INVALID", err=True)
+        for problem in report.problems:
+            typer.echo(f"  - {problem}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("task-run")
+def task_run_cmd(
+    name: str = typer.Argument(..., help="Task name to run."),
+    split: str = typer.Option("test", "--split", help="Dataset split to evaluate."),
+    provider: str = typer.Option("mock", "--provider", help="Provider name (mock, mistral, openai, anthropic, google)."),
+    model: str = typer.Option("", "--model", help="Model ID (overrides provider default)."),
+    limit: int | None = typer.Option(None, "--limit", min=1, help="Evaluate only the first N cases."),
+    tasks_root: Path | None = typer.Option(None, "--tasks-root", help="Override task directory location."),
+    output_root: Path | None = typer.Option(None, "--output-root", help="Where to write run artifacts."),
+) -> None:
+    """Run a custom task evaluation end-to-end."""
+    try:
+        task, cases = load_task_with_cases(name, split, tasks_root)
+    except FileNotFoundError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    if limit is not None:
+        cases = cases[:limit]
+
+    typer.echo(f"Task: {task.name} v{task.version}")
+    typer.echo(f"Split: {split} ({len(cases)} cases)")
+    typer.echo(f"Provider: {provider}")
+
+    from .providers import build_provider
+    from .schemas import PredictionRecord, Category
+    import time
+    from datetime import UTC, datetime
+
+    provider_inst = build_provider(
+        provider,
+        model=model or "",
+        options={
+            "input_fields": task.input_fields,
+            "output_schema": [f.model_dump() for f in task.output_schema],
+            "scoring_rules": [r.model_dump() for r in task.scoring_rules],
+            "system_prompt": task.system_prompt,
+        },
+    )
+
+    records: list[PredictionRecord] = []
+    start = time.perf_counter()
+    for index, case in enumerate(cases, start=1):
+        prompt = _build_task_prompt(task, case)
+        output_schema = [f.model_dump() for f in task.output_schema]
+        try:
+            if provider == "mock":
+                response = provider_inst.predict_text(prompt, output_schema)  # type: ignore[attr-defined]
+            else:
+                response = provider_inst.predict_text(prompt, output_schema)  # type: ignore[attr-defined]
+        except Exception as exc:
+            records.append(PredictionRecord(
+                case_id=case.id,
+                scenario_family="custom",
+                ok=False,
+                category=None,
+                requires_review=None,
+                expected_category=Category.MATCHED,
+                expected_requires_review=False,
+                correct=None,
+                raw_content=str(exc),
+                error_kind="provider_error",
+                error=str(exc),
+                latency_ms=0.0,
+            ))
+        else:
+            score_result = _score_task_output(task, case.expected, response.content)
+            records.append(PredictionRecord(
+                case_id=case.id,
+                scenario_family="custom",
+                ok=score_result["ok"],
+                category=None,
+                requires_review=None,
+                expected_category=Category.MATCHED,
+                expected_requires_review=False,
+                correct=score_result["ok"],
+                raw_content=response.content,
+                error_kind=None,
+                error=None,
+                latency_ms=response.latency_ms,
+                input_tokens=response.input_tokens,
+                output_tokens=response.output_tokens,
+            ))
+        if index % 25 == 0 or index == len(cases):
+            typer.echo(f"  {index}/{len(cases)} cases")
+
+    metrics = {"n_cases": len(cases), "n_valid": sum(1 for r in records if r.ok)}
+    created_at = datetime.now(UTC)
+    run_id = f"{name}-{provider}-{created_at.strftime('%Y%m%dT%H%M%SZ')}"
+    run_dir = (output_root or Path("runs")) / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    import json
+    (run_dir / "predictions.jsonl").write_text(
+        "".join(r.model_dump_json() + "\n" for r in records), encoding="utf-8"
+    )
+    (run_dir / "metrics.json").write_text(
+        json.dumps(metrics, indent=2), encoding="utf-8"
+    )
+    manifest = {
+        "run_id": run_id,
+        "task": task.name,
+        "task_version": task.version,
+        "split": split,
+        "provider": {"name": provider_inst.model, "model": provider_inst.model},
+        "n_cases": len(cases),
+        "created_at_utc": created_at.isoformat(timespec="seconds"),
+        "duration_seconds": round(time.perf_counter() - start, 3),
+    }
+    (run_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2), encoding="utf-8"
+    )
+    typer.echo(f"\nRun: {run_id}")
+    typer.echo(f"Cases: {metrics['n_cases']} ({metrics['n_valid']} valid)")
+    typer.echo(f"Artifacts: {run_dir.resolve()}")
+
+
 @app.command("run")
 def run_cmd(
     config: Path = typer.Option(..., "--config", "-c", help="Experiment config YAML."),
@@ -321,6 +490,89 @@ def report_cmd(
         typer.echo(f"wrote {out.resolve()}")
     else:
         typer.echo(text)
+
+
+def _build_task_prompt(task: TaskDefinition, case: TaskCase) -> str:
+    """Build a prompt from task definition and case input."""
+    lines: list[str] = []
+    if task.system_prompt:
+        lines.append(f"System: {task.system_prompt}")
+    lines.append(
+        "Task: Evaluate the following input and return JSON matching the output schema."
+    )
+    lines.append("")
+    lines.append("Input fields:")
+    for field in task.input_fields:
+        value = case.input.get(field, "")
+        lines.append(f"  {field}: {value}")
+    lines.append("")
+    lines.append("Output schema:")
+    for field in task.output_schema:
+        enum_info = (
+            f" (enum: {', '.join(field.enum_values)})" if field.enum_values else ""
+        )
+        lines.append(
+            f"  {field.name} ({field.type}){enum_info}: {field.description}"
+        )
+    lines.append("")
+    lines.append("Scoring rules:")
+    for rule in task.scoring_rules:
+        lines.append(f"  {rule.field}: {rule.method} (weight={rule.weight})")
+    lines.append("")
+    lines.append("Return valid JSON only.")
+    return "\n".join(lines)
+
+
+def _score_task_output(
+    task: TaskDefinition, expected: dict, raw_output: str
+) -> dict:
+    """Score a raw model output against expected values using scoring rules."""
+    import json
+
+    try:
+        parsed = json.loads(raw_output)
+    except json.JSONDecodeError:
+        return {"ok": False}
+
+    all_pass = True
+    for rule in task.scoring_rules:
+        expected_val = expected.get(rule.field)
+        actual_val = parsed.get(rule.field)
+        if not _apply_scoring_rule(rule.method, expected_val, actual_val, rule.threshold):
+            all_pass = False
+    return {"ok": all_pass}
+
+
+def _apply_scoring_rule(
+    method: str, expected: Any, actual: Any, threshold: float | None
+) -> bool:
+    if method == "exact_match":
+        return expected == actual
+    if method == "boolean":
+        return bool(expected) == bool(actual)
+    if method == "contains":
+        if isinstance(expected, str) and isinstance(actual, str):
+            return expected.lower() in actual.lower()
+        return str(expected) == str(actual)
+    if method == "f1":
+        if isinstance(expected, list) and isinstance(actual, list):
+            set_e = set(expected)
+            set_a = set(actual)
+            if not set_e and not set_a:
+                return True
+            if not set_e or not set_a:
+                return False
+            intersection = len(set_e & set_a)
+            precision = intersection / len(set_a)
+            recall = intersection / len(set_e)
+            if precision + recall == 0:
+                return False
+            f1 = 2 * precision * recall / (precision + recall)
+            return f1 >= (threshold or 0.5)
+        return expected == actual
+    if method == "llm_judge":
+        return type(expected) is type(actual)
+    return False
 
 
 if __name__ == "__main__":  # pragma: no cover
