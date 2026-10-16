@@ -13,6 +13,8 @@ ForgeBench is a reproducible, provider-agnostic benchmark harness for answering 
 
 The first benchmark domain is **financial and transaction operations**: synthetic banking, accounting, claims, and e-commerce scenarios (transaction exception classification and reconciliation triage). No private data, no GPU, no API key required to run the pipeline.
 
+![ForgeBench dashboard — API key view](docs/screenshots/dashboard.png)
+
 ## ✨ Key Features
 
 | Feature | Description |
@@ -24,7 +26,7 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 | **Full run manifests** | Dataset hash, config, model id, versions, timestamps, git SHA, and environment are captured for every run. |
 | **Machine-readable + human-readable results** | `predictions.jsonl`, `metrics.json`, `manifest.json`, and `report.md` per run. |
 | **Bring-your-own-key (BYOK)** | API keys saved to a git-ignored `.env` (chmod 600), verified against the provider API, never committed, never in run artifacts. |
-| **Local dashboard** | FastAPI + Hallmark-designed HTML/CSS/JS UI for key management, run launching, results browsing, and cross-run comparison. |
+| **Local dashboard** | FastAPI-served, Hallmark-designed UI with a dark-first Cobalt theme, side-rail navigation, and a ⌘K jump palette — key management, dataset browsing, run launching, results browsing, and cross-run comparison. |
 | **Deterministic dataset generator** | Same seed, byte-identical files. Regenerate `finance_v1` or add new datasets with `scripts/generate_dataset.py`. |
 | **User-defined tasks** | Define any evaluation task in YAML — input fields, output schema, weighted scoring rules — and run it with `forgebench task-run`. No code required. |
 
@@ -89,13 +91,24 @@ pip install -e ".[ui]"
 forgebench dashboard   # http://127.0.0.1:8502
 ```
 
-The dashboard is a FastAPI + Hallmark-designed single-page app with three panels:
+The dashboard is a single-page app served by FastAPI. Navigate with the left rail, or press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> to jump straight to any view:
 
-- **API key** — provider selector (Mock, Mistral, OpenAI, Anthropic, Google), model dropdown populated from [models.dev](https://models.dev), key save/verify/remove.
-- **Run** — pick a config, optional case limit, live progress bar, run id.
-- **Results** — run cards grid with metrics, click to view full Markdown report, download reports/predictions, N-way comparison with color-coded deltas, dataset browser (splits, case tables, download), config editor, dark/light theme toggle.
+- **01 API key** — provider selector (Mock, Mistral, OpenAI, Anthropic, Google), model dropdown populated from [models.dev](https://models.dev), key save/verify/remove, live masked status.
+- **02 Datasets** — browse datasets and splits, inspect case tables, download JSON.
+- **03 Config** — edit experiment YAML, validated before saving.
+- **04 Run** — pick a config, optional case limit, live progress bar, run id.
+- **05 Results** — run cards with metrics, full Markdown reports, a predictions viewer, and N-way comparison with colour-coded deltas.
+- **06 Tasks** — validate and run user-defined evaluation tasks.
 
-The UI calls the exact same runner and reporting code as the CLI, so artifacts are identical.
+It ships a dark-first **Cobalt** theme with a light mode (toggle, top-right), and calls the exact same runner and reporting code as the CLI — so artifacts are identical.
+
+| Results — run cards | Compare runs — deltas |
+|:--:|:--:|
+| ![Results view with run cards](docs/screenshots/results.png) | ![Compare runs view with metric deltas](docs/screenshots/compare.png) |
+| **Datasets** | **Custom tasks** |
+| ![Dataset browser](docs/screenshots/datasets.png) | ![Custom tasks view](docs/screenshots/tasks.png) |
+| **Light theme** | **Narrow layout** |
+| ![Light theme](docs/screenshots/theme-light.png) | ![Narrow layout](docs/screenshots/mobile.png) |
 
 ## 📋 CLI Reference
 
@@ -167,7 +180,7 @@ Dataset files live under `datasets/<name>/`:
 - `dataset_card.md` — human-readable documentation
 - `train.jsonl`, `dev.jsonl`, `test.jsonl` — JSONL split files with ground-truth labels
 
-View any dataset in the dashboard's **Results → Dataset browser** panel, or via the API:
+View any dataset in the dashboard's **Datasets** view, or via the API:
 
 ```bash
 curl http://localhost:8502/api/datasets
@@ -240,7 +253,7 @@ evaluation:
 
 Config values support `${ENV_VAR}` interpolation (e.g. `"${MISTRAL_MODEL}"`). Missing variables fail loudly — never silently.
 
-Configs can be edited in the dashboard's **Results → Config editor** panel, validated with Pydantic before saving.
+Configs can be edited in the dashboard's **Config** view, validated with Pydantic before saving.
 
 ## 📁 Repository Layout
 
@@ -273,7 +286,7 @@ forgebench/
 │   ├── sentiment_analysis/      # Classification with confidence and key phrases
 │   ├── summarization_qa/        # Summary accuracy and hallucination checks
 │   └── code_review/             # Bug/security/style review with severity
-├── docs/                        # Architecture, protocol, integration notes
+├── docs/                        # Architecture, protocol, integration notes, dashboard screenshots
 ├── scripts/                     # Deterministic dataset generators
 │   ├── generate_dataset.py      # Regenerate finance_v1
 │   └── generate_multi_dataset.py # Generate legal_v1, insurance_v1, support_v1
@@ -302,7 +315,7 @@ forgebench/
 │   ├── reporting/               # Markdown + JSON report renderers
 │   ├── api.py                   # FastAPI backend for the dashboard
 │   ├── dashboard.py             # Legacy Streamlit entry point (kept for compat)
-│   └── static/                  # Dashboard frontend (index.html, style.css, app.js, models.json)
+│   └── static/                  # Dashboard frontend (index.html, style.css, app.js, shell.js, models.json)
 ├── tests/                       # Unit + end-to-end tests (no API key needed)
 └── runs/                        # Local run artifacts (git-ignored by default)
 ```
