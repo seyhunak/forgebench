@@ -26,13 +26,14 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 | **Bring-your-own-key (BYOK)** | API keys saved to a git-ignored `.env` (chmod 600), verified against the provider API, never committed, never in run artifacts. |
 | **Local dashboard** | FastAPI + Hallmark-designed HTML/CSS/JS UI for key management, run launching, results browsing, and cross-run comparison. |
 | **Deterministic dataset generator** | Same seed, byte-identical files. Regenerate `finance_v1` or add new datasets with `scripts/generate_dataset.py`. |
+| **User-defined tasks** | Define any evaluation task in YAML — input fields, output schema, weighted scoring rules — and run it with `forgebench task-run`. No code required. |
 
 ## 🚀 Quickstart
 
 Requires Python 3.11+.
 
 ```bash
-git clone https://github.com/your-org/forgebench
+git clone https://github.com/seyhunak/forgebench
 cd forgebench
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
@@ -104,6 +105,9 @@ The UI calls the exact same runner and reporting code as the CLI, so artifacts a
 | `forgebench set-key [--provider mistral\|openai\|anthropic\|google] [--model MODEL] [--show\|--clear\|--verify/--no-verify]` | Save an API key to git-ignored `.env` (chmod 600), optionally verify against the provider API |
 | `forgebench list-datasets` | List available datasets |
 | `forgebench validate-dataset <name>` | Validate a dataset (schema, ids, splits, families, class distribution) |
+| `forgebench task-list [--tasks-root <path>]` | List user-defined evaluation tasks under `tasks/` |
+| `forgebench task-validate <name> [--tasks-root <path>]` | Validate a task manifest and its case files |
+| `forgebench task-run <name> [--split <s>] [--provider <p>] [--model <id>] [--limit N] [--judge-provider <p>] [--judge-model <id>]` | Run a custom task evaluation end-to-end |
 | `forgebench run --config <yaml> [--provider <name>] [--model <id>] [--limit N] [--run-id <id>] [--datasets-root <path>] [--output-root <path>]` | Execute one benchmark end-to-end |
 | `forgebench compare <run-a> <run-b> [...] [--out <file>]` | N-way comparison with deltas vs. the first run (baseline) |
 | `forgebench report <run-dir> [--out <file>]` | (Re)generate the Markdown report for a run |
@@ -141,6 +145,11 @@ forgebench run --config configs/baseline.yaml --provider google --model gemini-2
 | `finance_v1` | Bank/ledger exception classification | 200 | 100 train / 40 dev / 60 test | 1.0.0 |
 | `healthcare_v1` | Medical claims reconciliation | 125 | 80 train / 30 dev / 15 test | 1.0.0 |
 | `ecommerce_v1` | Marketplace order vs ERP reconciliation | 125 | 80 train / 30 dev / 15 test | 1.0.0 |
+| `legal_v1` | Contract clause reconciliation and exception triage | 105 | 42 train / 21 dev / 42 test | 1.0.0 |
+| `insurance_v1` | Insurance claims adjudication and exception triage | 105 | 42 train / 21 dev / 42 test | 1.0.0 |
+| `support_v1` | Customer support ticket triage and exception reconciliation | 105 | 42 train / 21 dev / 42 test | 1.0.0 |
+
+`legal_v1`, `insurance_v1`, and `support_v1` reuse the same input field names as `finance_v1`, so they run through the existing pipeline with no code changes. Each has a matching config under `configs/` (for example `configs/legal_baseline.yaml`).
 
 All datasets share six scenario families:
 
@@ -169,7 +178,11 @@ curl http://localhost:8502/api/datasets/finance_v1/splits/test
 Regenerate datasets deterministically:
 
 ```bash
+# finance_v1 (and its variants)
 python scripts/generate_dataset.py --seed 42 --train 100 --dev 40 --test 60
+
+# legal_v1, insurance_v1, support_v1 (fixed seed 2026)
+python scripts/generate_multi_dataset.py
 ```
 
 ## 📈 Metrics
@@ -244,6 +257,7 @@ forgebench/
 ├── .gitignore                   # Python, secrets, run artifacts
 ├── configs/                     # Experiment YAML configs
 │   ├── baseline.yaml            # Mock baseline
+│   ├── legal_baseline.yaml      # Mock baseline for legal_v1
 │   ├── mistral_baseline.yaml    # Mistral baseline
 │   └── experiments/
 │       ├── prompt_v1.yaml       # Prompt variant
@@ -251,17 +265,31 @@ forgebench/
 ├── datasets/                    # Versioned synthetic datasets
 │   ├── finance_v1/              # Bank/ledger exception classification
 │   ├── healthcare_v1/           # Medical claims reconciliation
-│   └── ecommerce_v1/            # Marketplace order vs ERP
+│   ├── ecommerce_v1/            # Marketplace order vs ERP
+│   ├── legal_v1/                # Contract clause reconciliation
+│   ├── insurance_v1/            # Insurance claims adjudication
+│   └── support_v1/              # Support ticket triage
+├── tasks/                       # User-defined evaluation tasks (task.yaml + JSONL)
+│   ├── sentiment_analysis/      # Classification with confidence and key phrases
+│   ├── summarization_qa/        # Summary accuracy and hallucination checks
+│   └── code_review/             # Bug/security/style review with severity
 ├── docs/                        # Architecture, protocol, integration notes
-├── scripts/                     # Deterministic dataset generator
+├── scripts/                     # Deterministic dataset generators
+│   ├── generate_dataset.py      # Regenerate finance_v1
+│   └── generate_multi_dataset.py # Generate legal_v1, insurance_v1, support_v1
 ├── src/forgebench/              # Source code
 │   ├── __init__.py              # Package, version
 │   ├── cli.py                   # Typer CLI
 │   ├── config.py                # Pydantic experiment config
 │   ├── runner.py                # Load → validate → infer → score → record
+│   ├── task_runner.py           # Custom task evaluation loop
+│   ├── tasks.py                 # Task registry (locate, load, hash, validate)
 │   ├── registry.py              # Dataset registry (locate, load, hash, validate)
-│   ├── schemas.py               # BenchmarkCase, Prediction, Category enums
+│   ├── schemas.py               # BenchmarkCase, Prediction, Category, TaskDefinition enums
 │   ├── credentials.py           # BYOK storage (.env, chmod 600)
+│   ├── judge.py                 # G-Eval style LLM-as-judge scoring
+│   ├── evidence.py              # Evidence field validation
+│   ├── parsing.py               # Structured output parsing
 │   ├── providers/               # Provider adapters
 │   │   ├── __init__.py
 │   │   ├── base.py              # ModelProvider protocol
@@ -270,7 +298,7 @@ forgebench/
 │   │   ├── openai.py            # OpenAI API adapter
 │   │   ├── anthropic.py         # Anthropic API adapter
 │   │   └── google.py            # Google API adapter
-│   ├── metrics/                 # Metric computation (classification, performance, pricing, reliability)
+│   ├── metrics/                 # Metric computation (classification, performance, pricing, reliability, rag)
 │   ├── reporting/               # Markdown + JSON report renderers
 │   ├── api.py                   # FastAPI backend for the dashboard
 │   ├── dashboard.py             # Legacy Streamlit entry point (kept for compat)
@@ -356,6 +384,16 @@ forgebench task-list
 forgebench task-validate sentiment_analysis
 forgebench task-run sentiment_analysis --split test --provider mock --judge-provider openai --judge-model gpt-4o-mini
 ```
+
+Three tasks ship with the repo under `tasks/`:
+
+| Task | What it evaluates | Scoring methods |
+|------|-------------------|-----------------|
+| `sentiment_analysis` | Feedback sentiment with confidence and key phrases | exact_match, contains, f1 |
+| `summarization_qa` | Summary accuracy, completeness, hallucination list | boolean, exact_match, f1 |
+| `code_review` | Bug/security/style review with severity and fix flag | exact_match, boolean, contains |
+
+Each task lives under `tasks/<name>/` with a `task.yaml` manifest and `train.jsonl`, `dev.jsonl`, `test.jsonl` case files.
 
 ### Safety / red-team scan (coming)
 DeepEval's `deepteam` red-team workflow (vulnerability detection via adversarial attacks: prompt injection, jailbreaking, PII leakage, bias, toxicity) is planned as a `forgebench safety-scan` command.
