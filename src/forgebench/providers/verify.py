@@ -35,7 +35,32 @@ def verify_provider_key(provider: str, key: str) -> tuple[bool | None, str]:
         return _verify_anthropic(key)
     if provider == "google":
         return _verify_google(key)
+    if provider == "ollama":
+        accepted, detail, _presented = ollama_verdict()
+        return accepted, detail
     return None, "verification not supported for this provider"
+
+
+def ollama_verdict() -> tuple[bool | None, str, str]:
+    """Ollama's "key check" is a daemon check: ``(verdict, detail, presented)``.
+
+    Local models ignore keys, so there is no accepted/rejected answer — the
+    useful question is whether the daemon is up. ``presented`` tells callers
+    how a human should read the detail: ``"ok"`` when the daemon is running,
+    ``"error"`` when it is not reachable. Never raises: the probe degrades to
+    "not reachable" on its own.
+    """
+    from ..ollama_probe import ollama_status  # noqa: PLC0415
+
+    state = ollama_status()
+    if state["running"]:
+        detail = (
+            f"ollama daemon is running on {state['host']} with "
+            f"{len(state['models'])} local model(s); local models ignore the key"
+        )
+        return None, detail, "ok"
+    detail = f"ollama daemon is not reachable at {state['host']} — start it with `ollama serve`"
+    return None, detail, "error"
 
 
 def _verify_openai(key: str) -> tuple[bool | None, str]:

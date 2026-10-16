@@ -49,12 +49,28 @@ def list_configs(base: Path | None = None) -> list[Path]:
 
 
 def list_runs(runs_root: Path | None = None) -> list[Path]:
-    """Run directories that have a manifest, newest-looking ids first."""
+    """Run directories that have a manifest, newest first.
+
+    The manifest's ``created_at_utc`` is authoritative (runs written by
+    different processes may have directory names that do not sort by time);
+    the directory name is only a fallback.
+    """
     root = runs_root or RUNS_ROOT
     if not root.is_dir():
         return []
     runs = [p for p in root.iterdir() if p.is_dir() and (p / "manifest.json").is_file()]
-    return sorted(runs, key=lambda p: p.name, reverse=True)
+
+    def sort_key(path: Path) -> tuple[str, str]:
+        try:
+            import json  # noqa: PLC0415
+
+            manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+            created = str(manifest.get("created_at_utc") or "")
+        except Exception:  # noqa: BLE001 - an unreadable manifest is still a run
+            created = ""
+        return (created, path.name)
+
+    return sorted(runs, key=sort_key, reverse=True)
 
 
 def read_predictions(run_dir: Path) -> list[PredictionRecord]:

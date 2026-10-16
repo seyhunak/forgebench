@@ -204,7 +204,7 @@ def models_cmd(
     provider: str = typer.Option(
         "openrouter",
         "--provider",
-        help="Provider: mock, mistral, openai, anthropic, google, openrouter.",
+        help="Provider: mock, mistral, openai, anthropic, google, openrouter, ollama.",
     ),
     live: bool = typer.Option(
         False,
@@ -224,7 +224,17 @@ def models_cmd(
     entries: list[tuple[str, str]] = []
     source = ""
 
-    if provider == "openrouter" and live:
+    if provider == "ollama":
+        from .providers.ollama import list_local_models  # noqa: PLC0415
+
+        try:
+            entries = [(m["id"], m["name"]) for m in list_local_models()]
+            source = "ollama daemon (/api/tags)"
+        except Exception as exc:  # noqa: BLE001 - daemon may be down
+            typer.echo(f"error: {type(exc).__name__}: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+
+    if provider == "openrouter" and live and not entries:
         from .providers.openrouter import list_models  # noqa: PLC0415
 
         try:
@@ -236,7 +246,11 @@ def models_cmd(
                 err=True,
             )
 
-    if not entries:
+    if provider == "ollama" and not entries:
+        typer.echo("# 0 model(s) — ollama daemon (no models pulled)")
+        return
+
+    if not entries and provider != "ollama":
         snapshot = Path(__file__).resolve().parent / "static" / "models.json"
         if not snapshot.exists():
             typer.echo("error: models.json snapshot not found.", err=True)
@@ -345,7 +359,7 @@ def task_run_cmd(
     provider: str = typer.Option(
         DEFAULT_PROVIDER,
         "--provider",
-        help="Provider name (mock, mistral, openai, anthropic, google, openrouter).",
+        help="Provider name (mistral, openai, anthropic, google, openrouter, ollama).",
     ),
     model: str = typer.Option("", "--model", help="Model ID (overrides provider default)."),
     limit: int | None = typer.Option(
@@ -360,13 +374,20 @@ def task_run_cmd(
     judge_provider: str = typer.Option(
         "",
         "--judge-provider",
-        help="Judge provider override (mock, mistral, openai, anthropic, google, openrouter).",
-    ),
+        help="Judge provider: one of mistral/openai/anthropic/google/openrouter/ollama.",    ),
     judge_model: str = typer.Option(
         "", "--judge-model", help="Judge model override (e.g. gpt-4o-mini)."
     ),
 ) -> None:
     """Run a custom task evaluation end-to-end."""
+    if provider == "mock" or judge_provider == "mock":
+        typer.echo(
+            "error: custom tasks run against your selected providers only; "
+            "choose mistral, openai, anthropic, google, openrouter, or ollama.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     try:
         task, cases = load_task_with_cases(name, split, tasks_root)
     except FileNotFoundError as exc:
@@ -828,11 +849,9 @@ def _apply_llm_judge(
         evaluation_steps=evaluation_steps,
     )
     if judge_provider is None:
-        from .providers import build_provider
-        from .schemas import JudgeConfig
-
-        cfg = task.judge if task and task.judge else JudgeConfig()
-        judge_provider = build_provider(cfg.provider, model=cfg.model, options={})
+        # No implicit judge: fail this criterion rather than quietly scoring
+        # with the offline mock provider.
+        return False
     try:
         from .providers.base import ProviderError
 

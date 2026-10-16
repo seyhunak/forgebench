@@ -35,13 +35,18 @@ from .credentials import (
 )
 from .dashboard import list_configs as _list_configs
 from .dashboard import list_runs as _list_runs
+from .ollama_probe import ollama_status
 from .providers import DEFAULT_PROVIDER, PROVIDER_ENV_VARS
-from .providers.verify import verify_provider_key
+from .providers.verify import ollama_verdict, verify_provider_key
 from .registry import default_datasets_root, list_datasets, load_dataset, load_split
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
 from .task_runner import run_task_experiment
 from .tasks import list_tasks, load_task_with_cases, validate_task
+
+from bleach import clean
+from markdown_it import MarkdownIt
+from mdit_py_plugins.gfm import gfm_plugin
 
 _run_state: dict[str, dict[str, Any]] = {}
 
@@ -104,6 +109,27 @@ CONFIGS_DIR = REPO_ROOT / "configs"
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+# HTML tags allowed in the rendered report (whitelist for XSS prevention).
+ALLOWED_HTML_TAGS = {
+    # Text formatting
+    "strong", "b", "em", "i", "code", "s", "u",
+    # Headings
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    # Lists
+    "ul", "ol", "li",
+    # Tables
+    "table", "thead", "tbody", "tr", "th", "td",
+    # Paragraphs and line breaks
+    "p", "br", "hr",
+    # Blockquotes and code blocks
+    "blockquote", "pre", "div",
+    # Links and spans
+    "a", "span",
+    # Images (src is sanitized by the renderer)
+    "img",
+}
+
+
 def _resolve_run_dir(run_id: str) -> Path | None:
     """Resolve a run identifier to its directory, or ``None``.
 
@@ -149,13 +175,16 @@ def get_config(config_path: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 #: Dashboard provider order. OpenRouter leads so it is the default selection.
+#: Mock is deliberately absent — it needs no key, so it never belonged in a
+#: credentials list; it stays available to the CLI and configs. Ollama closes
+#: the list: selectable for BYOK and local models, not runnable yet.
 _PROVIDER_LABELS: dict[str, str] = {
     "openrouter": "OpenRouter",
-    "mock": "Mock",
     "mistral": "Mistral",
     "openai": "OpenAI",
     "anthropic": "Anthropic",
     "google": "Google",
+    "ollama": "Ollama",
 }
 
 
@@ -167,7 +196,7 @@ def _env_var_for(provider: str) -> str:
 def _configured_provider() -> str:
     """First provider (OpenRouter first) that actually has a key, else the default."""
     for pid in _PROVIDER_LABELS:
-        if pid != "mock" and get_value(PROVIDER_ENV_VARS[pid]):
+        if get_value(PROVIDER_ENV_VARS[pid]):
             return pid
     return DEFAULT_PROVIDER
 
@@ -238,12 +267,22 @@ class CredentialVerify(BaseModel):
 
 @app.post("/api/credentials/verify")
 def verify_credential(payload: CredentialVerify) -> dict[str, Any]:
-    """Check the saved key against the provider API."""
+    """Check the saved key against the provider API — or the daemon, for Ollama.
+
+    ``presented`` (``ok`` / ``error``) tells the frontend how to show an
+    ``accepted: None`` verdict: informational status rather than a failed
+    verification. Only Ollama sets it today.
+    """
     load_env_files()
     env_var = _env_var_for(payload.provider)
     key = get_value(env_var)
-    if not key:
+    # Local Ollama needs no key: its check is the daemon, reported either way.
+    if not key and payload.provider != "ollama":
         raise HTTPException(status_code=400, detail=f"No key saved for {env_var}.")
+
+    if payload.provider == "ollama":
+        accepted, detail, presented = ollama_verdict()
+        return {"accepted": accepted, "detail": detail, "presented": presented}
 
     accepted, detail = verify_provider_key(payload.provider, key)
     if accepted is True:
@@ -260,11 +299,30 @@ def verify_credential(payload: CredentialVerify) -> dict[str, Any]:
 
 @app.get("/api/providers")
 def list_providers() -> list[dict[str, Any]]:
-    """Available providers with display names. OpenRouter comes first (default)."""
+    """Providers for the dashboard selectors: OpenRouter first (default).
+
+    Two flags keep the UI honest:
+
+    * ``api_key_required`` — false for Ollama, whose local models need no key.
+    * ``runnable`` — false while a provider has no run adapter yet (Ollama is
+      key storage + local model listing only), so the Tasks view filters it
+      out and never offers a run that would fail with "unknown provider".
+    """
     return [
-        {"id": pid, "name": name, "api_key_required": pid != "mock"}
+        {
+            "id": pid,
+            "name": name,
+            "api_key_required": pid != "ollama",
+            "runnable": True,
+        }
         for pid, name in _PROVIDER_LABELS.items()
     ]
+
+
+@app.get("/api/ollama/status")
+def ollama_status_endpoint() -> dict[str, Any]:
+    """Is Ollama installed/running, and which models are pulled locally?"""
+    return ollama_status()
 
 
 # ---------------------------------------------------------------------------
@@ -604,7 +662,16 @@ def get_run_report(run_id: str) -> dict[str, str]:
         entry = load_run(str(run_dir))
         records = read_predictions(run_dir)
         text = render_report(entry["manifest"], entry["metrics"], records)
-        return {"markdown": text}
+        # Render markdown to HTML for proper display in the UI.
+        # Use the GFM plugin (with table support) and sanitize the output.
+        # sanitize=True strips any raw HTML (e.g. scripts) injected via dataset/
+        # /generator content, preventing XSS while keeping valid HTML.
+        md = MarkdownIt(config="commonmark", options_update={"sanitize": True})
+        md.use(gfm_plugin)
+        html = md.render(text)
+        # Bleach-sanitize the output to allow only safe HTML tags.
+        html = clean(html, tags=ALLOWED_HTML_TAGS, strip=True)
+        return {"markdown": text, "html": html}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -671,6 +738,25 @@ def list_task_runs() -> list[dict[str, Any]]:
         except Exception:  # noqa: BLE001
             continue
     return out
+
+
+@app.delete("/api/tasks/runs")
+def delete_task_runs() -> dict[str, Any]:
+    """Delete every task-run directory (never benchmark runs)."""
+    deleted: list[str] = []
+    for p in _list_runs():
+        try:
+            entry = load_run(str(p))
+        except Exception:  # noqa: BLE001 - not a readable task run
+            continue
+        if not entry["manifest"].get("task"):
+            continue
+        shutil.rmtree(p)
+        deleted.append(p.name)
+    # Drop any in-memory progress slots that belong to deleted runs.
+    for run_id in deleted:
+        _run_state.pop(run_id, None)
+    return {"deleted": deleted, "count": len(deleted)}
 
 
 @app.get("/api/tasks/{name}")

@@ -7,6 +7,7 @@ from .base import ModelProvider, ProviderError
 from .google import GoogleProvider
 from .mistral import MistralProvider
 from .mock import MockProvider
+from .ollama import OllamaProvider
 from .openai import OpenAIProvider
 from .openrouter import OpenRouterProvider
 
@@ -18,6 +19,7 @@ __all__ = [
     "OpenAIProvider",
     "AnthropicProvider",
     "GoogleProvider",
+    "OllamaProvider",
     "OpenRouterProvider",
     "PROVIDER_ENV_VARS",
     "DEFAULT_PROVIDER",
@@ -80,8 +82,10 @@ def build_provider(name: str, *, model: str, options: dict | None = None) -> Mod
         return GoogleProvider(model=model, **options)
     if name == "openrouter":
         return OpenRouterProvider(model=model, **options)
+    if name == "ollama":
+        return OllamaProvider(model=model, **options)
     raise ProviderError(
         f"unknown provider '{name}'. Supported providers: mock, mistral, openai, "
-        "anthropic, google, openrouter. Add a new adapter in "
+        "anthropic, google, openrouter, ollama. Add a new adapter in "
         "src/forgebench/providers/ instead of editing the runner."
     )

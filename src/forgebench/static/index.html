@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=5">
+<link rel="stylesheet" href="/static/style.css?v=7">
 </head>
 <body>
 
@@ -135,6 +135,8 @@
             <div id="model-details" class="model-details"></div>
           </div>
         </div>
+
+        <div id="key-ollama" class="ollama-status" data-state="" hidden></div>
 
         <div class="button-group">
           <button class="button button--primary" id="btn-save-key">Save key</button>
@@ -374,7 +376,7 @@
           </div>
           <div class="form-field">
             <label class="form-label">Model</label>
-            <input type="text" id="task-model" placeholder="(provider default)">
+            <select id="task-model"></select>
             <span class="field-hint">Model id override.</span>
           </div>
         </div>
@@ -387,7 +389,7 @@
           </div>
           <div class="form-field">
             <label class="form-label">Judge model</label>
-            <input type="text" id="task-judge-model" placeholder="(task default)">
+            <select id="task-judge-model"></select>
             <span class="field-hint">Judge model id override.</span>
           </div>
           <div class="form-field">
@@ -425,7 +427,10 @@
         </div>
 
         <div class="task-runs">
-          <h3 class="status-title">Task runs</h3>
+          <div class="task-runs-head">
+            <h3 class="status-title">Task runs</h3>
+            <button class="button button--danger" id="btn-clear-task-runs">Clear all task runs</button>
+          </div>
           <div id="task-runs-grid"></div>
         </div>
       </div>
@@ -478,7 +483,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=10"></script>
+<script src="/static/app.js?v=18"></script>
 <script src="/static/shell.js?v=2"></script>
 </body>
 </html>

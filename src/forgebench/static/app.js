@@ -113,6 +113,7 @@ const els = {
   taskResValid: document.getElementById("task-res-valid"),
   taskBtnOpenRun: document.getElementById("task-btn-open-run"),
   taskRunsGrid: document.getElementById("task-runs-grid"),
+  btnClearTaskRuns: document.getElementById("btn-clear-task-runs"),
 };
 
 // ---------- Theme ----------
@@ -204,7 +205,7 @@ const PROVIDER_DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
   anthropic: "claude-sonnet-4-5",
   google: "gemini-flash-latest",
-  mock: "rule-mock-v1",
+  ollama: "llama3.1:8b",
 };
 
 function preferredModel(providerId, models) {
@@ -220,6 +221,58 @@ function selectOption(select, value) {
   select.value = has ? value : (select.options[0] ? select.options[0].value : "");
 }
 
+// ---------- Ollama: install / running check (local models have no catalog) ----------
+
+let ollamaCache = null; // last /api/ollama/status payload
+
+async function fetchOllamaStatus(force = false) {
+  if (ollamaCache && !force) return ollamaCache;
+  try {
+    ollamaCache = await fetchJSON("/api/ollama/status");
+  } catch (err) {
+    ollamaCache = { binary: null, installed: false, running: false, host: "", models: [], detail: err.message };
+  }
+  return ollamaCache;
+}
+
+function ollamaModelMap() {
+  const map = {};
+  for (const m of (ollamaCache && ollamaCache.models) || []) map[m] = { id: m, name: m };
+  return map;
+}
+
+// The status panel under the form: is Ollama installed, running, what's pulled?
+async function syncOllamaPanel(providerId) {
+  const box = document.getElementById("key-ollama");
+  if (!box) return;
+  if (providerId !== "ollama") {
+    box.hidden = true;
+    box.textContent = "";
+    return;
+  }
+  const st = await fetchOllamaStatus();
+  let state = "missing";
+  let text = "";
+  if (st.running && st.models.length) {
+    state = "running";
+    const preview = st.models.slice(0, 3).join(", ");
+    text = `Ollama is running on ${st.host} — ${st.models.length} local model(s): ${preview}` +
+      (st.models.length > 3 ? ", …" : "");
+  } else if (st.running) {
+    state = "empty";
+    text = "Ollama is running but has no models — pull one: ollama pull llama3.1:8b";
+  } else if (st.installed) {
+    state = "stopped";
+    text = "Ollama is installed but not answering — start it with `ollama serve` (or the Ollama app).";
+  } else {
+    state = "missing";
+    text = "Ollama not found — install: https://ollama.com/download (macOS: brew install ollama).";
+  }
+  box.dataset.state = state;
+  box.textContent = text;
+  box.hidden = false;
+}
+
 async function loadProvidersAndModels() {
   try {
     const [providers, models] = await Promise.all([
@@ -228,10 +281,12 @@ async function loadProvidersAndModels() {
     ]);
     modelsData = models;
 
-    const providerList = [
-      { id: "mock", name: "Mock", env: [], models: { "rule-mock-v1": { id: "rule-mock-v1", name: "Rule Mock v1" } } },
-      ...providers.map(p => ({ ...p, models: (modelsData[p.id] && modelsData[p.id].models) || {} })),
-    ];
+    // Mock needs no key and is gone from these selectors (CLI/config only);
+    // Ollama joins for BYOK + local model listing (see syncOllamaPanel).
+    const providerList = providers.map(p => ({
+      ...p,
+      models: (modelsData[p.id] && modelsData[p.id].models) || {},
+    }));
 
     safeInnerHTML(els.keyProvider, providerList
       .map(p => `<option value="${p.id}">${p.name}</option>`)
@@ -246,13 +301,19 @@ async function loadProvidersAndModels() {
 }
 
 function populateModels(providerId) {
-  const provider = modelsData ? modelsData[providerId] : null;
   let models = {};
 
-  if (providerId === "mock") {
-    models = { "rule-mock-v1": { id: "rule-mock-v1", name: "Rule Mock v1" } };
-  } else if (provider) {
-    models = provider.models || {};
+  if (providerId === "ollama") {
+    // No models.dev catalog — the daemon is the source of truth.
+    models = ollamaModelMap();
+    if (!Object.keys(models).length) {
+      safeInnerHTML(els.modelSelect, '<option value="">(start Ollama to list local models)</option>');
+      els.modelSelect.value = "";
+      showModelDetails(providerId, "");
+      return;
+    }
+  } else if (modelsData && modelsData[providerId]) {
+    models = modelsData[providerId].models || {};
   }
 
   safeInnerHTML(els.modelSelect, Object.values(models)
@@ -272,9 +333,10 @@ function showModelDetails(providerId, modelId) {
   let model = null;
   let provider = null;
 
-  if (providerId === "mock") {
-    model = { id: "rule-mock-v1", name: "Rule Mock v1", cost: { input: 0, output: 0 } };
-    provider = { name: "Mock", env: [] };
+  if (providerId === "ollama" && modelId) {
+    // Local models carry no published pricing — they run on your machine.
+    model = { id: modelId, name: modelId, cost: { input: 0, output: 0 } };
+    provider = { name: "Ollama", env: [] };
   } else if (modelsData && modelsData[providerId]) {
     provider = modelsData[providerId];
     model = provider.models && provider.models[modelId];
@@ -290,7 +352,7 @@ function showModelDetails(providerId, modelId) {
   const modalities = model.modalities || {};
 
   details.innerHTML = `
-    <p><strong>Provider:</strong> ${provider ? provider.name : "Mock"}</p>
+    <p><strong>Provider:</strong> ${provider ? provider.name : "—"}</p>
     <p><strong>Model ID:</strong> <code>${model.id}</code></p>
     ${model.description ? `<p>${model.description}</p>` : ""}
     <div class="price-row">
@@ -322,16 +384,26 @@ async function loadCredentialStatus(provider) {
     if (!provider && data.provider && els.keyProvider.value !== data.provider) {
       selectOption(els.keyProvider, data.provider);
       populateModels(els.keyProvider.value);
+      if (els.keyProvider.value === "ollama") onProviderChange();
     }
   } catch (err) {
     setMessage(els.keyMessage, `Failed to load status: ${err.message}`, "error");
   }
 }
 
-els.keyProvider.addEventListener("change", () => {
-  populateModels(els.keyProvider.value);
-  loadCredentialStatus(els.keyProvider.value);
-});
+async function onProviderChange() {
+  const pid = els.keyProvider.value;
+  populateModels(pid);
+  loadCredentialStatus(pid);
+  if (pid === "ollama") {
+    await syncOllamaPanel(pid); // fetch install/running state first…
+    if (els.keyProvider.value === pid) populateModels(pid); // …then list local models
+  } else {
+    syncOllamaPanel(pid); // hides the panel
+  }
+}
+
+els.keyProvider.addEventListener("change", onProviderChange);
 
 els.modelSelect.addEventListener("change", () => {
   showModelDetails(els.keyProvider.value, els.modelSelect.value);
@@ -366,7 +438,16 @@ els.btnVerifyKey.addEventListener("click", async () => {
       method: "POST",
       body: JSON.stringify({ provider }),
     });
-    if (data.accepted === true) {
+    if (provider === "ollama" && data.presented !== "error") {
+      // Local Ollama's "key check" is a daemon check: when the daemon is up
+      // (or the status cannot be proved down) it is the only success signal
+      // the button can give, regardless of stale/missing `presented` fields.
+      setMessage(els.keyMessage, `OK — ${data.detail}`, "ok");
+    } else if (data.presented === "error") {
+      setMessage(els.keyMessage, data.detail, "error");
+    } else if (data.presented === "ok") {
+      setMessage(els.keyMessage, `OK — ${data.detail}`, "ok");
+    } else if (data.accepted === true) {
       setMessage(els.keyMessage, `Key OK — ${data.detail}`, "ok");
     } else if (data.accepted === false) {
       setMessage(els.keyMessage, `Key rejected — ${data.detail}`, "error");
@@ -773,7 +854,7 @@ window.viewRunReport = async (runPath) => {
       fetchJSON(`/api/runs/${runPath}/report`),
       fetchJSON(`/api/runs/${runPath}`).catch(() => null),
     ]);
-    openRunModal(runPath, run, report.markdown);
+    openRunModal(runPath, run, report);
   } catch (err) {
     setMessage(els.runMessage, `Failed to load report: ${err.message}`, "error");
   }
@@ -787,13 +868,18 @@ function pct(value) {
   return value != null ? (value * 100).toFixed(1) + "%" : "—";
 }
 
-function openRunModal(runPath, run, markdown) {
+function openRunModal(runPath, run, report) {
   const manifest = (run && run.manifest) || {};
   const provider = manifest.provider || {};
   const dataset = manifest.dataset || {};
   const m = (run && run.metrics) || {};
 
-  currentRun = { path: runPath, markdown: markdown || "", predictions: null };
+  currentRun = {
+    path: runPath,
+    markdown: (report && report.markdown) || "",
+    html: (report && report.html) || "",
+    predictions: null,
+  };
 
   els.runModalTitle.textContent = (run && run.run_id) || runPath.replace(/^runs\//, "");
   els.runModalMeta.innerHTML = [
@@ -825,7 +911,9 @@ function closeRunModal() {
 function showModalReport() {
   if (!els.runModalBody) return;
   els.runModalBody.classList.remove("modal-body--table");
-  els.runModalBody.textContent = (currentRun && currentRun.markdown) || "(no report)";
+  // Use innerHTML to render the markdown report as HTML (escaped by the server).
+  // Keep the raw markdown available for download via the .md file.
+  els.runModalBody.innerHTML = (currentRun && currentRun.html) || (currentRun && currentRun.markdown) || "(no report)";
   els.btnModalReport.classList.add("is-active");
   els.btnModalPredictions.classList.remove("is-active");
 }
@@ -1137,15 +1225,44 @@ window.downloadComparison = async (runDirs) => {
 // ---------- Tasks ----------
 
 /** The model the Tasks form should send for a provider (never empty). */
-function preferredModelFor(providerId) {
-  if (providerId === "mock") return "rule-mock-v1";
+async function taskModelMap(providerId) {
+  if (providerId === "ollama") {
+    if (!ollamaCache) await fetchOllamaStatus();
+    return ollamaModelMap();
+  }
   const provider = modelsData && modelsData[providerId];
-  return preferredModel(providerId, (provider && provider.models) || {});
+  return (provider && provider.models) || {};
 }
 
-function syncTaskModel(providerSelect, modelInput) {
-  if (!providerSelect || !modelInput) return;
-  modelInput.value = preferredModelFor(providerSelect.value);
+// Ollama's daemon list mixes cloud aliases (:cloud) and models that cannot
+// chat; prefer a local completion model, then a known general-purpose family.
+function preferredOllamaModel(models) {
+  const names = models.map(m => m.id);
+  const caps = (ollamaCache && ollamaCache.capabilities) || {};
+  const completions = names.filter(n => (caps[n] || []).includes("completion"));
+  const local = completions.filter(n => !/:cloud$/.test(n));
+  for (const token of ["nemotron", "qwen", "llama", "mistral", "phi", "gemma", "deepseek", "glm"]) {
+    const found = local.find(n => n.toLowerCase().includes(token));
+    if (found) return found;
+  }
+  return local[0] || completions[0] || names[0] || "";
+}
+
+// Fill the model select for a provider (local models for Ollama, catalog for
+// everything else) and preselect its preferred model.
+async function syncTaskModel(providerSelect, modelSelect) {
+  if (!providerSelect || !modelSelect) return;
+  const providerId = providerSelect.value;
+  const models = await taskModelMap(providerId);
+  const values = Object.values(models);
+  safeInnerHTML(modelSelect, values
+    .map(m => `<option value="${escapeAttr(m.id)}">${escapeHtml(m.name || m.id)}</option>`)
+    .join(""));
+  if (!values.length) return;
+  const preferred = providerId === "ollama"
+    ? preferredOllamaModel(values)
+    : preferredModel(providerId, models);
+  if (preferred) modelSelect.value = preferred;
 }
 
 async function loadTasks() {
@@ -1161,7 +1278,9 @@ async function loadTasks() {
     els.taskProvider.innerHTML = "";
     els.taskJudgeProvider.innerHTML = "";
     const providers = await fetchJSON("/api/providers");
-    for (const p of providers) {
+    // Task runs need an adapter: the API marks storage-only providers
+    // (Ollama) runnable: false, so they never appear as a run option.
+    for (const p of providers.filter(prov => prov.runnable !== false)) {
       const opt = document.createElement("option");
       opt.value = p.id;
       opt.textContent = p.name;
@@ -1171,8 +1290,8 @@ async function loadTasks() {
     // OpenRouter is the default provider — prefill a model id that works.
     selectOption(els.taskProvider, "openrouter");
     selectOption(els.taskJudgeProvider, "openrouter");
-    syncTaskModel(els.taskProvider, els.taskModel);
-    syncTaskModel(els.taskJudgeProvider, els.taskJudgeModel);
+    await syncTaskModel(els.taskProvider, els.taskModel);
+    await syncTaskModel(els.taskJudgeProvider, els.taskJudgeModel);
     await loadTaskRuns();
   } catch (err) {
     setMessage(els.taskMessage, `Failed to load tasks: ${err.message}`, "error");
@@ -1302,9 +1421,21 @@ async function loadTaskRuns() {
 
 els.btnValidateTask.addEventListener("click", validateTask);
 els.btnRunTask.addEventListener("click", startTaskRun);
-els.taskProvider.addEventListener("change", () => syncTaskModel(els.taskProvider, els.taskModel));
-els.taskJudgeProvider.addEventListener("change", () =>
-  syncTaskModel(els.taskJudgeProvider, els.taskJudgeModel));
+
+els.btnClearTaskRuns.addEventListener("click", async () => {
+  if (!confirm("Delete every custom-task run? This cannot be undone.")) return;
+  try {
+    const data = await fetchJSON("/api/tasks/runs", { method: "DELETE" });
+    setMessage(els.taskMessage, `Cleared ${data.count} task run(s).`, "ok");
+    await loadTaskRuns();
+  } catch (err) {
+    setMessage(els.taskMessage, `Clear failed: ${err.message}`, "error");
+  }
+});
+els.taskProvider.addEventListener("change", async () => { await syncTaskModel(els.taskProvider, els.taskModel); });
+els.taskJudgeProvider.addEventListener("change", async () => {
+  await syncTaskModel(els.taskJudgeProvider, els.taskJudgeModel);
+});
 
 // ---------- Init ----------
 

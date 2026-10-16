@@ -103,7 +103,7 @@ forgebench dashboard   # http://127.0.0.1:8502
 The dashboard is a single-page app served by FastAPI. Navigate with the left rail, or press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> to jump straight to any view:
 
 - **01 Setup** — the first stop: a BYOK checklist of providers — **OpenRouter, Google, Anthropic, OpenAI, Ollama** (local, key optional), **Mistral** — one row each for its `*_API_KEY` (and default `*_MODEL`), with masked set/not-set status and source. Fill in the keys you use and save — everything is written to the git-ignored `.env` (chmod 600), never committed. Any other environment variable can be added below the provider list.
-- **02 API key** — provider selector, OpenRouter first (the default: one key, every hosted model). Picking a provider fills the model dropdown with its full catalog from [models.dev](https://models.dev) and preselects a sensible model for it (e.g. `openai/gpt-4o-mini` for OpenRouter), so a first run works without hunting for an id. Save, verify, or remove a key, with live masked status and cost/context details. (The screenshot shows Mistral and its default `open-mistral-nemo` — that is the key saved in the demo environment.)
+- **02 API key** — provider selector (Mock is gone from this list — it needs no key and stays in the CLI/configs — and **Ollama** is listed with an install/running check: pick it and the view reports whether the daemon is up and fills the model dropdown with your locally pulled models). OpenRouter leads (the default: one key, every hosted model). Picking a provider fills the model dropdown with its full catalog from [models.dev](https://models.dev) and preselects a sensible model for it (e.g. `openai/gpt-4o-mini` for OpenRouter), so a first run works without hunting for an id. Save, verify, or remove a key, with live masked status and cost/context details. (The screenshot shows Mistral and its default `open-mistral-nemo` — that is the key saved in the demo environment.)
 - **03 Datasets** — browse datasets and splits, inspect case tables, download JSON.
 - **04 Config** — edit experiment YAML, validated before saving.
 - **05 Run** — pick a config, optional case limit, live progress bar, run id.
@@ -121,6 +121,8 @@ It ships a dark-first **Cobalt** theme with a light mode (toggle, top-right), an
 | ![Dataset browser](docs/screenshots/datasets.png) | ![Custom tasks view](docs/screenshots/tasks.png) |
 | **Setup — provider keys** | **Setup — narrow layout** |
 | ![Setup view listing every provider API key with masked status](docs/screenshots/setup.png) | ![Narrow layout of the Setup view](docs/screenshots/setup-mobile.png) |
+| **API key — Ollama install check** | **Ollama — narrow layout** |
+| ![API key view with Ollama selected, daemon status and local models](docs/screenshots/ollama.png) | ![Narrow layout of the API key view with Ollama selected](docs/screenshots/ollama-mobile.png) |
 | **Light theme** | **Narrow layout** |
 | ![Light theme](docs/screenshots/theme-light.png) | ![Narrow layout — API key view with Mistral and its default model](docs/screenshots/mobile.png) |
 
@@ -153,7 +155,7 @@ All providers implement the same `predict(case) -> ProviderResponse` contract:
 | **Anthropic** | `providers/anthropic.py` | Claude 4 Opus, Claude 4 Sonnet, Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku | `ANTHROPIC_API_KEY` |
 | **Google** | `providers/google.py` | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash, Gemini 1.5 Pro, Gemini 1.5 Flash | `GOOGLE_API_KEY` |
 | **OpenRouter** | `providers/openrouter.py` | Every model OpenRouter hosts (hundreds), addressed as `vendor/model` — e.g. `anthropic/claude-3.5-sonnet`, `openai/gpt-4o`, `meta-llama/llama-3.1-70b-instruct`, `google/gemini-2.5-pro` | `OPENROUTER_API_KEY` |
-| **Ollama** | — (no adapter yet; key storage only) | — | `OLLAMA_API_KEY` (optional for local Ollama) |
+| **Ollama** | `providers/ollama.py` (`OllamaProvider`) — local daemon | Whatever you have pulled — listed live from the daemon, not from a catalog | `OLLAMA_API_KEY` (optional for local Ollama) / `OLLAMA_HOST` |
 
 The OpenRouter adapter speaks the REST API directly with the standard library, so it works on a bare install (no extra SDK). Its catalog is available from `forgebench models --provider openrouter` (the pinned snapshot) or `--live` (straight from `openrouter.ai/api/v1/models`).
 

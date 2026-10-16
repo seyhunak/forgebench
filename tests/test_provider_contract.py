@@ -132,10 +132,11 @@ def test_mistral_requires_an_api_key(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         MistralProvider(model="open-mistral-7b")
 
 
-def test_ollama_key_storage_does_not_imply_run_support() -> None:
-    """Setup/set-key save OLLAMA_API_KEY, but running needs an adapter that does not exist yet."""
-    with pytest.raises(ProviderError, match="unknown provider"):
-        build_provider("ollama", model="llama3.1")
+def test_ollama_provider_is_available_for_task_runs() -> None:
+    """Ollama now has a local adapter, so task runs can select it like any other provider."""
+    provider = build_provider("ollama", model="llama3.1:8b")
+    assert provider.name == "ollama"
+    assert provider.model == "llama3.1:8b"
 
 
 def test_mistral_retry_policy_only_retries_operational_failures() -> None:

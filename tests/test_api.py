@@ -6,6 +6,8 @@ it is not installed rather than failing a plain ``[dev]`` environment.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 pytest.importorskip("fastapi")
@@ -162,7 +164,7 @@ def test_setup_lists_byok_providers_in_the_requested_order() -> None:
 
 
 def test_setup_ollama_row_is_storage_only_with_a_hint() -> None:
-    """Ollama: key storage on Setup (hint shown), not a runnable adapter."""
+    """Ollama: key storage + local models, now runnable via the local adapter."""
     from forgebench.api import list_env, list_providers
 
     ollama = next(p for p in list_env()["providers"] if p["provider"] == "ollama")
@@ -170,8 +172,81 @@ def test_setup_ollama_row_is_storage_only_with_a_hint() -> None:
     assert ollama["model_var"] == "OLLAMA_MODEL"
     assert "key optional" in ollama["hint"]
 
-    # The API key view offers runnable adapters only — no ollama.
-    assert "ollama" not in [p["id"] for p in list_providers()]
+    # Offered in the Provider selector (BYOK, no key required for local use),
+    # now runnable, so the Tasks view offers it like any other adapter.
+    offered = {p["id"]: p for p in list_providers()}
+    assert "ollama" in offered
+    assert offered["ollama"]["api_key_required"] is False
+    assert offered["ollama"]["runnable"] is True
+
+
+def test_provider_selector_drops_mock_and_keeps_order() -> None:
+    """Mock needs no key — it is out of the selectors; Ollama takes its place."""
+    from forgebench.api import list_providers
+
+    ids = [p["id"] for p in list_providers()]
+    assert "mock" not in ids
+    assert ids == ["openrouter", "mistral", "openai", "anthropic", "google", "ollama"]
+    # Every other entry stays a runnable, key-requiring provider.
+    for p in list_providers():
+        if p["id"] != "ollama":
+            assert p["runnable"] is True
+            assert p["api_key_required"] is True
+
+
+def test_ollama_status_endpoint_reports_without_raising() -> None:
+    """The install check must answer even with no Ollama at all."""
+    assert "/api/ollama/status" in _paths()
+
+    from forgebench.api import ollama_status_endpoint
+
+    status = ollama_status_endpoint()
+    assert set(status) >= {"binary", "installed", "running", "host", "models", "detail"}
+    assert isinstance(status["running"], bool)
+    assert isinstance(status["installed"], bool)
+    assert isinstance(status["models"], list)
+    assert all(isinstance(name, str) for name in status["models"])
+
+
+def test_verify_ollama_is_a_daemon_check_with_presentation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify for Ollama reports daemon state; 'presented' says how to show it."""
+    from forgebench import api
+    from forgebench.api import CredentialVerify, verify_credential
+
+    monkeypatch.setattr(api, "ollama_verdict", lambda: (None, "daemon is running", "ok"))
+    assert verify_credential(CredentialVerify(provider="ollama")) == {
+        "accepted": None,
+        "detail": "daemon is running",
+        "presented": "ok",
+    }
+
+    monkeypatch.setattr(api, "ollama_verdict", lambda: (None, "not reachable", "error"))
+    assert verify_credential(CredentialVerify(provider="ollama"))["presented"] == "error"
+
+
+def test_verify_ollama_needs_no_saved_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Local Ollama needs no key — verify must not 400 when none is saved."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+
+    from forgebench import api
+    from forgebench.api import CredentialVerify, verify_credential
+
+    monkeypatch.setattr(api, "ollama_verdict", lambda: (None, "not reachable", "error"))
+    assert verify_credential(CredentialVerify(provider="ollama"))["accepted"] is None
+
+
+def test_verify_without_a_key_is_still_a_400_for_keyed_providers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+
+    from forgebench.api import CredentialVerify, verify_credential
+
+    with pytest.raises(HTTPException) as excinfo:
+        verify_credential(CredentialVerify(provider="mistral"))
+    assert excinfo.value.status_code == 400
 
 
 def test_setup_never_offers_the_mock_provider() -> None:

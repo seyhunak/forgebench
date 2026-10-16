@@ -69,9 +69,11 @@ def run_task_experiment(
     judge_instance = None
     needs_judge = any(r.method == "llm_judge" for r in task.scoring_rules)
     if needs_judge:
+        # No implicit judge: use the provider/model the caller selected. A
+        # task's historical mock judge must not override a real selection.
         judge_cfg = JudgeConfig(
-            provider=judge_provider or task.judge.provider,
-            model=judge_model or task.judge.model,
+            provider=judge_provider or provider,
+            model=judge_model or model,
         )
         try:
             judge_instance = build_provider(judge_cfg.provider, model=judge_cfg.model, options={})
@@ -84,14 +86,8 @@ def run_task_experiment(
 
     for index, case in enumerate(cases, start=1):
         prompt = _build_task_prompt(task, case)
-        output_schema = [f.model_dump() for f in task.output_schema]
         try:
-            if provider == "mock":
-                response = provider_inst.predict_text(  # type: ignore[attr-defined]
-                    prompt, output_schema=output_schema
-                )
-            else:
-                response = provider_inst.predict_text(prompt)  # type: ignore[attr-defined]
+            response = provider_inst.predict_text(prompt)  # type: ignore[attr-defined]
         except Exception as exc:
             records.append(
                 PredictionRecord(

@@ -187,8 +187,11 @@ class JudgeConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     provider: str = Field(
-        default="mock",
-        description="Judge provider: mock, mistral, openai, anthropic, google, openrouter.",
+        default="",
+        description=(
+            "Judge provider: empty = use the selected prediction provider/model. "
+            "Supported: mistral, openai, anthropic, google, openrouter, ollama."
+        ),
     )
     model: str = Field(
         default="",
