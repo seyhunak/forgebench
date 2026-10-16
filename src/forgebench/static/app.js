@@ -18,6 +18,9 @@ window.onerror = function(msg, url, line, col, error) {
 let modelsData = null;
 let theme = localStorage.getItem("fb-theme") || "dark";
 
+// Debug logger — silent unless the page is opened with ?debug in the URL.
+let dlog = () => {};
+
 // DOM elements
 const els = {
   keyProvider: document.getElementById("key-provider"),
@@ -106,12 +109,12 @@ const els = {
 // ---------- Theme ----------
 
 function applyTheme() {
-  if (theme === "light") {
-    document.documentElement.classList.add("theme-light");
-    els.btnThemeToggle.textContent = "☀️";
-  } else {
-    document.documentElement.classList.remove("theme-light");
-    els.btnThemeToggle.textContent = "🌙";
+  const light = theme === "light";
+  document.documentElement.classList.toggle("theme-light", light);
+  const btn = els.btnThemeToggle;
+  if (btn) {
+    btn.dataset.theme = light ? "light" : "dark";
+    btn.setAttribute("aria-pressed", String(light));
   }
 }
 
@@ -747,7 +750,7 @@ els.modeCompare.addEventListener("click", () => {
 els.btnCompare.addEventListener("click", async () => {
   const selected = Array.from(els.compareSelect.selectedOptions).map(o => o.value);
   if (selected.length < 2) {
-    setMessage(els.compareViewContainer.parentElement, "Select at least two runs to compare.", "error");
+    setMessage(document.getElementById("compare-message"), "Select at least two runs to compare.", "error");
     return;
   }
   try {
@@ -758,7 +761,7 @@ els.btnCompare.addEventListener("click", async () => {
     renderComparisonTable(data);
     show(els.compareViewContainer);
   } catch (err) {
-    setMessage(els.compareViewContainer.parentElement, `Compare failed: ${err.message}`, "error");
+    setMessage(document.getElementById("compare-message"), `Compare failed: ${err.message}`, "error");
   }
 });
 
@@ -839,7 +842,7 @@ window.downloadComparison = async (runDirs) => {
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {
-    setMessage(els.compareViewContainer.parentElement, `Download failed: ${err.message}`, "error");
+    setMessage(document.getElementById("compare-message"), `Download failed: ${err.message}`, "error");
   }
 };
 
@@ -999,13 +1002,15 @@ els.btnRunTask.addEventListener("click", startTaskRun);
 
 async function init() {
   try {
-    // Debug overlay
-    const debug = document.createElement('div');
-    debug.id = 'fb-debug';
-    debug.style.cssText = 'position:fixed;bottom:1rem;left:1rem;right:1rem;background:#1e293b;color:#e2e8f0;padding:0.75rem;border-radius:6px;z-index:9999;font-family:monospace;font-size:0.75rem;max-height:200px;overflow-y:auto;border:1px solid #334155;';
-    debug.innerHTML = '<strong style="display:flex;justify-content:space-between;align-items:center;"><span>🔧 ForgeBench Debug</span><button onclick="document.getElementById(\'fb-debug\').remove()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:0.75rem;padding:0 0.25rem;">×</button></strong><br>';
-    document.body.appendChild(debug);
-    function dlog(msg) { debug.innerHTML += '<br>▸ ' + msg; console.log('[FB]', msg); }
+    // Debug overlay — opt-in via ?debug so it never intrudes on the UI.
+    if (new URLSearchParams(location.search).has("debug")) {
+      const debug = document.createElement('div');
+      debug.id = 'fb-debug';
+      debug.style.cssText = 'position:fixed;bottom:1rem;left:1rem;right:1rem;background:#1e293b;color:#e2e8f0;padding:0.75rem;border-radius:6px;z-index:9999;font-family:monospace;font-size:0.75rem;max-height:200px;overflow-y:auto;border:1px solid #334155;';
+      debug.innerHTML = '<strong style="display:flex;justify-content:space-between;align-items:center;"><span>🔧 ForgeBench Debug</span><button onclick="document.getElementById(\'fb-debug\').remove()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:0.75rem;padding:0 0.25rem;">×</button></strong><br>';
+      document.body.appendChild(debug);
+      dlog = (msg) => { debug.innerHTML += '<br>▸ ' + msg; console.log('[FB]', msg); };
+    }
 
     dlog('DOM validation starting...');
     // Verify critical DOM elements exist
