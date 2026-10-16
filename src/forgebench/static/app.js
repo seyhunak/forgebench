@@ -80,6 +80,27 @@ const els = {
   runPredictionsView: document.getElementById("run-predictions-view"),
   btnBackToReport: document.getElementById("btn-back-to-report"),
   btnDownloadPredictions: document.getElementById("btn-download-predictions"),
+  // Task panel
+  taskSelect: document.getElementById("task-select"),
+  taskSplit: document.getElementById("task-split"),
+  taskProvider: document.getElementById("task-provider"),
+  taskModel: document.getElementById("task-model"),
+  taskJudgeProvider: document.getElementById("task-judge-provider"),
+  taskJudgeModel: document.getElementById("task-judge-model"),
+  taskLimit: document.getElementById("task-limit"),
+  btnValidateTask: document.getElementById("btn-validate-task"),
+  btnRunTask: document.getElementById("btn-run-task"),
+  taskMessage: document.getElementById("task-message"),
+  taskProgress: document.getElementById("task-progress"),
+  taskProgressText: document.getElementById("task-progress-text"),
+  taskProgressCounter: document.getElementById("task-progress-counter"),
+  taskProgressFill: document.getElementById("task-progress-fill"),
+  taskResult: document.getElementById("task-result"),
+  taskResRunId: document.getElementById("task-res-run-id"),
+  taskResCases: document.getElementById("task-res-cases"),
+  taskResValid: document.getElementById("task-res-valid"),
+  taskBtnOpenRun: document.getElementById("task-btn-open-run"),
+  taskRunsGrid: document.getElementById("task-runs-grid"),
 };
 
 // ---------- Theme ----------
@@ -822,6 +843,158 @@ window.downloadComparison = async (runDirs) => {
   }
 };
 
+// ---------- Tasks ----------
+
+async function loadTasks() {
+  try {
+    const taskNames = await fetchJSON("/api/tasks");
+    els.taskSelect.innerHTML = '<option value="">Select a task</option>';
+    for (const name of taskNames) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      els.taskSelect.appendChild(opt);
+    }
+    els.taskProvider.innerHTML = "";
+    els.taskJudgeProvider.innerHTML = "";
+    const providers = await fetchJSON("/api/providers");
+    for (const p of providers) {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.name;
+      els.taskProvider.appendChild(opt.cloneNode(true));
+      els.taskJudgeProvider.appendChild(opt.cloneNode(true));
+    }
+    await loadTaskRuns();
+  } catch (err) {
+    setMessage(els.taskMessage, `Failed to load tasks: ${err.message}`, "error");
+  }
+}
+
+async function validateTask() {
+  const name = els.taskSelect.value;
+  if (!name) {
+    setMessage(els.taskMessage, "Select a task first.", "error");
+    return;
+  }
+  try {
+    const data = await fetchJSON(`/api/tasks/${name}`);
+    const problems = data.problems?.length
+      ? `<ul style="margin:0.5rem 0 0 1rem">${data.problems.map(p => `<li>${p}</li>`).join("")}</ul>`
+      : "<em>none</em>";
+    els.taskMessage.innerHTML = `
+      <strong>${data.name} v${data.version}</strong><br>
+      <strong>Valid:</strong> ${data.ok}<br>
+      <strong>Input fields:</strong> ${data.input_fields.join(", ")}<br>
+      <strong>Output fields:</strong> ${data.output_fields.join(", ")}<br>
+      <strong>Scoring:</strong> ${data.scoring_methods.join(", ")}<br>
+      <strong>Cases:</strong> ${JSON.stringify(data.n_cases)}<br>
+      <strong>Problems:</strong> ${problems}
+    `;
+    show(els.taskMessage, data.ok ? "ok" : "error");
+  } catch (err) {
+    setMessage(els.taskMessage, `Validation failed: ${err.message}`, "error");
+  }
+}
+
+async function startTaskRun() {
+  const name = els.taskSelect.value;
+  if (!name) {
+    setMessage(els.taskMessage, "Select a task first.", "error");
+    return;
+  }
+  const payload = {
+    name,
+    split: els.taskSplit.value,
+    provider: els.taskProvider.value,
+    model: els.taskModel.value.trim(),
+    judge_provider: els.taskJudgeProvider.value,
+    judge_model: els.taskJudgeModel.value.trim(),
+    limit: els.taskLimit.value ? parseInt(els.taskLimit.value, 10) : undefined,
+  };
+  try {
+    hide(els.taskResult);
+    show(els.taskProgress);
+    els.taskProgressText.textContent = "Running…";
+    els.taskProgressFill.style.width = "0%";
+    els.taskProgressCounter.textContent = "0 / 0";
+    const data = await fetchJSON(`/api/tasks/${name}/run`, { method: "POST", body: JSON.stringify(payload) });
+    pollTaskProgress(data.run_id);
+  } catch (err) {
+    hide(els.taskProgress);
+    setMessage(els.taskMessage, `Run failed to start: ${err.message}`, "error");
+  }
+}
+
+async function pollTaskProgress(runId) {
+  let attempts = 0;
+  const maxAttempts = 300;
+  async function tick() {
+    attempts++;
+    try {
+      const state = await fetchJSON(`/api/tasks/${encodeURIComponent(runId)}/progress`);
+      if (state.progress) {
+        const { done, total } = state.progress;
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        els.taskProgressFill.style.width = `${pct}%`;
+        els.taskProgressCounter.textContent = `${done} / ${total}`;
+      }
+      if (state.status === "done") {
+        hide(els.taskProgress);
+        showResult(state.result);
+        await loadTasks();
+        return;
+      }
+      if (state.status === "error") {
+        hide(els.taskProgress);
+        setMessage(els.taskMessage, `Task run failed: ${state.error}`, "error");
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        hide(els.taskProgress);
+        setMessage(els.taskMessage, "Run timed out. Check the server logs.", "error");
+        return;
+      }
+      setTimeout(tick, 1000);
+    } catch (err) {
+      hide(els.taskProgress);
+      setMessage(els.taskMessage, `Progress poll failed: ${err.message}`, "error");
+    }
+  }
+  tick();
+}
+
+function showResult(result) {
+  if (!result) return;
+  show(els.taskResult);
+  els.taskResRunId.textContent = result.run_id;
+  els.taskResCases.textContent = result.metrics?.n_cases ?? "—";
+  els.taskResValid.textContent = result.metrics?.n_valid ?? "—";
+  els.taskBtnOpenRun.onclick = () => {
+    window.location.href = `/api/runs/${encodeURIComponent(result.run_id)}/report`;
+  };
+}
+
+async function loadTaskRuns() {
+  try {
+    const runs = await fetchJSON("/api/tasks/runs");
+    if (runs.length === 0) {
+      els.taskRunsGrid.innerHTML = '<p style="color:var(--fg-muted);text-align:center;padding:1rem;">No task runs yet.</p>';
+      return;
+    }
+    const rows = runs.map(r => {
+      const m = r.metrics || {};
+      return `<div class="run-card" onclick="window.location.href='/api/runs/${encodeURIComponent(r.path)}/report'"><div class="run-card--header"><div class="run-card--id">${escapeHtml(r.run_id)}</div><span style="font-size:0.75rem;color:var(--fg-muted);">${escapeHtml(r.task ?? '')}</span></div><div class="run-card--meta"><div>Split: ${escapeHtml(r.split)}</div><div>Cases: ${m.n_cases ?? '—'} | Valid: ${m.n_valid ?? '—'}</div><div>${r.created_at || '—'}</div></div></div>`;
+    }).join("");
+    els.taskRunsGrid.innerHTML = `<div style="display:flex;flex-direction:column;gap:0.5rem;">${rows}</div>`;
+  } catch (err) {
+    els.taskRunsGrid.innerHTML = `<p style="color:var(--fg-danger);">Failed to load task runs: ${err.message}</p>`;
+  }
+}
+
+els.btnValidateTask.addEventListener("click", validateTask);
+els.btnRunTask.addEventListener("click", startTaskRun);
+
 // ---------- Init ----------
 
 async function init() {
@@ -846,7 +1019,13 @@ async function init() {
       'dataset-table-body', 'btn-download-dataset', 'dataset-message',
       'config-editor-select', 'config-editor', 'config-editor-loading',
       'btn-save-config', 'btn-reset-config', 'config-message',
-      'btn-theme-toggle', 'btn-download-report', 'btn-view-predictions'];
+      'btn-theme-toggle', 'btn-download-report', 'btn-view-predictions',
+      'task-select', 'task-split', 'task-provider', 'task-model',
+      'task-judge-provider', 'task-judge-model', 'task-limit',
+      'btn-validate-task', 'btn-run-task', 'task-message',
+      'task-progress', 'task-progress-text', 'task-progress-counter',
+      'task-progress-fill', 'task-result', 'task-res-run-id', 'task-res-cases',
+      'task-res-valid', 'task-btn-open-run', 'task-runs-grid'];
     const missing = critical.filter(id => !document.getElementById(id));
     if (missing.length > 0) {
       throw new Error('Missing DOM elements: ' + missing.join(', '));
@@ -864,6 +1043,8 @@ async function init() {
     dlog('Datasets loaded');
     await loadRuns();
     dlog('Runs loaded');
+    await loadTasks();
+    dlog('Tasks loaded');
   } catch (err) {
     const errEl = document.createElement('div');
     errEl.style.cssText = 'position:fixed;top:1rem;left:1rem;right:1rem;background:#dc2626;color:#fff;padding:1rem;border-radius:6px;z-index:9999;font-family:monospace;font-size:0.875rem;';

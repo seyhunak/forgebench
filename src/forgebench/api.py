@@ -34,6 +34,8 @@ from .dashboard import list_runs as _list_runs
 from .registry import default_datasets_root, list_datasets, load_dataset, load_split
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
+from .task_runner import run_task_experiment
+from .tasks import list_tasks, load_task_with_cases, validate_task
 
 _run_state: dict[str, dict[str, Any]] = {}
 
@@ -57,6 +59,17 @@ class RunRequest(BaseModel):
     provider: str = "mock"
     limit: int | None = None
     run_id: str | None = None
+    output_root: str = "runs"
+
+
+class TaskRunRequest(BaseModel):
+    name: str
+    split: str = "test"
+    provider: str = "mock"
+    model: str = ""
+    judge_provider: str = ""
+    judge_model: str = ""
+    limit: int | None = None
     output_root: str = "runs"
 
 
@@ -499,6 +512,122 @@ def get_run(run_id: str) -> dict[str, Any]:
         return entry
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Task endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/tasks")
+def list_tasks_endpoint() -> list[str]:
+    """All task names under tasks/."""
+    root = Path(__file__).resolve().parents[2] / "tasks"
+    return list_tasks(root)
+
+
+@app.get("/api/tasks/{name}")
+def validate_task_endpoint(name: str) -> dict[str, Any]:
+    """Validate a task definition and its case files."""
+    root = Path(__file__).resolve().parents[2] / "tasks"
+    try:
+        info, report = validate_task(name, root)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "name": info.name,
+        "version": info.version,
+        "description": info.description,
+        "input_fields": info.input_fields,
+        "output_fields": info.output_fields,
+        "scoring_methods": info.scoring_methods,
+        "n_cases": info.n_cases,
+        "case_hashes": info.case_hashes,
+        "ok": report.ok,
+        "problems": report.problems,
+    }
+
+
+@app.post("/api/tasks/{name}/run")
+def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, str]:
+    """Start a custom-task evaluation run in a background thread."""
+    try:
+        task, _ = load_task_with_cases(name, payload.split)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    run_id = f"{name}-{payload.provider}"
+
+    _run_state[run_id] = {
+        "status": "running",
+        "progress": {"done": 0, "total": 0},
+        "result": None,
+        "error": None,
+        "type": "task",
+    }
+
+    def _worker() -> None:
+        try:
+            reporter = _ProgressReporter(run_id)
+            result = run_task_experiment(
+                name=name,
+                split=payload.split,
+                provider=payload.provider,
+                model=payload.model,
+                judge_provider=payload.judge_provider,
+                judge_model=payload.judge_model,
+                limit=payload.limit,
+                output_root=Path(payload.output_root),
+                on_progress=reporter,
+            )
+            _run_state[run_id]["status"] = "done"
+            _run_state[run_id]["result"] = {
+                "run_id": result.run_id,
+                "run_dir": str(result.run_dir),
+                "metrics": result.metrics,
+                "manifest": result.manifest,
+            }
+        except Exception as exc:  # noqa: BLE001
+            _run_state[run_id]["status"] = "error"
+            _run_state[run_id]["error"] = str(exc)
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+
+    return {"run_id": run_id, "status": "started"}
+
+
+@app.get("/api/tasks/{name}/runs/{run_id:path}/progress")
+def task_run_progress(name: str, run_id: str) -> dict[str, Any]:
+    state = _run_state.get(run_id)
+    if state is None or state.get("type") != "task":
+        raise HTTPException(status_code=404, detail=f"task run not found: {run_id}")
+    return state
+
+
+@app.get("/api/tasks/runs")
+def list_task_runs() -> list[dict[str, Any]]:
+    """Task run directories that have a manifest, newest first."""
+    paths = _list_runs()
+    out = []
+    for p in paths:
+        try:
+            entry = load_run(str(p))
+            manifest = entry["manifest"]
+            if manifest.get("task"):
+                out.append(
+                    {
+                        "run_id": entry["run_id"],
+                        "path": str(p.relative_to(REPO_ROOT)),
+                        "task": manifest.get("task", {}),
+                        "split": manifest.get("split", ""),
+                        "metrics": entry["metrics"],
+                        "created_at": manifest.get("created_at_utc"),
+                    }
+                )
+        except Exception:  # noqa: BLE001
+            continue
+    return out
 
 
 @app.post("/api/compare")

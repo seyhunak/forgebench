@@ -276,6 +276,93 @@
     </div>
   </section>
 
+  <!-- ===== TASKS SECTION ===== -->
+  <section class="panel panel--tasks" id="tasks-panel">
+    <div class="panel-header">
+      <h2>Custom Tasks</h2>
+      <p class="panel-sub">Run user-defined evaluation tasks (DeepEval-compatible). Select a task, pick a provider and judge, then run.</p>
+    </div>
+
+    <div class="panel-body">
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="form-label">Task</label>
+          <select id="task-select"></select>
+          <span class="field-hint">Choose a custom task definition under tasks/.</span>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Split</label>
+          <select id="task-split">
+            <option value="test">test</option>
+            <option value="dev">dev</option>
+            <option value="train">train</option>
+          </select>
+          <span class="field-hint">Dataset split to evaluate.</span>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Provider</label>
+          <select id="task-provider"></select>
+          <span class="field-hint">Model provider for predictions.</span>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Model</label>
+          <input type="text" id="task-model" placeholder="(provider default)">
+          <span class="field-hint">Model id override.</span>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="form-label">Judge Provider</label>
+          <select id="task-judge-provider"></select>
+          <span class="field-hint">Provider for LLM-as-judge scoring (llm_judge rules).</span>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Judge Model</label>
+          <input type="text" id="task-judge-model" placeholder="(task default)">
+          <span class="field-hint">Judge model id override.</span>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Limit</label>
+          <input type="number" id="task-limit" placeholder="cases">
+          <span class="field-hint">Evaluate only the first N cases (smoke test).</span>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button class="button button--primary" id="btn-validate-task">Validate Task</button>
+        <button class="button button--primary button--wide" id="btn-run-task">Run Task</button>
+      </div>
+
+      <div id="task-message" class="message"></div>
+
+      <div class="task-progress" id="task-progress" style="display:none;">
+        <div class="progress-label">
+          <span id="task-progress-text">Starting…</span>
+          <span id="task-progress-counter" class="progress-counter">0 / 0</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="task-progress-fill"></div>
+        </div>
+      </div>
+
+      <div id="task-result" class="run-result" style="display:none;">
+        <h3 class="result-title">Task run complete</h3>
+        <table class="result-table">
+          <tr><td class="label">Run id</td><td class="value" id="task-res-run-id">—</td></tr>
+          <tr><td class="label">Cases</td><td class="value" id="task-res-cases">—</td></tr>
+          <tr><td class="label">Valid</td><td class="value" id="task-res-valid">—</td></tr>
+          <tr><td class="label">Artifacts</td><td class="value" id="task-res-artifacts"><button class="button button--quiet" id="task-btn-open-run">Open run dir</button></td></tr>
+        </table>
+      </div>
+
+      <div class="task-runs">
+        <h3 class="status-title">Task runs</h3>
+        <div id="task-runs-grid"></div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <script src="/static/app.js?v=6"></script>
