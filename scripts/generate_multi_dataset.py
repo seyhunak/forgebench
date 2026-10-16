@@ -12,12 +12,21 @@ import random
 from pathlib import Path
 
 SEED = 2026
-FAMILIES = ["matched", "amount_mismatch", "date_mismatch", "reference_mismatch", "duplicate", "ambiguous"]
+FAMILIES = [
+    "matched",
+    "amount_mismatch",
+    "date_mismatch",
+    "reference_mismatch",
+    "duplicate",
+    "ambiguous",
+]
 
 random.seed(SEED)
 
 
-def make_case(prefix, idx, family, category, requires_review, input_fields, expected_fields, explanation):
+def make_case(
+    prefix, idx, family, category, requires_review, input_fields, expected_fields, explanation
+):
     return {
         "id": f"{prefix}-{idx:04d}",
         "task": "classification",
@@ -62,23 +71,51 @@ def write_dataset(name, version, task, license_str, train, dev, test, card_md):
     write_jsonl(d / "train.jsonl", train)
     write_jsonl(d / "dev.jsonl", dev)
     write_jsonl(d / "test.jsonl", test)
-    print(f"✓ {name}: train={len(train)}, dev={len(dev)}, test={len(test)}, "
-          f"total={len(train)+len(dev)+len(test)}")
+    print(
+        f"✓ {name}: train={len(train)}, dev={len(dev)}, test={len(test)}, "
+        f"total={len(train) + len(dev) + len(test)}"
+    )
 
 
 # ---------------- legal_v1 ----------------
 vendors_legal = [
-    "Skadden Arps", "Kirkland Ellis", "Latham Watkins", "Baker McKenzie",
-    "Dentons", "Clifford Chance", "Linklaters", "White & Case",
-    "Jones Day", "Morgan Lewis", "Sidley Austin", "Gibson Dunn",
+    "Skadden Arps",
+    "Kirkland Ellis",
+    "Latham Watkins",
+    "Baker McKenzie",
+    "Dentons",
+    "Clifford Chance",
+    "Linklaters",
+    "White & Case",
+    "Jones Day",
+    "Morgan Lewis",
+    "Sidley Austin",
+    "Gibson Dunn",
 ]
 clauses = ["nda", "service_agreement", "lease", "procurement", "consulting"]
 
 
-def legal_case(idx, family, category, vendor, clause_type, contract_val,
-               invoice_val, contract_ref, invoice_ref, contract_date,
-               invoice_date, requires_review, explanation):
-    return make_case("LG", idx, family, category, requires_review,
+def legal_case(
+    idx,
+    family,
+    category,
+    vendor,
+    clause_type,
+    contract_val,
+    invoice_val,
+    contract_ref,
+    invoice_ref,
+    contract_date,
+    invoice_date,
+    requires_review,
+    explanation,
+):
+    return make_case(
+        "LG",
+        idx,
+        family,
+        category,
+        requires_review,
         {
             "vendor": vendor,
             "description": f"Clause review - {clause_type} - {vendor}",
@@ -101,9 +138,23 @@ for _ in range(30):  # matched
     amt = f"${random.randint(1000, 50000)}"
     ref = f"CTR-{random.randint(10000, 99999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_legal.append(legal_case(idx, "matched", "matched", v, random.choice(clauses),
-                                  amt, amt, ref, ref, date, date, False,
-                                  "Contract and invoice agree on amount, date and reference."))
+    cases_legal.append(
+        legal_case(
+            idx,
+            "matched",
+            "matched",
+            v,
+            random.choice(clauses),
+            amt,
+            amt,
+            ref,
+            ref,
+            date,
+            date,
+            False,
+            "Contract and invoice agree on amount, date and reference.",
+        )
+    )
     idx += 1
 for _ in range(20):  # amount mismatch
     v = random.choice(vendors_legal)
@@ -113,9 +164,23 @@ for _ in range(20):  # amount mismatch
         b = f"${random.randint(1000, 30000)}"
     ref = f"CTR-{random.randint(10000, 99999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_legal.append(legal_case(idx, "amount_mismatch", "amount_mismatch", v, random.choice(clauses),
-                                  a, b, ref, ref, date, date, True,
-                                  f"Contract amount {a} does not equal invoice amount {b}."))
+    cases_legal.append(
+        legal_case(
+            idx,
+            "amount_mismatch",
+            "amount_mismatch",
+            v,
+            random.choice(clauses),
+            a,
+            b,
+            ref,
+            ref,
+            date,
+            date,
+            True,
+            f"Contract amount {a} does not equal invoice amount {b}.",
+        )
+    )
     idx += 1
 for _ in range(15):  # date mismatch
     v = random.choice(vendors_legal)
@@ -125,9 +190,23 @@ for _ in range(15):  # date mismatch
     d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
     while d2 == d1:
         d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_legal.append(legal_case(idx, "date_mismatch", "date_mismatch", v, random.choice(clauses),
-                                  amt, amt, ref, ref, d1, d2, True,
-                                  f"Contract date {d1} does not equal invoice date {d2}; amounts agree."))
+    cases_legal.append(
+        legal_case(
+            idx,
+            "date_mismatch",
+            "date_mismatch",
+            v,
+            random.choice(clauses),
+            amt,
+            amt,
+            ref,
+            ref,
+            d1,
+            d2,
+            True,
+            f"Contract date {d1} does not equal invoice date {d2}; amounts agree.",
+        )
+    )
     idx += 1
 for _ in range(15):  # reference mismatch
     v = random.choice(vendors_legal)
@@ -135,22 +214,50 @@ for _ in range(15):  # reference mismatch
     r1 = f"CTR-{random.randint(10000, 99999)}"
     r2 = f"CTR-{random.randint(10000, 99999)}-A"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_legal.append(legal_case(idx, "reference_mismatch", "reference_mismatch", v, random.choice(clauses),
-                                  amt, amt, r1, r2, date, date, True,
-                                  f"Contract reference {r1} does not equal invoice reference {r2}; amounts agree."))
+    cases_legal.append(
+        legal_case(
+            idx,
+            "reference_mismatch",
+            "reference_mismatch",
+            v,
+            random.choice(clauses),
+            amt,
+            amt,
+            r1,
+            r2,
+            date,
+            date,
+            True,
+            f"Contract reference {r1} does not equal invoice reference {r2}; amounts agree.",
+        )
+    )
     idx += 1
 for _ in range(12):  # duplicate
     v = random.choice(vendors_legal)
     amt = f"${random.randint(1000, 30000)}"
     ref = f"CTR-{random.randint(10000, 99999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_legal.append(make_case("LG", idx, "duplicate", "duplicate", True,
-        {"vendor": v, "description": f"Clause review - {random.choice(clauses)} - {v}",
-         "bank_amount": amt, "ledger_amount": amt,
-         "bank_reference": ref, "ledger_reference": ref,
-         "bank_date": date, "ledger_date": date},
-        {"category": "duplicate", "requires_review": True},
-        "The contract shows the clause twice while the invoice shows it once."))
+    cases_legal.append(
+        make_case(
+            "LG",
+            idx,
+            "duplicate",
+            "duplicate",
+            True,
+            {
+                "vendor": v,
+                "description": f"Clause review - {random.choice(clauses)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": ref,
+                "ledger_reference": ref,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "duplicate", "requires_review": True},
+            "The contract shows the clause twice while the invoice shows it once.",
+        )
+    )
     idx += 1
 for _ in range(13):  # ambiguous
     v = random.choice(vendors_legal)
@@ -158,13 +265,27 @@ for _ in range(13):  # ambiguous
     r1 = f"CTR-{random.randint(10000, 99999)}"
     r2 = f"CTR-{random.randint(10000, 99999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_legal.append(make_case("LG", idx, "ambiguous", "ambiguous", True,
-        {"vendor": v, "description": f"Clause review - {random.choice(clauses)} - {v}",
-         "bank_amount": amt, "ledger_amount": amt,
-         "bank_reference": r1, "ledger_reference": r2,
-         "bank_date": date, "ledger_date": date},
-        {"category": "ambiguous", "requires_review": True},
-        "Reference and date both differ weakly; human review required."))
+    cases_legal.append(
+        make_case(
+            "LG",
+            idx,
+            "ambiguous",
+            "ambiguous",
+            True,
+            {
+                "vendor": v,
+                "description": f"Clause review - {random.choice(clauses)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": r1,
+                "ledger_reference": r2,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "ambiguous", "requires_review": True},
+            "Reference and date both differ weakly; human review required.",
+        )
+    )
     idx += 1
 
 random.shuffle(cases_legal)
@@ -205,22 +326,54 @@ by deterministic rules, never by a model.
 - Comparing prompts and structured-output strategies on legal document data.
 - Validating an evaluation pipeline end to end without any API key.
 """
-write_dataset("legal_v1", "1.0.0", "claims_reconciliation",
-              "Apache-2.0 (synthetic data generated by this repository)",
-              cases_legal[:42], cases_legal[42:63], cases_legal[63:], legal_card)
+write_dataset(
+    "legal_v1",
+    "1.0.0",
+    "claims_reconciliation",
+    "Apache-2.0 (synthetic data generated by this repository)",
+    cases_legal[:42],
+    cases_legal[42:63],
+    cases_legal[63:],
+    legal_card,
+)
 
 # ---------------- insurance_v1 ----------------
 vendors_ins = [
-    "Allstate", "State Farm", "Liberty Mutual", "Travelers", "USAA",
-    "Nationwide", "Progressive", "Chubb", "AIG", "Hartford",
+    "Allstate",
+    "State Farm",
+    "Liberty Mutual",
+    "Travelers",
+    "USAA",
+    "Nationwide",
+    "Progressive",
+    "Chubb",
+    "AIG",
+    "Hartford",
 ]
 claim_types = ["auto", "property", "liability", "workers_comp", "health"]
 
 
-def insurance_case(idx, family, category, vendor, claim_type,
-                   adjuster_val, paid_val, claim_ref, paid_ref,
-                   adj_date, paid_date, requires_review, explanation):
-    return make_case("IN", idx, family, category, requires_review,
+def insurance_case(
+    idx,
+    family,
+    category,
+    vendor,
+    claim_type,
+    adjuster_val,
+    paid_val,
+    claim_ref,
+    paid_ref,
+    adj_date,
+    paid_date,
+    requires_review,
+    explanation,
+):
+    return make_case(
+        "IN",
+        idx,
+        family,
+        category,
+        requires_review,
         {
             "vendor": vendor,
             "description": f"Claim - {claim_type} - {vendor}",
@@ -243,9 +396,23 @@ for _ in range(30):  # matched
     amt = f"${random.randint(500, 20000)}"
     ref = f"CLM-{random.randint(100000, 999999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_ins.append(insurance_case(idx, "matched", "matched", v, random.choice(claim_types),
-                                    amt, amt, ref, ref, date, date, False,
-                                    "Adjuster and payment agree on amount, date and reference."))
+    cases_ins.append(
+        insurance_case(
+            idx,
+            "matched",
+            "matched",
+            v,
+            random.choice(claim_types),
+            amt,
+            amt,
+            ref,
+            ref,
+            date,
+            date,
+            False,
+            "Adjuster and payment agree on amount, date and reference.",
+        )
+    )
     idx += 1
 for _ in range(20):  # amount mismatch
     v = random.choice(vendors_ins)
@@ -255,9 +422,23 @@ for _ in range(20):  # amount mismatch
         b = f"${random.randint(500, 15000)}"
     ref = f"CLM-{random.randint(100000, 999999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_ins.append(insurance_case(idx, "amount_mismatch", "amount_mismatch", v, random.choice(claim_types),
-                                    a, b, ref, ref, date, date, True,
-                                    f"Adjuster amount {a} does not equal paid amount {b}."))
+    cases_ins.append(
+        insurance_case(
+            idx,
+            "amount_mismatch",
+            "amount_mismatch",
+            v,
+            random.choice(claim_types),
+            a,
+            b,
+            ref,
+            ref,
+            date,
+            date,
+            True,
+            f"Adjuster amount {a} does not equal paid amount {b}.",
+        )
+    )
     idx += 1
 for _ in range(15):  # date mismatch
     v = random.choice(vendors_ins)
@@ -267,9 +448,23 @@ for _ in range(15):  # date mismatch
     d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
     while d2 == d1:
         d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_ins.append(insurance_case(idx, "date_mismatch", "date_mismatch", v, random.choice(claim_types),
-                                    amt, amt, ref, ref, d1, d2, True,
-                                    f"Adjuster date {d1} does not equal paid date {d2}; amounts agree."))
+    cases_ins.append(
+        insurance_case(
+            idx,
+            "date_mismatch",
+            "date_mismatch",
+            v,
+            random.choice(claim_types),
+            amt,
+            amt,
+            ref,
+            ref,
+            d1,
+            d2,
+            True,
+            f"Adjuster date {d1} does not equal paid date {d2}; amounts agree.",
+        )
+    )
     idx += 1
 for _ in range(15):  # reference mismatch
     v = random.choice(vendors_ins)
@@ -277,22 +472,50 @@ for _ in range(15):  # reference mismatch
     r1 = f"CLM-{random.randint(100000, 999999)}"
     r2 = f"CLM-{random.randint(100000, 999999)}-A"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_ins.append(insurance_case(idx, "reference_mismatch", "reference_mismatch", v, random.choice(claim_types),
-                                    amt, amt, r1, r2, date, date, True,
-                                    f"Adjuster reference {r1} does not equal paid reference {r2}; amounts agree."))
+    cases_ins.append(
+        insurance_case(
+            idx,
+            "reference_mismatch",
+            "reference_mismatch",
+            v,
+            random.choice(claim_types),
+            amt,
+            amt,
+            r1,
+            r2,
+            date,
+            date,
+            True,
+            f"Adjuster reference {r1} does not equal paid reference {r2}; amounts agree.",
+        )
+    )
     idx += 1
 for _ in range(12):  # duplicate
     v = random.choice(vendors_ins)
     amt = f"${random.randint(500, 15000)}"
     ref = f"CLM-{random.randint(100000, 999999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_ins.append(make_case("IN", idx, "duplicate", "duplicate", True,
-        {"vendor": v, "description": f"Claim - {random.choice(claim_types)} - {v}",
-         "bank_amount": amt, "ledger_amount": amt,
-         "bank_reference": ref, "ledger_reference": ref,
-         "bank_date": date, "ledger_date": date},
-        {"category": "duplicate", "requires_review": True},
-        "The adjuster shows the claim twice while the payment shows it once."))
+    cases_ins.append(
+        make_case(
+            "IN",
+            idx,
+            "duplicate",
+            "duplicate",
+            True,
+            {
+                "vendor": v,
+                "description": f"Claim - {random.choice(claim_types)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": ref,
+                "ledger_reference": ref,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "duplicate", "requires_review": True},
+            "The adjuster shows the claim twice while the payment shows it once.",
+        )
+    )
     idx += 1
 for _ in range(13):  # ambiguous
     v = random.choice(vendors_ins)
@@ -300,13 +523,27 @@ for _ in range(13):  # ambiguous
     r1 = f"CLM-{random.randint(100000, 999999)}"
     r2 = f"CLM-{random.randint(100000, 999999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_ins.append(make_case("IN", idx, "ambiguous", "ambiguous", True,
-        {"vendor": v, "description": f"Claim - {random.choice(claim_types)} - {v}",
-         "bank_amount": amt, "ledger_amount": amt,
-         "bank_reference": r1, "ledger_reference": r2,
-         "bank_date": date, "ledger_date": date},
-        {"category": "ambiguous", "requires_review": True},
-        "Reference and date both differ weakly; human review required."))
+    cases_ins.append(
+        make_case(
+            "IN",
+            idx,
+            "ambiguous",
+            "ambiguous",
+            True,
+            {
+                "vendor": v,
+                "description": f"Claim - {random.choice(claim_types)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": r1,
+                "ledger_reference": r2,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "ambiguous", "requires_review": True},
+            "Reference and date both differ weakly; human review required.",
+        )
+    )
     idx += 1
 
 random.shuffle(cases_ins)
@@ -347,22 +584,54 @@ by deterministic rules, never by a model.
 - Comparing prompts and structured-output strategies on insurance claims data.
 - Validating an evaluation pipeline end to end without any API key.
 """
-write_dataset("insurance_v1", "1.0.0", "claims_reconciliation",
-              "Apache-2.0 (synthetic data generated by this repository)",
-              cases_ins[:42], cases_ins[42:63], cases_ins[63:], ins_card)
+write_dataset(
+    "insurance_v1",
+    "1.0.0",
+    "claims_reconciliation",
+    "Apache-2.0 (synthetic data generated by this repository)",
+    cases_ins[:42],
+    cases_ins[42:63],
+    cases_ins[63:],
+    ins_card,
+)
 
 # ---------------- support_v1 ----------------
 vendors_sup = [
-    "Zendesk", "Freshdesk", "Intercom", "Salesforce Service Cloud", "HubSpot",
-    "ServiceNow", "Freshservice", "Jira Service Management", "Kustomer", "Gorgias",
+    "Zendesk",
+    "Freshdesk",
+    "Intercom",
+    "Salesforce Service Cloud",
+    "HubSpot",
+    "ServiceNow",
+    "Freshservice",
+    "Jira Service Management",
+    "Kustomer",
+    "Gorgias",
 ]
 ticket_types = ["billing", "technical", "account_access", "feature_request", "refund"]
 
 
-def support_case(idx, family, category, vendor, ticket_type,
-                 agent_val, system_val, ticket_ref, system_ref,
-                 agent_date, system_date, requires_review, explanation):
-    return make_case("SP", idx, family, category, requires_review,
+def support_case(
+    idx,
+    family,
+    category,
+    vendor,
+    ticket_type,
+    agent_val,
+    system_val,
+    ticket_ref,
+    system_ref,
+    agent_date,
+    system_date,
+    requires_review,
+    explanation,
+):
+    return make_case(
+        "SP",
+        idx,
+        family,
+        category,
+        requires_review,
         {
             "vendor": vendor,
             "description": f"Ticket - {ticket_type} - {vendor}",
@@ -385,9 +654,23 @@ for _ in range(30):  # matched
     amt = f"${random.randint(10, 5000)}"
     ref = f"TKT-{random.randint(100000, 999999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_sup.append(support_case(idx, "matched", "matched", v, random.choice(ticket_types),
-                                  amt, amt, ref, ref, date, date, False,
-                                  "Agent resolution and system record agree."))
+    cases_sup.append(
+        support_case(
+            idx,
+            "matched",
+            "matched",
+            v,
+            random.choice(ticket_types),
+            amt,
+            amt,
+            ref,
+            ref,
+            date,
+            date,
+            False,
+            "Agent resolution and system record agree.",
+        )
+    )
     idx += 1
 for _ in range(20):  # amount mismatch
     v = random.choice(vendors_sup)
@@ -397,9 +680,23 @@ for _ in range(20):  # amount mismatch
         b = f"${random.randint(10, 3000)}"
     ref = f"TKT-{random.randint(100000, 999999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_sup.append(support_case(idx, "amount_mismatch", "amount_mismatch", v, random.choice(ticket_types),
-                                  a, b, ref, ref, date, date, True,
-                                  f"Agent amount {a} does not equal system amount {b}."))
+    cases_sup.append(
+        support_case(
+            idx,
+            "amount_mismatch",
+            "amount_mismatch",
+            v,
+            random.choice(ticket_types),
+            a,
+            b,
+            ref,
+            ref,
+            date,
+            date,
+            True,
+            f"Agent amount {a} does not equal system amount {b}.",
+        )
+    )
     idx += 1
 for _ in range(15):  # date mismatch
     v = random.choice(vendors_sup)
@@ -409,9 +706,23 @@ for _ in range(15):  # date mismatch
     d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
     while d2 == d1:
         d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_sup.append(support_case(idx, "date_mismatch", "date_mismatch", v, random.choice(ticket_types),
-                                  amt, amt, ref, ref, d1, d2, True,
-                                  f"Agent date {d1} does not equal system date {d2}; amounts agree."))
+    cases_sup.append(
+        support_case(
+            idx,
+            "date_mismatch",
+            "date_mismatch",
+            v,
+            random.choice(ticket_types),
+            amt,
+            amt,
+            ref,
+            ref,
+            d1,
+            d2,
+            True,
+            f"Agent date {d1} does not equal system date {d2}; amounts agree.",
+        )
+    )
     idx += 1
 for _ in range(15):  # reference mismatch
     v = random.choice(vendors_sup)
@@ -419,22 +730,50 @@ for _ in range(15):  # reference mismatch
     r1 = f"TKT-{random.randint(100000, 999999)}"
     r2 = f"TKT-{random.randint(100000, 999999)}-A"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_sup.append(support_case(idx, "reference_mismatch", "reference_mismatch", v, random.choice(ticket_types),
-                                  amt, amt, r1, r2, date, date, True,
-                                  f"Agent reference {r1} does not equal system reference {r2}; amounts agree."))
+    cases_sup.append(
+        support_case(
+            idx,
+            "reference_mismatch",
+            "reference_mismatch",
+            v,
+            random.choice(ticket_types),
+            amt,
+            amt,
+            r1,
+            r2,
+            date,
+            date,
+            True,
+            f"Agent reference {r1} does not equal system reference {r2}; amounts agree.",
+        )
+    )
     idx += 1
 for _ in range(12):  # duplicate
     v = random.choice(vendors_sup)
     amt = f"${random.randint(10, 3000)}"
     ref = f"TKT-{random.randint(100000, 999999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_sup.append(make_case("SP", idx, "duplicate", "duplicate", True,
-        {"vendor": v, "description": f"Ticket - {random.choice(ticket_types)} - {v}",
-         "bank_amount": amt, "ledger_amount": amt,
-         "bank_reference": ref, "ledger_reference": ref,
-         "bank_date": date, "ledger_date": date},
-        {"category": "duplicate", "requires_review": True},
-        "The agent shows the ticket twice while the system shows it once."))
+    cases_sup.append(
+        make_case(
+            "SP",
+            idx,
+            "duplicate",
+            "duplicate",
+            True,
+            {
+                "vendor": v,
+                "description": f"Ticket - {random.choice(ticket_types)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": ref,
+                "ledger_reference": ref,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "duplicate", "requires_review": True},
+            "The agent shows the ticket twice while the system shows it once.",
+        )
+    )
     idx += 1
 for _ in range(13):  # ambiguous
     v = random.choice(vendors_sup)
@@ -442,13 +781,27 @@ for _ in range(13):  # ambiguous
     r1 = f"TKT-{random.randint(100000, 999999)}"
     r2 = f"TKT-{random.randint(100000, 999999)}"
     date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
-    cases_sup.append(make_case("SP", idx, "ambiguous", "ambiguous", True,
-        {"vendor": v, "description": f"Ticket - {random.choice(ticket_types)} - {v}",
-         "bank_amount": amt, "ledger_amount": amt,
-         "bank_reference": r1, "ledger_reference": r2,
-         "bank_date": date, "ledger_date": date},
-        {"category": "ambiguous", "requires_review": True},
-        "Reference and date both differ weakly; human review required."))
+    cases_sup.append(
+        make_case(
+            "SP",
+            idx,
+            "ambiguous",
+            "ambiguous",
+            True,
+            {
+                "vendor": v,
+                "description": f"Ticket - {random.choice(ticket_types)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": r1,
+                "ledger_reference": r2,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "ambiguous", "requires_review": True},
+            "Reference and date both differ weakly; human review required.",
+        )
+    )
     idx += 1
 
 random.shuffle(cases_sup)
@@ -489,9 +842,16 @@ by deterministic rules, never by a model.
 - Comparing prompts and structured-output strategies on support ticket data.
 - Validating an evaluation pipeline end to end without any API key.
 """
-write_dataset("support_v1", "1.0.0", "claims_reconciliation",
-              "Apache-2.0 (synthetic data generated by this repository)",
-              cases_sup[:42], cases_sup[42:63], cases_sup[63:], sup_card)
+write_dataset(
+    "support_v1",
+    "1.0.0",
+    "claims_reconciliation",
+    "Apache-2.0 (synthetic data generated by this repository)",
+    cases_sup[:42],
+    cases_sup[42:63],
+    cases_sup[63:],
+    sup_card,
+)
 
 print("\nDone! Created 3 new datasets: legal_v1, insurance_v1, support_v1")
 print("Run: forgebench validate-dataset legal_v1  (etc.) to confirm")
