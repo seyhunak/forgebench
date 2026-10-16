@@ -526,6 +526,33 @@ def list_tasks_endpoint() -> list[str]:
     return list_tasks(root)
 
 
+# NOTE: registered before "/api/tasks/{name}" so the literal "runs" segment
+# is not captured as a task name (which would 500 on an unknown task).
+@app.get("/api/tasks/runs")
+def list_task_runs() -> list[dict[str, Any]]:
+    """Task run directories that have a manifest, newest first."""
+    paths = _list_runs()
+    out = []
+    for p in paths:
+        try:
+            entry = load_run(str(p))
+            manifest = entry["manifest"]
+            if manifest.get("task"):
+                out.append(
+                    {
+                        "run_id": entry["run_id"],
+                        "path": str(p.relative_to(REPO_ROOT)),
+                        "task": manifest.get("task", {}),
+                        "split": manifest.get("split", ""),
+                        "metrics": entry["metrics"],
+                        "created_at": manifest.get("created_at_utc"),
+                    }
+                )
+        except Exception:  # noqa: BLE001
+            continue
+    return out
+
+
 @app.get("/api/tasks/{name}")
 def validate_task_endpoint(name: str) -> dict[str, Any]:
     """Validate a task definition and its case files."""
@@ -534,6 +561,11 @@ def validate_task_endpoint(name: str) -> dict[str, Any]:
         info, report = validate_task(name, root)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if info is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"task not found or invalid: {name}: {report.problems}",
+        )
     return {
         "name": info.name,
         "version": info.version,
@@ -603,31 +635,6 @@ def task_run_progress(name: str, run_id: str) -> dict[str, Any]:
     if state is None or state.get("type") != "task":
         raise HTTPException(status_code=404, detail=f"task run not found: {run_id}")
     return state
-
-
-@app.get("/api/tasks/runs")
-def list_task_runs() -> list[dict[str, Any]]:
-    """Task run directories that have a manifest, newest first."""
-    paths = _list_runs()
-    out = []
-    for p in paths:
-        try:
-            entry = load_run(str(p))
-            manifest = entry["manifest"]
-            if manifest.get("task"):
-                out.append(
-                    {
-                        "run_id": entry["run_id"],
-                        "path": str(p.relative_to(REPO_ROOT)),
-                        "task": manifest.get("task", {}),
-                        "split": manifest.get("split", ""),
-                        "metrics": entry["metrics"],
-                        "created_at": manifest.get("created_at_utc"),
-                    }
-                )
-        except Exception:  # noqa: BLE001
-            continue
-    return out
 
 
 @app.post("/api/compare")
