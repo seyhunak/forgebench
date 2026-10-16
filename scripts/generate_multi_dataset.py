@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Generate additional synthetic datasets: legal_v1, insurance_v1, support_v1.
+"""Generate additional synthetic datasets.
+
+Datasets: legal_v1, insurance_v1, support_v1, payments_v1, procurement_v1 and
+subscriptions_v1.
 
 Each dataset uses the same input field names as finance_v1
 (bank_amount, ledger_amount, bank_reference, ledger_reference,
@@ -855,3 +858,841 @@ write_dataset(
 
 print("\nDone! Created 3 new datasets: legal_v1, insurance_v1, support_v1")
 print("Run: forgebench validate-dataset legal_v1  (etc.) to confirm")
+
+# ---------------- payments_v1 ----------------
+processors_payments = [
+    "Stripe",
+    "Adyen",
+    "Worldpay",
+    "Fiserv",
+    "Checkout.com",
+    "PayPal",
+    "Square",
+    "Braintree",
+    "Klarna",
+    "Nuvei",
+]
+payment_rails = ["card", "ach", "wire", "sepa", "open_banking", "wallet"]
+
+
+def payments_case(
+    idx,
+    family,
+    category,
+    vendor,
+    rail,
+    processor_val,
+    ledger_val,
+    processor_ref,
+    ledger_ref,
+    processor_date,
+    ledger_date,
+    requires_review,
+    explanation,
+):
+    return make_case(
+        "PA",
+        idx,
+        family,
+        category,
+        requires_review,
+        {
+            "vendor": vendor,
+            "description": f"Payment settlement - {rail} - {vendor}",
+            "bank_amount": processor_val,
+            "ledger_amount": ledger_val,
+            "bank_reference": processor_ref,
+            "ledger_reference": ledger_ref,
+            "bank_date": processor_date,
+            "ledger_date": ledger_date,
+        },
+        {"category": category, "requires_review": requires_review},
+        explanation,
+    )
+
+
+cases_payments = []
+idx = 1
+for _ in range(30):  # matched
+    v = random.choice(processors_payments)
+    amt = f"${random.randint(10, 50000)}"
+    ref = f"TXN-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_payments.append(
+        payments_case(
+            idx,
+            "matched",
+            "matched",
+            v,
+            random.choice(payment_rails),
+            amt,
+            amt,
+            ref,
+            ref,
+            date,
+            date,
+            False,
+            "Processor and ledger agree on amount, date and reference; auto-settled.",
+        )
+    )
+    idx += 1
+for _ in range(20):  # amount mismatch
+    v = random.choice(processors_payments)
+    a = f"${random.randint(10, 25000)}"
+    b = f"${random.randint(10, 25000)}"
+    while b == a:
+        b = f"${random.randint(10, 25000)}"
+    ref = f"TXN-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_payments.append(
+        payments_case(
+            idx,
+            "amount_mismatch",
+            "amount_mismatch",
+            v,
+            random.choice(payment_rails),
+            a,
+            b,
+            ref,
+            ref,
+            date,
+            date,
+            True,
+            f"Processor amount {a} does not equal ledger amount {b}; amount review required.",
+        )
+    )
+    idx += 1
+for _ in range(15):  # date mismatch
+    v = random.choice(processors_payments)
+    amt = f"${random.randint(10, 25000)}"
+    ref = f"TXN-{random.randint(100000, 999999)}"
+    d1 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    while d2 == d1:
+        d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_payments.append(
+        payments_case(
+            idx,
+            "date_mismatch",
+            "date_mismatch",
+            v,
+            random.choice(payment_rails),
+            amt,
+            amt,
+            ref,
+            ref,
+            d1,
+            d2,
+            True,
+            f"Processor date {d1} does not equal ledger date {d2}; amounts agree.",
+        )
+    )
+    idx += 1
+for _ in range(15):  # reference mismatch
+    v = random.choice(processors_payments)
+    amt = f"${random.randint(10, 25000)}"
+    r1 = f"TXN-{random.randint(100000, 999999)}"
+    r2 = f"TXN-{random.randint(100000, 999999)}-A"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_payments.append(
+        payments_case(
+            idx,
+            "reference_mismatch",
+            "reference_mismatch",
+            v,
+            random.choice(payment_rails),
+            amt,
+            amt,
+            r1,
+            r2,
+            date,
+            date,
+            True,
+            f"Processor reference {r1} does not equal ledger reference {r2}; fraud hold.",
+        )
+    )
+    idx += 1
+for _ in range(12):  # duplicate
+    v = random.choice(processors_payments)
+    amt = f"${random.randint(10, 25000)}"
+    ref = f"TXN-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_payments.append(
+        make_case(
+            "PA",
+            idx,
+            "duplicate",
+            "duplicate",
+            True,
+            {
+                "vendor": v,
+                "description": f"Payment settlement - {random.choice(payment_rails)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": ref,
+                "ledger_reference": ref,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "duplicate", "requires_review": True},
+            "The processor shows the settlement twice while the ledger shows it once.",
+        )
+    )
+    idx += 1
+for _ in range(13):  # ambiguous
+    v = random.choice(processors_payments)
+    amt = f"${random.randint(10, 25000)}"
+    r1 = f"TXN-{random.randint(100000, 999999)}"
+    r2 = f"TXN-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_payments.append(
+        make_case(
+            "PA",
+            idx,
+            "ambiguous",
+            "ambiguous",
+            True,
+            {
+                "vendor": v,
+                "description": f"Payment settlement - {random.choice(payment_rails)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": r1,
+                "ledger_reference": r2,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "ambiguous", "requires_review": True},
+            "Reference and date both differ weakly; human review required.",
+        )
+    )
+    idx += 1
+
+random.shuffle(cases_payments)
+payments_card = """# Dataset card: payments_v1
+
+- **Name:** payments_v1
+- **Version:** 1.0.0
+- **Task:** payments settlement reconciliation and fraud/exception triage
+- **Created:** 2026-10-16 (fully synthetic; no cardholder or merchant data)
+- **Total cases:** 105
+- **License:** Apache-2.0 (synthetic data generated by this repository)
+
+## What is in it
+
+Each case shows one payment-processor settlement next to its ledger entry and asks:
+do these match, and if not, what kind of exception is it? Ground truth is produced
+by deterministic rules, never by a model.
+
+Fields (input): `vendor`, `description`, `bank_amount`, `ledger_amount`,
+`bank_reference`, `ledger_reference`, `bank_date`, `ledger_date`.
+Expected: `category`, `requires_review`.
+
+| Family | Ground truth |
+| --- | --- |
+| matched | amounts, dates and references agree |
+| amount_mismatch | processor amount differs from ledger amount |
+| date_mismatch | dates differ, amounts agree |
+| reference_mismatch | processor reference differs from ledger reference |
+| duplicate | one side shows more occurrences than the other |
+| ambiguous | conflicting weak signals; must be escalated to a human |
+
+## Domain vocabulary (payments triage labels)
+
+The `expected.category` field uses the shared reconciliation vocabulary above so
+ForgeBench can score the dataset without code changes. These are the payments-ops
+labels for the same situations:
+
+| Triage label | Meaning | Maps to |
+| --- | --- | --- |
+| auto_settled | processor and ledger agree; settles with no human | matched |
+| amount_review | amounts disagree; needs an amount review | amount_mismatch |
+| fraud_hold | unexpected reference; hold pending fraud review | reference_mismatch |
+| duplicate_settlement | the same charge appears twice | duplicate |
+| needs_analyst | date or conflicting signals need an analyst | date_mismatch, ambiguous |
+| invalid | row fails schema validation; never emitted as ground truth | (reserved) |
+
+## Splits
+
+| Split | Cases |
+| --- | ---: |
+| train | 42 |
+| dev | 21 |
+| test | 42 |
+
+## Intended use
+
+- Comparing prompts and structured-output strategies on payments settlement data.
+- Validating an evaluation pipeline end to end without any API key.
+"""
+write_dataset(
+    "payments_v1",
+    "1.0.0",
+    "classification",
+    "Apache-2.0 (synthetic data generated by this repository)",
+    cases_payments[:42],
+    cases_payments[42:63],
+    cases_payments[63:],
+    payments_card,
+)
+
+# ---------------- procurement_v1 ----------------
+suppliers_procurement = [
+    "Grainger",
+    "Fastenal",
+    "McMaster-Carr",
+    "Sysco",
+    "Ferguson",
+    "Caterpillar",
+    "Bosch Rexroth",
+    "RS Components",
+    "Office Depot",
+    "Bunzl",
+]
+spend_categories = ["raw_materials", "tooling", "logistics", "MRO", "it_hardware", "packaging"]
+
+
+def procurement_case(
+    idx,
+    family,
+    category,
+    vendor,
+    spend_category,
+    order_val,
+    invoice_val,
+    order_ref,
+    invoice_ref,
+    order_date,
+    invoice_date,
+    requires_review,
+    explanation,
+):
+    return make_case(
+        "PO",
+        idx,
+        family,
+        category,
+        requires_review,
+        {
+            "vendor": vendor,
+            "description": f"Purchase order - {spend_category} - {vendor}",
+            "bank_amount": order_val,
+            "ledger_amount": invoice_val,
+            "bank_reference": order_ref,
+            "ledger_reference": invoice_ref,
+            "bank_date": order_date,
+            "ledger_date": invoice_date,
+        },
+        {"category": category, "requires_review": requires_review},
+        explanation,
+    )
+
+
+cases_procurement = []
+idx = 1
+for _ in range(30):  # matched
+    v = random.choice(suppliers_procurement)
+    amt = f"${random.randint(100, 100000)}"
+    ref = f"PO-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_procurement.append(
+        procurement_case(
+            idx,
+            "matched",
+            "matched",
+            v,
+            random.choice(spend_categories),
+            amt,
+            amt,
+            ref,
+            ref,
+            date,
+            date,
+            False,
+            "Purchase order and supplier invoice agree; clean match.",
+        )
+    )
+    idx += 1
+for _ in range(20):  # amount mismatch
+    v = random.choice(suppliers_procurement)
+    a = f"${random.randint(100, 50000)}"
+    b = f"${random.randint(100, 50000)}"
+    while b == a:
+        b = f"${random.randint(100, 50000)}"
+    ref = f"PO-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_procurement.append(
+        procurement_case(
+            idx,
+            "amount_mismatch",
+            "amount_mismatch",
+            v,
+            random.choice(spend_categories),
+            a,
+            b,
+            ref,
+            ref,
+            date,
+            date,
+            True,
+            f"Purchase order amount {a} does not equal invoice amount {b}; price variance.",
+        )
+    )
+    idx += 1
+for _ in range(15):  # date mismatch
+    v = random.choice(suppliers_procurement)
+    amt = f"${random.randint(100, 50000)}"
+    ref = f"PO-{random.randint(100000, 999999)}"
+    d1 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    while d2 == d1:
+        d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_procurement.append(
+        procurement_case(
+            idx,
+            "date_mismatch",
+            "date_mismatch",
+            v,
+            random.choice(spend_categories),
+            amt,
+            amt,
+            ref,
+            ref,
+            d1,
+            d2,
+            True,
+            f"Purchase order date {d1} does not equal invoice date {d2}; amounts agree.",
+        )
+    )
+    idx += 1
+for _ in range(15):  # reference mismatch
+    v = random.choice(suppliers_procurement)
+    amt = f"${random.randint(100, 50000)}"
+    r1 = f"PO-{random.randint(100000, 999999)}"
+    r2 = f"PO-{random.randint(100000, 999999)}-A"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_procurement.append(
+        procurement_case(
+            idx,
+            "reference_mismatch",
+            "reference_mismatch",
+            v,
+            random.choice(spend_categories),
+            amt,
+            amt,
+            r1,
+            r2,
+            date,
+            date,
+            True,
+            f"PO reference {r1} does not match invoice reference {r2}; missing receipt.",
+        )
+    )
+    idx += 1
+for _ in range(12):  # duplicate
+    v = random.choice(suppliers_procurement)
+    amt = f"${random.randint(100, 50000)}"
+    ref = f"PO-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_procurement.append(
+        make_case(
+            "PO",
+            idx,
+            "duplicate",
+            "duplicate",
+            True,
+            {
+                "vendor": v,
+                "description": f"Purchase order - {random.choice(spend_categories)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": ref,
+                "ledger_reference": ref,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "duplicate", "requires_review": True},
+            "The supplier billed the same order twice while the ledger shows it once.",
+        )
+    )
+    idx += 1
+for _ in range(13):  # ambiguous
+    v = random.choice(suppliers_procurement)
+    amt = f"${random.randint(100, 50000)}"
+    r1 = f"PO-{random.randint(100000, 999999)}"
+    r2 = f"PO-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_procurement.append(
+        make_case(
+            "PO",
+            idx,
+            "ambiguous",
+            "ambiguous",
+            True,
+            {
+                "vendor": v,
+                "description": f"Purchase order - {random.choice(spend_categories)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": r1,
+                "ledger_reference": r2,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "ambiguous", "requires_review": True},
+            "Quantity and price both differ weakly; human review required.",
+        )
+    )
+    idx += 1
+
+random.shuffle(cases_procurement)
+procurement_card = """# Dataset card: procurement_v1
+
+- **Name:** procurement_v1
+- **Version:** 1.0.0
+- **Task:** purchase-order to supplier-invoice reconciliation and exception triage
+- **Created:** 2026-10-16 (fully synthetic; no supplier data)
+- **Total cases:** 105
+- **License:** Apache-2.0 (synthetic data generated by this repository)
+
+## What is in it
+
+Each case shows one purchase order next to its supplier invoice and asks:
+do these match, and if not, what kind of exception is it? Ground truth is produced
+by deterministic rules, never by a model.
+
+Fields (input): `vendor`, `description`, `bank_amount`, `ledger_amount`,
+`bank_reference`, `ledger_reference`, `bank_date`, `ledger_date`.
+Expected: `category`, `requires_review`.
+
+| Family | Ground truth |
+| --- | --- |
+| matched | amounts, dates and references agree |
+| amount_mismatch | invoice amount differs from the purchase-order amount |
+| date_mismatch | dates differ, amounts agree |
+| reference_mismatch | invoice reference differs from the purchase-order reference |
+| duplicate | one side shows more occurrences than the other |
+| ambiguous | conflicting weak signals; must be escalated to a human |
+
+## Domain vocabulary (procurement triage labels)
+
+The `expected.category` field uses the shared reconciliation vocabulary above so
+ForgeBench can score the dataset without code changes. These are the accounts-payable
+labels for the same situations:
+
+| Triage label | Meaning | Maps to |
+| --- | --- | --- |
+| clean_match | order and invoice agree on all fields | matched |
+| price_variance | invoice amount differs from the ordered amount | amount_mismatch |
+| quantity_variance | received quantity differs from the ordered quantity | amount_mismatch |
+| missing_receipt | no goods receipt for the invoice | reference_mismatch |
+| duplicate_invoice | the same invoice appears twice | duplicate |
+| needs_review | dates or conflicting signals need a human | date_mismatch, ambiguous |
+| invalid | row fails schema validation; never emitted as ground truth | (reserved) |
+
+## Splits
+
+| Split | Cases |
+| --- | ---: |
+| train | 42 |
+| dev | 21 |
+| test | 42 |
+
+## Intended use
+
+- Comparing prompts and structured-output strategies on procurement data.
+- Validating an evaluation pipeline end to end without any API key.
+"""
+write_dataset(
+    "procurement_v1",
+    "1.0.0",
+    "classification",
+    "Apache-2.0 (synthetic data generated by this repository)",
+    cases_procurement[:42],
+    cases_procurement[42:63],
+    cases_procurement[63:],
+    procurement_card,
+)
+
+# ---------------- subscriptions_v1 ----------------
+saas_vendors = [
+    "Atlassian",
+    "Salesforce",
+    "Datadog",
+    "Snowflake",
+    "GitHub",
+    "Slack",
+    "Zoom",
+    "Okta",
+    "Twilio",
+    "MongoDB",
+]
+plan_tiers = ["starter", "team", "business", "enterprise", "pro"]
+
+
+def subscriptions_case(
+    idx,
+    family,
+    category,
+    vendor,
+    plan_tier,
+    billed_val,
+    contract_val,
+    billed_ref,
+    contract_ref,
+    billed_date,
+    contract_date,
+    requires_review,
+    explanation,
+):
+    return make_case(
+        "SB",
+        idx,
+        family,
+        category,
+        requires_review,
+        {
+            "vendor": vendor,
+            "description": f"Subscription billing - {plan_tier} - {vendor}",
+            "bank_amount": billed_val,
+            "ledger_amount": contract_val,
+            "bank_reference": billed_ref,
+            "ledger_reference": contract_ref,
+            "bank_date": billed_date,
+            "ledger_date": contract_date,
+        },
+        {"category": category, "requires_review": requires_review},
+        explanation,
+    )
+
+
+cases_subscriptions = []
+idx = 1
+for _ in range(30):  # matched
+    v = random.choice(saas_vendors)
+    amt = f"${random.randint(10, 20000)}"
+    ref = f"SUB-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_subscriptions.append(
+        subscriptions_case(
+            idx,
+            "matched",
+            "matched",
+            v,
+            random.choice(plan_tiers),
+            amt,
+            amt,
+            ref,
+            ref,
+            date,
+            date,
+            False,
+            "Billing and contract agree on amount, date and reference; in sync.",
+        )
+    )
+    idx += 1
+for _ in range(20):  # amount mismatch
+    v = random.choice(saas_vendors)
+    a = f"${random.randint(10, 10000)}"
+    b = f"${random.randint(10, 10000)}"
+    while b == a:
+        b = f"${random.randint(10, 10000)}"
+    ref = f"SUB-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_subscriptions.append(
+        subscriptions_case(
+            idx,
+            "amount_mismatch",
+            "amount_mismatch",
+            v,
+            random.choice(plan_tiers),
+            a,
+            b,
+            ref,
+            ref,
+            date,
+            date,
+            True,
+            f"Billed amount {a} does not equal contract amount {b}; overcharge review.",
+        )
+    )
+    idx += 1
+for _ in range(15):  # date mismatch
+    v = random.choice(saas_vendors)
+    amt = f"${random.randint(10, 10000)}"
+    ref = f"SUB-{random.randint(100000, 999999)}"
+    d1 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    while d2 == d1:
+        d2 = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_subscriptions.append(
+        subscriptions_case(
+            idx,
+            "date_mismatch",
+            "date_mismatch",
+            v,
+            random.choice(plan_tiers),
+            amt,
+            amt,
+            ref,
+            ref,
+            d1,
+            d2,
+            True,
+            f"Billed date {d1} does not equal contract date {d2}; amounts agree.",
+        )
+    )
+    idx += 1
+for _ in range(15):  # reference mismatch
+    v = random.choice(saas_vendors)
+    amt = f"${random.randint(10, 10000)}"
+    r1 = f"SUB-{random.randint(100000, 999999)}"
+    r2 = f"SUB-{random.randint(100000, 999999)}-A"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_subscriptions.append(
+        subscriptions_case(
+            idx,
+            "reference_mismatch",
+            "reference_mismatch",
+            v,
+            random.choice(plan_tiers),
+            amt,
+            amt,
+            r1,
+            r2,
+            date,
+            date,
+            True,
+            f"Billed reference {r1} does not equal contract reference {r2}; plan check.",
+        )
+    )
+    idx += 1
+for _ in range(12):  # duplicate
+    v = random.choice(saas_vendors)
+    amt = f"${random.randint(10, 10000)}"
+    ref = f"SUB-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_subscriptions.append(
+        make_case(
+            "SB",
+            idx,
+            "duplicate",
+            "duplicate",
+            True,
+            {
+                "vendor": v,
+                "description": f"Subscription billing - {random.choice(plan_tiers)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": ref,
+                "ledger_reference": ref,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "duplicate", "requires_review": True},
+            "The vendor billed the same subscription twice while the ledger shows it once.",
+        )
+    )
+    idx += 1
+for _ in range(13):  # ambiguous
+    v = random.choice(saas_vendors)
+    amt = f"${random.randint(10, 10000)}"
+    r1 = f"SUB-{random.randint(100000, 999999)}"
+    r2 = f"SUB-{random.randint(100000, 999999)}"
+    date = f"2026-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
+    cases_subscriptions.append(
+        make_case(
+            "SB",
+            idx,
+            "ambiguous",
+            "ambiguous",
+            True,
+            {
+                "vendor": v,
+                "description": f"Subscription billing - {random.choice(plan_tiers)} - {v}",
+                "bank_amount": amt,
+                "ledger_amount": amt,
+                "bank_reference": r1,
+                "ledger_reference": r2,
+                "bank_date": date,
+                "ledger_date": date,
+            },
+            {"category": "ambiguous", "requires_review": True},
+            "Plan and period both differ weakly; human review required.",
+        )
+    )
+    idx += 1
+
+random.shuffle(cases_subscriptions)
+subscriptions_card = """# Dataset card: subscriptions_v1
+
+- **Name:** subscriptions_v1
+- **Version:** 1.0.0
+- **Task:** SaaS subscription billing reconciliation and exception triage
+- **Created:** 2026-10-16 (fully synthetic; no customer data)
+- **Total cases:** 105
+- **License:** Apache-2.0 (synthetic data generated by this repository)
+
+## What is in it
+
+Each case shows one SaaS bill next to its contract record and asks:
+do these match, and if not, what kind of exception is it? Ground truth is produced
+by deterministic rules, never by a model.
+
+Fields (input): `vendor`, `description`, `bank_amount`, `ledger_amount`,
+`bank_reference`, `ledger_reference`, `bank_date`, `ledger_date`.
+Expected: `category`, `requires_review`.
+
+| Family | Ground truth |
+| --- | --- |
+| matched | amounts, dates and references agree |
+| amount_mismatch | billed amount differs from the contract amount |
+| date_mismatch | dates differ, amounts agree |
+| reference_mismatch | billed reference differs from the contract reference |
+| duplicate | one side shows more occurrences than the other |
+| ambiguous | conflicting weak signals; must be escalated to a human |
+
+## Domain vocabulary (subscription billing labels)
+
+The `expected.category` field uses the shared reconciliation vocabulary above so
+ForgeBench can score the dataset without code changes. These are the revenue-ops
+labels for the same situations:
+
+| Triage label | Meaning | Maps to |
+| --- | --- | --- |
+| in_sync | billing and contract agree; no action | matched |
+| overcharge | amount billed exceeds the contract amount | amount_mismatch |
+| overdue | billing date is past the contract term | date_mismatch |
+| plan_mismatch | billed plan differs from the contracted plan | reference_mismatch |
+| churned_but_billed | customer cancelled but is still billed | duplicate |
+| needs_review | conflicting signals need a human | ambiguous |
+| invalid | row fails schema validation; never emitted as ground truth | (reserved) |
+
+## Splits
+
+| Split | Cases |
+| --- | ---: |
+| train | 42 |
+| dev | 21 |
+| test | 42 |
+
+## Intended use
+
+- Comparing prompts and structured-output strategies on subscription billing data.
+- Validating an evaluation pipeline end to end without any API key.
+"""
+write_dataset(
+    "subscriptions_v1",
+    "1.0.0",
+    "classification",
+    "Apache-2.0 (synthetic data generated by this repository)",
+    cases_subscriptions[:42],
+    cases_subscriptions[42:63],
+    cases_subscriptions[63:],
+    subscriptions_card,
+)
+
+print(
+    "\nAdded 3 datasets: payments_v1, procurement_v1, subscriptions_v1 "
+    "(105 cases each; run forgebench validate-dataset <name> to confirm)"
+)
