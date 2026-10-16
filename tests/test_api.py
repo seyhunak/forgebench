@@ -96,3 +96,86 @@ def test_task_state_ids_are_unique_per_model_and_run() -> None:
     assert eight.startswith("sentiment_analysis-mistral-ministral-8b-latest-")
     # Path-safe even when the model id contains slashes (e.g. OpenRouter ids).
     assert "/" not in _task_state_id("t", "openrouter", "meta-llama/llama-3-70b")
+
+
+# ---------------------------------------------------------------------------
+# Setup view: environment variables
+# ---------------------------------------------------------------------------
+
+
+def test_env_routes_are_registered_for_read_write_delete() -> None:
+    assert "/api/env" in _paths()
+    assert _matched("/api/env") == "/api/env"
+    assert _matched("/api/env", "POST") == "/api/env"
+    assert _matched("/api/env", "DELETE") == "/api/env"
+
+
+def test_env_var_model_accepts_real_names_and_rejects_the_rest() -> None:
+    from pydantic import ValidationError
+
+    from forgebench.api import EnvVar
+
+    saved = EnvVar(name="OPENROUTER_API_KEY", value="sk-or-v1-placeholder")
+    assert saved.name == "OPENROUTER_API_KEY"
+
+    for bad in ("9LEADING_DIGIT", "has space", "has-dash", "", "a" * 65):
+        with pytest.raises(ValidationError):
+            EnvVar(name=bad, value="x")
+
+
+def test_delete_env_refuses_names_that_are_not_variables() -> None:
+    """Names reach the .env line format, so anything unusual is a 400, not a write."""
+    from forgebench.api import delete_env
+
+    for bad in ("../../etc/passwd", "A B", "A=B", ""):
+        with pytest.raises(HTTPException) as excinfo:
+            delete_env(bad)
+        assert excinfo.value.status_code == 400
+
+
+def test_env_source_reports_where_a_value_is_read_from() -> None:
+    """``source_of`` cannot tell file-loaded keys apart, so ``.env`` is checked directly."""
+    from forgebench.api import _env_source
+
+    assert _env_source("UNSET_VAR", {}, False) == "not_set"
+    assert _env_source("SHELL_ONLY", {}, True) == "environment"
+    assert _env_source("IN_FILE", {"IN_FILE": "value"}, True) == "file"
+
+
+def test_setup_lists_byok_providers_in_the_requested_order() -> None:
+    """The Setup screen asks for keys as a list: openrouter → … → mistral."""
+    from forgebench.api import list_env
+
+    providers = list_env()["providers"]
+    assert [p["provider"] for p in providers] == [
+        "openrouter",
+        "google",
+        "anthropic",
+        "openai",
+        "ollama",
+        "mistral",
+    ]
+    for row in providers:
+        assert row["key_var"].endswith("_API_KEY")
+        assert row["model_var"].endswith("_MODEL")
+        assert row["label"]
+
+
+def test_setup_ollama_row_is_storage_only_with_a_hint() -> None:
+    """Ollama: key storage on Setup (hint shown), not a runnable adapter."""
+    from forgebench.api import list_env, list_providers
+
+    ollama = next(p for p in list_env()["providers"] if p["provider"] == "ollama")
+    assert ollama["key_var"] == "OLLAMA_API_KEY"
+    assert ollama["model_var"] == "OLLAMA_MODEL"
+    assert "key optional" in ollama["hint"]
+
+    # The API key view offers runnable adapters only — no ollama.
+    assert "ollama" not in [p["id"] for p in list_providers()]
+
+
+def test_setup_never_offers_the_mock_provider() -> None:
+    """Mock needs no key, so it must not take up a row on Setup."""
+    from forgebench.api import list_env
+
+    assert "mock" not in [p["provider"] for p in list_env()["providers"]]

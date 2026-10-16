@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=3">
+<link rel="stylesheet" href="/static/style.css?v=5">
 </head>
 <body>
 
@@ -51,12 +51,13 @@
   <nav class="rail" id="rail" aria-label="Sections">
     <p class="rail-label">Workspace</p>
     <ul class="rail-list">
-      <li><button type="button" class="rail-link is-active" data-view="keys" data-label="API key" aria-current="page"><span class="rail-num">01</span>API key</button></li>
-      <li><button type="button" class="rail-link" data-view="datasets" data-label="Datasets"><span class="rail-num">02</span>Datasets</button></li>
-      <li><button type="button" class="rail-link" data-view="config" data-label="Config"><span class="rail-num">03</span>Config</button></li>
-      <li><button type="button" class="rail-link" data-view="run" data-label="Run"><span class="rail-num">04</span>Run</button></li>
-      <li><button type="button" class="rail-link" data-view="results" data-label="Results"><span class="rail-num">05</span>Results</button></li>
-      <li><button type="button" class="rail-link" data-view="tasks" data-label="Custom tasks"><span class="rail-num">06</span>Tasks</button></li>
+      <li><button type="button" class="rail-link is-active" data-view="setup" data-label="Setup" aria-current="page"><span class="rail-num">01</span>Setup</button></li>
+      <li><button type="button" class="rail-link" data-view="keys" data-label="API key"><span class="rail-num">02</span>API key</button></li>
+      <li><button type="button" class="rail-link" data-view="datasets" data-label="Datasets"><span class="rail-num">03</span>Datasets</button></li>
+      <li><button type="button" class="rail-link" data-view="config" data-label="Config"><span class="rail-num">04</span>Config</button></li>
+      <li><button type="button" class="rail-link" data-view="run" data-label="Run"><span class="rail-num">05</span>Run</button></li>
+      <li><button type="button" class="rail-link" data-view="results" data-label="Results"><span class="rail-num">06</span>Results</button></li>
+      <li><button type="button" class="rail-link" data-view="tasks" data-label="Custom tasks"><span class="rail-num">07</span>Tasks</button></li>
     </ul>
     <div class="rail-foot">
       <div class="rail-chip"><span class="rail-dot" id="rail-dot" data-state="none"></span><span class="rail-foot__key" id="rail-dot-label">key not set</span></div>
@@ -67,11 +68,46 @@
 
   <main class="workspace" id="workspace">
 
-    <!-- ===== 01 · API KEY ===== -->
-    <section class="view is-active" id="view-keys" data-view="keys" aria-label="API key">
+    <!-- ===== 01 · SETUP ===== -->
+<section class="view is-active" id="view-setup" data-view="setup" aria-label="Setup">
+  <header class="view-head">
+    <div>
+      <p class="view-kicker">01 · Setup</p>
+      <h2 class="view-title">Setup</h2>
+    </div>
+    <p class="view-lede">Bring your own keys — fill in the API key for each provider you use (OpenRouter first) and any custom variable; everything is saved to a git-ignored <code>.env</code>.</p>
+  </header>
+
+  <div class="view-body">
+    <div id="setup-message" class="message"></div>
+
+    <div class="credential-status">
+      <h3 class="status-title">Environment file</h3>
+      <table class="status-table">
+        <tr><td class="label">File</td><td class="value" id="setup-file">—</td></tr>
+        <tr><td class="label">Precedence</td><td class="value">process environment, then <code>.env</code></td></tr>
+        <tr><td class="label">Permissions</td><td class="value">0600 — owner read/write, never committed</td></tr>
+      </table>
+    </div>
+
+    <h3 class="status-title status-title--section">Provider credentials</h3>
+    <div id="setup-providers" class="env-list"></div>
+
+    <h3 class="status-title status-title--section">Other variables</h3>
+    <div id="setup-custom" class="env-list"></div>
+    <div class="env-add">
+      <input type="text" id="setup-name" placeholder="MY_VARIABLE" autocomplete="off" spellcheck="false" aria-label="Variable name">
+      <input type="text" id="setup-value" placeholder="value" autocomplete="off" spellcheck="false" aria-label="Variable value">
+      <button class="button" id="btn-setup-add">Save variable</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 02 · API KEY ===== -->
+<section class="view" id="view-keys" data-view="keys" aria-label="API key">
       <header class="view-head">
         <div>
-          <p class="view-kicker">01 · Credentials</p>
+          <p class="view-kicker">02 · Credentials</p>
           <h2 class="view-title">API key</h2>
         </div>
         <p class="view-lede">Provider credentials, saved to a git-ignored <code>.env</code> with owner-only permissions.</p>
@@ -120,11 +156,11 @@
       </div>
     </section>
 
-    <!-- ===== 02 · DATASETS ===== -->
+<!-- ===== 03 · DATASETS ===== -->
     <section class="view" id="view-datasets" data-view="datasets" aria-label="Datasets">
       <header class="view-head">
         <div>
-          <p class="view-kicker">02 · Corpora</p>
+          <p class="view-kicker">03 · Corpora</p>
           <h2 class="view-title">Datasets</h2>
         </div>
         <p class="view-lede">Browse benchmark datasets and their splits.</p>
@@ -175,11 +211,11 @@
       </div>
     </section>
 
-    <!-- ===== 03 · CONFIG ===== -->
+    <!-- ===== 04 · CONFIG ===== -->
     <section class="view" id="view-config" data-view="config" aria-label="Config editor">
       <header class="view-head">
         <div>
-          <p class="view-kicker">03 · Experiment</p>
+          <p class="view-kicker">04 · Experiment</p>
           <h2 class="view-title">Config editor</h2>
         </div>
         <p class="view-lede">Edit experiment configuration files, then save back to disk.</p>
@@ -210,11 +246,11 @@
       </div>
     </section>
 
-    <!-- ===== 04 · RUN ===== -->
+    <!-- ===== 05 · RUN ===== -->
     <section class="view" id="view-run" data-view="run" aria-label="Run benchmark">
       <header class="view-head">
         <div>
-          <p class="view-kicker">04 · Execute</p>
+          <p class="view-kicker">05 · Execute</p>
           <h2 class="view-title">Run benchmark</h2>
         </div>
         <p class="view-lede">Execute an experiment config and watch progress live.</p>
@@ -267,11 +303,11 @@
       </div>
     </section>
 
-    <!-- ===== 05 · RESULTS ===== -->
+    <!-- ===== 06 · RESULTS ===== -->
     <section class="view" id="view-results" data-view="results" aria-label="Results">
       <header class="view-head">
         <div>
-          <p class="view-kicker">05 · Inspect</p>
+          <p class="view-kicker">06 · Inspect</p>
           <h2 class="view-title">Results</h2>
         </div>
         <p class="view-lede">Tap a run to open its report, browse predictions and download artifacts.</p>
@@ -305,11 +341,11 @@
       </div>
     </section>
 
-    <!-- ===== 06 · TASKS ===== -->
+    <!-- ===== 07 · TASKS ===== -->
     <section class="view" id="view-tasks" data-view="tasks" aria-label="Custom tasks">
       <header class="view-head">
         <div>
-          <p class="view-kicker">06 · Custom tasks</p>
+          <p class="view-kicker">07 · Custom tasks</p>
           <h2 class="view-title">Custom tasks</h2>
         </div>
         <p class="view-lede">Run user-defined evaluation tasks (DeepEval-compatible). Pick a task, a provider and a judge, then run.</p>
@@ -442,7 +478,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=8"></script>
-<script src="/static/shell.js?v=1"></script>
+<script src="/static/app.js?v=10"></script>
+<script src="/static/shell.js?v=2"></script>
 </body>
 </html>

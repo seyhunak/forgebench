@@ -115,6 +115,25 @@ def test_set_key_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert "cleared" in cleared.output
 
 
+def test_set_key_saves_storage_only_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BYOK covers providers with no adapter yet — the Setup screen lists them."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+
+    saved = runner.invoke(
+        app,
+        ["set-key", "--provider", "ollama", "--key", "ollama-local-abc123", "--no-verify"],
+    )
+    assert saved.exit_code == 0, saved.output
+    assert "OLLAMA_API_KEY=ollama-local-abc123" in (tmp_path / ".env").read_text(encoding="utf-8")
+
+    cleared = runner.invoke(app, ["set-key", "--provider", "ollama", "--clear"])
+    assert cleared.exit_code == 0, cleared.output
+    assert "OLLAMA_API_KEY" not in (tmp_path / ".env").read_text(encoding="utf-8")
+
+
 def test_set_key_rejects_empty_input(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("MISTRAL_API_KEY", raising=False)

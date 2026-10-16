@@ -31,7 +31,10 @@ __all__ = [
 DEFAULT_PROVIDER = "openrouter"
 
 #: Environment variable (and .env key) each provider reads its credential from.
-#: The single source of truth for the CLI and the dashboard.
+#: The single source of truth for the CLI and the dashboard. Entries without a
+#: runnable adapter yet (ollama) are storage-only: ``set-key`` and the Setup
+#: view save them fine, while ``build_provider`` still refuses them at run
+#: start with "unknown provider" until an adapter lands.
 PROVIDER_ENV_VARS: dict[str, str] = {
     "mock": "MOCK_API_KEY",
     "mistral": "MISTRAL_API_KEY",
@@ -39,6 +42,7 @@ PROVIDER_ENV_VARS: dict[str, str] = {
     "anthropic": "ANTHROPIC_API_KEY",
     "google": "GOOGLE_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
+    "ollama": "OLLAMA_API_KEY",
 }
 
 

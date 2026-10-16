@@ -26,7 +26,7 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 | **Full run manifests** | Dataset hash, config, model id, versions, timestamps, git SHA, and environment are captured for every run. |
 | **Machine-readable + human-readable results** | `predictions.jsonl`, `metrics.json`, `manifest.json`, and `report.md` per run. |
 | **Bring-your-own-key (BYOK)** | API keys saved to a git-ignored `.env` (chmod 600), verified against the provider API, never committed, never in run artifacts. |
-| **Local dashboard** | FastAPI-served, Hallmark-designed UI with a dark-first Cobalt theme, side-rail navigation, and a ⌘K jump palette — key management, dataset browsing, run launching, and results browsing where every run opens a detail modal (report, predictions, downloadable artifacts) plus cross-run comparison. |
+| **Local dashboard** | FastAPI-served, Hallmark-designed UI with a dark-first Cobalt theme, side-rail navigation, and a ⌘K jump palette — environment setup with per-provider key entry, key management, dataset browsing, run launching, and results browsing where every run opens a detail modal (report, predictions, downloadable artifacts) plus cross-run comparison. |
 | **Deterministic dataset generator** | Same seed, byte-identical files. Regenerate `finance_v1` or add new datasets with `scripts/generate_dataset.py`. |
 | **User-defined tasks** | Define any evaluation task in YAML — input fields, output schema, weighted scoring rules — and run it with `forgebench task-run`. No code required. |
 
@@ -69,6 +69,7 @@ forgebench set-key --provider mistral
 forgebench set-key --provider openai
 forgebench set-key --provider anthropic
 forgebench set-key --provider google
+forgebench set-key --provider ollama      # local/cloud Ollama — key optional
 
 # Save a default model id with the key
 forgebench set-key --model ministral-8b-2512 --provider mistral
@@ -101,12 +102,13 @@ forgebench dashboard   # http://127.0.0.1:8502
 
 The dashboard is a single-page app served by FastAPI. Navigate with the left rail, or press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> to jump straight to any view:
 
-- **01 API key** — provider selector, OpenRouter first (the default: one key, every hosted model). Picking a provider fills the model dropdown with its full catalog from [models.dev](https://models.dev) and preselects a sensible model for it (e.g. `openai/gpt-4o-mini` for OpenRouter), so a first run works without hunting for an id. Save, verify, or remove a key, with live masked status and cost/context details. (The screenshot shows Mistral and its default `open-mistral-nemo` — that is the key saved in the demo environment.)
-- **02 Datasets** — browse datasets and splits, inspect case tables, download JSON.
-- **03 Config** — edit experiment YAML, validated before saving.
-- **04 Run** — pick a config, optional case limit, live progress bar, run id.
-- **05 Results** — run cards that open a detail modal: metrics, the full Markdown report, a predictions table, and Markdown/JSON downloads. Plus N-way comparison with colour-coded deltas.
-- **06 Tasks** — validate and run user-defined evaluation tasks; provider defaults to OpenRouter with a model prefilled.
+- **01 Setup** — the first stop: a BYOK checklist of providers — **OpenRouter, Google, Anthropic, OpenAI, Ollama** (local, key optional), **Mistral** — one row each for its `*_API_KEY` (and default `*_MODEL`), with masked set/not-set status and source. Fill in the keys you use and save — everything is written to the git-ignored `.env` (chmod 600), never committed. Any other environment variable can be added below the provider list.
+- **02 API key** — provider selector, OpenRouter first (the default: one key, every hosted model). Picking a provider fills the model dropdown with its full catalog from [models.dev](https://models.dev) and preselects a sensible model for it (e.g. `openai/gpt-4o-mini` for OpenRouter), so a first run works without hunting for an id. Save, verify, or remove a key, with live masked status and cost/context details. (The screenshot shows Mistral and its default `open-mistral-nemo` — that is the key saved in the demo environment.)
+- **03 Datasets** — browse datasets and splits, inspect case tables, download JSON.
+- **04 Config** — edit experiment YAML, validated before saving.
+- **05 Run** — pick a config, optional case limit, live progress bar, run id.
+- **06 Results** — run cards that open a detail modal: metrics, the full Markdown report, a predictions table, and Markdown/JSON downloads. Plus N-way comparison with colour-coded deltas.
+- **07 Tasks** — validate and run user-defined evaluation tasks; provider defaults to OpenRouter with a model prefilled.
 
 It ships a dark-first **Cobalt** theme with a light mode (toggle, top-right), and calls the exact same runner and reporting code as the CLI — so artifacts are identical.
 
@@ -117,6 +119,8 @@ It ships a dark-first **Cobalt** theme with a light mode (toggle, top-right), an
 | ![Run detail modal with the Markdown report and download buttons](docs/screenshots/run-detail.png) | ![Predictions table inside the run detail modal](docs/screenshots/run-predictions.png) |
 | **Datasets** | **Custom tasks** |
 | ![Dataset browser](docs/screenshots/datasets.png) | ![Custom tasks view](docs/screenshots/tasks.png) |
+| **Setup — provider keys** | **Setup — narrow layout** |
+| ![Setup view listing every provider API key with masked status](docs/screenshots/setup.png) | ![Narrow layout of the Setup view](docs/screenshots/setup-mobile.png) |
 | **Light theme** | **Narrow layout** |
 | ![Light theme](docs/screenshots/theme-light.png) | ![Narrow layout — API key view with Mistral and its default model](docs/screenshots/mobile.png) |
 
@@ -149,6 +153,7 @@ All providers implement the same `predict(case) -> ProviderResponse` contract:
 | **Anthropic** | `providers/anthropic.py` | Claude 4 Opus, Claude 4 Sonnet, Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku | `ANTHROPIC_API_KEY` |
 | **Google** | `providers/google.py` | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash, Gemini 1.5 Pro, Gemini 1.5 Flash | `GOOGLE_API_KEY` |
 | **OpenRouter** | `providers/openrouter.py` | Every model OpenRouter hosts (hundreds), addressed as `vendor/model` — e.g. `anthropic/claude-3.5-sonnet`, `openai/gpt-4o`, `meta-llama/llama-3.1-70b-instruct`, `google/gemini-2.5-pro` | `OPENROUTER_API_KEY` |
+| **Ollama** | — (no adapter yet; key storage only) | — | `OLLAMA_API_KEY` (optional for local Ollama) |
 
 The OpenRouter adapter speaks the REST API directly with the standard library, so it works on a bare install (no extra SDK). Its catalog is available from `forgebench models --provider openrouter` (the pinned snapshot) or `--live` (straight from `openrouter.ai/api/v1/models`).
 

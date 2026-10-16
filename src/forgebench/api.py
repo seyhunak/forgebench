@@ -8,6 +8,7 @@ frontend can drive the benchmark without Streamlit.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import threading
@@ -18,12 +19,13 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import __version__
 from .config import ExperimentConfig, load_config
 from .credentials import (
     delete_value,
+    env_file_values,
     find_env_file,
     get_value,
     load_env_files,
@@ -170,6 +172,19 @@ def _configured_provider() -> str:
     return DEFAULT_PROVIDER
 
 
+def _remember(name: str, value: str | None) -> None:
+    """Keep the process environment in step with a ``.env`` write or removal.
+
+    ``get_value`` prefers the process environment and ``load_env_files`` never
+    overrides it, so a key saved while the server runs would otherwise be
+    shadowed by whatever was loaded at startup.
+    """
+    if value:
+        os.environ[name] = value
+    else:
+        os.environ.pop(name, None)
+
+
 @app.get("/api/credentials")
 def credential_status(provider: str | None = None) -> dict[str, Any]:
     """Current key/mask/status without exposing the raw key.
@@ -197,16 +212,20 @@ def save_credential(payload: CredentialSave) -> dict[str, str]:
     """Save API key (+ optional default model) to .env."""
     env_var = _env_var_for(payload.provider)
     target = set_value(env_var, payload.key)
+    _remember(env_var, payload.key)
     if payload.model:
         model_var = env_var.replace("_API_KEY", "_MODEL")
         set_value(model_var, payload.model)
+        _remember(model_var, payload.model)
     return {"saved_to": str(target), "chmod": "0600", "provider": payload.provider}
 
 
 @app.delete("/api/credentials")
 def delete_credential(provider: str = DEFAULT_PROVIDER) -> dict[str, str | None]:
     """Remove the saved API key for one provider."""
-    removed = delete_value(_env_var_for(provider))
+    env_var = _env_var_for(provider)
+    removed = delete_value(env_var)
+    _remember(env_var, None)
     return {
         "removed_from": str(removed) if removed else None,
         "provider": provider,
@@ -246,6 +265,126 @@ def list_providers() -> list[dict[str, Any]]:
         {"id": pid, "name": name, "api_key_required": pid != "mock"}
         for pid, name in _PROVIDER_LABELS.items()
     ]
+
+
+# ---------------------------------------------------------------------------
+# Environment endpoints (the Setup view)
+# ---------------------------------------------------------------------------
+
+#: BYOK rows on the Setup screen, in the order the user fills them in: the
+#: default first, then the majors, then local Ollama, then the rest. This is
+#: key *storage*, not runnability — an entry here may have no adapter yet
+#: (ollama); the runner still refuses it with "unknown provider".
+_SETUP_ORDER: tuple[str, ...] = (
+    "openrouter",
+    "google",
+    "anthropic",
+    "openai",
+    "ollama",
+    "mistral",
+)
+
+#: Display names for Setup rows. Runnable providers keep the same names in
+#: ``_PROVIDER_LABELS`` (the API key view); ollama is storage-only.
+_SETUP_LABELS: dict[str, str] = {
+    "openrouter": "OpenRouter",
+    "google": "Google",
+    "anthropic": "Anthropic",
+    "openai": "OpenAI",
+    "ollama": "Ollama",
+    "mistral": "Mistral",
+}
+
+#: Optional note rendered next to a row's variable name.
+_SETUP_HINTS: dict[str, str] = {"ollama": "local — key optional"}
+
+#: Variable names ForgeBench will read or write: letters, digits, underscore.
+_ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+
+
+def _env_source(name: str, stored: dict[str, str | None], is_set: bool) -> str:
+    """``environment``, ``file`` or ``not_set`` — where the value is read from.
+
+    ``source_of`` reports "environment" for anything already loaded from ``.env``
+    at startup, so the file contents are consulted directly instead.
+    """
+    if not is_set:
+        return "not_set"
+    return "file" if name in stored else "environment"
+
+
+class EnvVar(BaseModel):
+    name: str = Field(
+        pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+        description="Environment variable name, e.g. OPENROUTER_API_KEY.",
+    )
+    value: str = Field(description="Value to store in the git-ignored .env file.")
+
+
+@app.get("/api/env")
+def list_env() -> dict[str, Any]:
+    """Every provider credential variable, plus any other variable in ``.env``.
+
+    Values are never returned raw — only masked — so the endpoint is safe to
+    drive from the browser.
+    """
+    load_env_files()
+    env_file = find_env_file()
+    stored = env_file_values(env_file)
+
+    known: set[str] = set()
+    providers: list[dict[str, Any]] = []
+    for pid in _SETUP_ORDER:
+        key_var = PROVIDER_ENV_VARS[pid]
+        model_var = key_var.replace("_API_KEY", "_MODEL")
+        known.update({key_var, model_var})
+        key = get_value(key_var)
+        providers.append(
+            {
+                "provider": pid,
+                "label": _SETUP_LABELS[pid],
+                "key_var": key_var,
+                "model_var": model_var,
+                "key_set": bool(key),
+                "key_masked": mask(key),
+                "key_source": _env_source(key_var, stored, bool(key)),
+                "model": get_value(model_var) or "",
+                "hint": _SETUP_HINTS.get(pid, ""),
+            }
+        )
+
+    custom = sorted(
+        (
+            {"name": name, "masked": mask(value), "source": _env_source(name, stored, True)}
+            for name, value in stored.items()
+            if name not in known
+        ),
+        key=lambda item: item["name"],
+    )
+
+    return {
+        "env_file": str(env_file) if env_file else None,
+        "providers": providers,
+        "custom": custom,
+    }
+
+
+@app.post("/api/env")
+def save_env(payload: EnvVar) -> dict[str, str]:
+    """Upsert one variable in the ``.env`` file (created 0600, git-ignored)."""
+    target = set_value(payload.name, payload.value)
+    _remember(payload.name, payload.value)
+    return {"name": payload.name, "saved_to": str(target)}
+
+
+@app.delete("/api/env")
+def delete_env(name: str) -> dict[str, str | None]:
+    """Remove one variable from the ``.env`` file."""
+    if not _ENV_NAME_RE.fullmatch(name):
+        raise HTTPException(status_code=400, detail=f"invalid variable name: {name!r}")
+    removed = delete_value(name)
+    _remember(name, None)
+    return {"name": name, "removed_from": str(removed) if removed else None}
 
 
 @app.get("/api/models")

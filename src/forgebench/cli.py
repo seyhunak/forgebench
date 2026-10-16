@@ -79,7 +79,7 @@ def set_key_cmd(
     provider: str = typer.Option(
         DEFAULT_PROVIDER,
         "--provider",
-        help="Provider: mistral, openai, anthropic, google, openrouter.",
+        help="Provider: openrouter, google, anthropic, openai, ollama, mistral.",
     ),
     model: str = typer.Option(
         "", "--model", help="Also save a default model id (e.g. ministral-8b-2512)."

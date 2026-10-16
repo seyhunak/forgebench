@@ -35,6 +35,14 @@ const els = {
   statusSource: document.getElementById("status-source"),
   statusModel: document.getElementById("status-model"),
   statusFile: document.getElementById("status-file"),
+  // Setup panel
+  setupMessage: document.getElementById("setup-message"),
+  setupFile: document.getElementById("setup-file"),
+  setupProviders: document.getElementById("setup-providers"),
+  setupCustom: document.getElementById("setup-custom"),
+  setupName: document.getElementById("setup-name"),
+  setupValue: document.getElementById("setup-value"),
+  btnSetupAdd: document.getElementById("btn-setup-add"),
   configSelect: document.getElementById("config-select"),
   runLimit: document.getElementById("run-limit"),
   runId: document.getElementById("run-id"),
@@ -172,6 +180,17 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+// escapeHtml is built on textContent -> innerHTML, which leaves quotes alone;
+// attribute values need the stricter form so a stray quote cannot break out.
+function escapeAttr(text) {
+  return String(text == null ? "" : text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // ---------- Providers & Models (from models.dev) ----------
@@ -369,6 +388,179 @@ els.btnRemoveKey.addEventListener("click", async () => {
   } catch (err) {
     setMessage(els.keyMessage, `Remove failed: ${err.message}`, "error");
   }
+});
+
+// ---------- Setup (environment variables) ----------
+
+const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+
+// Where a saved variable is read from, in the user's words.
+const ENV_SOURCE_LABEL = {
+  file: ".env",
+  environment: "shell environment",
+  not_set: "",
+};
+
+function envStatusChip(isSet, masked, source) {
+  const state = isSet ? "set" : "unset";
+  const label = isSet ? "set" : "not set";
+  const where = ENV_SOURCE_LABEL[source] || "";
+  const detail = isSet
+    ? `<span class="env-value">${escapeHtml(masked || "")}</span>` +
+      (where ? `<span class="env-source">${escapeHtml(where)}</span>` : "")
+    : "";
+  return `<span class="env-chip" data-state="${state}">${label}</span>${detail}`;
+}
+
+function envRow(name, modelName, head, valueInput, modelInput) {
+  return `
+    <article class="env-row" data-env-name="${escapeAttr(name)}"${modelName ? ` data-env-model-name="${escapeAttr(modelName)}"` : ""}>
+      <div class="env-row__head">${head}</div>
+      <div class="env-row__form">
+        ${valueInput}
+        <button class="button button--primary" data-env-action="value">Save</button>
+        <button class="button button--danger" data-env-action="remove">Remove</button>
+      </div>
+      ${modelInput ? `<div class="env-row__form">${modelInput}<button class="button" data-env-action="model">Save model</button></div>` : ""}
+    </article>`;
+}
+
+function renderEnvProviders(providers) {
+  safeInnerHTML(els.setupProviders, providers.map((p) => envRow(
+    p.key_var,
+    p.model_var,
+    `<span class="env-row__label">${escapeHtml(p.label)}</span>
+     <code class="env-row__var">${escapeHtml(p.key_var)}</code>
+     ${p.hint ? `<span class="env-hint">${escapeHtml(p.hint)}</span>` : ""}
+     ${envStatusChip(p.key_set, p.key_masked, p.key_source)}`,
+    `<input type="password" class="env-row__input" data-env-input="value" placeholder="new value…" autocomplete="off" spellcheck="false" aria-label="${escapeAttr(p.key_var)} value">`,
+    `<code class="env-row__var">${escapeHtml(p.model_var)}</code>
+     <input type="text" class="env-row__input" data-env-input="model" placeholder="(provider default)" autocomplete="off" spellcheck="false" aria-label="${escapeAttr(p.model_var)} value">`
+  )).join(""));
+
+  // Model ids are set as properties rather than attribute text, so an id
+  // containing a quote can never break out of the markup.
+  els.setupProviders.querySelectorAll(".env-row").forEach((row, index) => {
+    const input = row.querySelector('[data-env-input="model"]');
+    if (input) input.value = providers[index].model || "";
+  });
+}
+
+function renderEnvCustom(custom) {
+  if (!custom.length) {
+    safeInnerHTML(els.setupCustom,
+      '<p class="env-empty">Nothing else in <code>.env</code> yet. Add a variable below.</p>');
+    return;
+  }
+  safeInnerHTML(els.setupCustom, custom.map((v) => envRow(
+    v.name,
+    "",
+    `<code class="env-row__var">${escapeHtml(v.name)}</code>${envStatusChip(true, v.masked, v.source)}`,
+    `<input type="password" class="env-row__input" data-env-input="value" placeholder="new value…" autocomplete="off" spellcheck="false" aria-label="${escapeAttr(v.name)} value">`,
+    ""
+  )).join(""));
+}
+
+async function loadEnv() {
+  try {
+    const data = await fetchJSON("/api/env");
+    els.setupFile.textContent = data.env_file ||
+      "(none yet — created in the first writable directory on save)";
+    renderEnvProviders(data.providers || []);
+    renderEnvCustom(data.custom || []);
+  } catch (err) {
+    setMessage(els.setupMessage, `Failed to load environment: ${err.message}`, "error");
+  }
+}
+
+async function saveEnv(name, value) {
+  await fetchJSON("/api/env", { method: "POST", body: JSON.stringify({ name, value }) });
+  setMessage(els.setupMessage, `Saved ${name} to .env (chmod 600).`, "ok");
+  await loadEnv();
+  await loadCredentialStatus();
+  dlog(`env saved: ${name}`);
+}
+
+async function envAction(row, action) {
+  if (!row) return;
+  const name = row.getAttribute("data-env-name");
+  try {
+    if (action === "remove") {
+      await fetchJSON(`/api/env?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+      setMessage(els.setupMessage, `Removed ${name} from .env.`, "ok");
+      await loadEnv();
+      await loadCredentialStatus();
+      return;
+    }
+    const target = action === "model" ? row.getAttribute("data-env-model-name") : name;
+    const input = row.querySelector(`[data-env-input="${action === "model" ? "model" : "value"}"]`);
+    const value = (input && input.value.trim()) || "";
+    if (!target) return;
+    if (!value) {
+      setMessage(els.setupMessage, `Enter a value for ${target} first.`, "error");
+      return;
+    }
+    if (action === "model") {
+      // A model id is not a secret; show the result without re-typing it.
+      await saveEnv(target, value);
+    } else {
+      await saveEnv(target, value);
+      if (input) input.value = "";
+    }
+  } catch (err) {
+    setMessage(els.setupMessage, `${action === "remove" ? "Remove" : "Save"} failed: ${err.message}`, "error");
+  }
+}
+
+function wireEnvList(container) {
+  if (!container) return;
+  container.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-env-action]");
+    if (!button) return;
+    envAction(button.closest(".env-row"), button.getAttribute("data-env-action"));
+  });
+  container.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    const input = event.target.closest("input[data-env-input]");
+    if (!input) return;
+    event.preventDefault();
+    const action = input.getAttribute("data-env-input") === "model" ? "model" : "value";
+    envAction(input.closest(".env-row"), action);
+  });
+}
+
+wireEnvList(els.setupProviders);
+wireEnvList(els.setupCustom);
+
+els.btnSetupAdd.addEventListener("click", async () => {
+  const name = (els.setupName.value || "").trim();
+  const value = els.setupValue.value || "";
+  if (!ENV_NAME_RE.test(name)) {
+    setMessage(els.setupMessage, "Names use letters, digits and underscores, and cannot start with a digit.", "error");
+    return;
+  }
+  if (!value.trim()) {
+    setMessage(els.setupMessage, "Enter a value to save.", "error");
+    return;
+  }
+  try {
+    await saveEnv(name, value);
+    els.setupName.value = "";
+    els.setupValue.value = "";
+  } catch (err) {
+    setMessage(els.setupMessage, `Save failed: ${err.message}`, "error");
+  }
+});
+
+// Enter anywhere in the add form saves it.
+[els.setupName, els.setupValue].forEach((input) => {
+  if (!input) return;
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      els.btnSetupAdd.click();
+    }
+  });
 });
 
 // ---------- Configs ----------
@@ -1148,7 +1340,9 @@ async function init() {
       'btn-validate-task', 'btn-run-task', 'task-message',
       'task-progress', 'task-progress-text', 'task-progress-counter',
       'task-progress-fill', 'task-result', 'task-res-run-id', 'task-res-cases',
-      'task-res-valid', 'task-btn-open-run', 'task-runs-grid'];
+      'task-res-valid', 'task-btn-open-run', 'task-runs-grid',
+      'setup-message', 'setup-file', 'setup-providers', 'setup-custom',
+      'setup-name', 'setup-value', 'btn-setup-add'];
     const missing = critical.filter(id => !document.getElementById(id));
     if (missing.length > 0) {
       throw new Error('Missing DOM elements: ' + missing.join(', '));
@@ -1160,6 +1354,8 @@ async function init() {
     dlog('Providers and models loaded');
     await loadCredentialStatus();
     dlog('Credential status loaded');
+    await loadEnv();
+    dlog('Environment loaded');
     await loadConfigs();
     dlog('Configs loaded');
     await loadDatasets();

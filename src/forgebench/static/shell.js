@@ -131,6 +131,8 @@
           (i === activeIndex ? " is-active" : "") +
           '" role="option" aria-selected="' +
           (i === activeIndex) +
+          '" data-view="' +
+          it.id +
           '" data-index="' +
           i +
           '"><span class="pal-num">' +

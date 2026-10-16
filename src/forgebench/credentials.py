@@ -123,6 +123,18 @@ def get_value(name: str) -> str | None:
     return None
 
 
+def env_file_values(path: Path | None = None) -> dict[str, str | None]:
+    """Parsed ``.env`` contents — the file only, never the process environment.
+
+    The dashboard's Setup view uses this to list what is stored on disk,
+    including variables ForgeBench does not own.
+    """
+    target = path or find_env_file()
+    if target is None or not target.exists():
+        return {}
+    return dict(dotenv_values(target))
+
+
 def mask(value: str | None) -> str:
     """Display form for a secret: never the whole thing."""
     if not value:

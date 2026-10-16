@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import json
+from pathlib import Path
 
 import pytest
 
@@ -121,10 +122,20 @@ def test_build_provider_unknown_name_fails_loudly() -> None:
         build_provider("definitely-not-a-provider", model="x")
 
 
-def test_mistral_requires_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mistral_requires_an_api_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    # get_value falls back to the nearest .env, so run where there is none —
+    # a key saved through `forgebench set-key` or the Setup view must not make
+    # this test pass or fail depending on the developer's local credentials.
+    monkeypatch.chdir(tmp_path)
     with pytest.raises(ProviderError, match="MISTRAL_API_KEY"):
         MistralProvider(model="open-mistral-7b")
+
+
+def test_ollama_key_storage_does_not_imply_run_support() -> None:
+    """Setup/set-key save OLLAMA_API_KEY, but running needs an adapter that does not exist yet."""
+    with pytest.raises(ProviderError, match="unknown provider"):
+        build_provider("ollama", model="llama3.1")
 
 
 def test_mistral_retry_policy_only_retries_operational_failures() -> None:
