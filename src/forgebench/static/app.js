@@ -268,7 +268,8 @@ async function loadCredentialStatus() {
     els.statusFile.textContent = data.env_file || "—";
 
     const source = data.source || "";
-    if (source.includes("OPENAI")) els.keyProvider.value = "openai";
+    if (source.includes("OPENROUTER")) els.keyProvider.value = "openrouter";
+    else if (source.includes("OPENAI")) els.keyProvider.value = "openai";
     else if (source.includes("ANTHROPIC")) els.keyProvider.value = "anthropic";
     else if (source.includes("GOOGLE")) els.keyProvider.value = "google";
     else if (source.includes("MISTRAL")) els.keyProvider.value = "mistral";

@@ -47,6 +47,24 @@ def test_unknown_task_returns_404_not_500() -> None:
     assert excinfo.value.status_code == 404
 
 
+def test_openrouter_is_an_offered_provider() -> None:
+    from forgebench.api import list_providers
+
+    ids = [p["id"] for p in list_providers()]
+    assert "openrouter" in ids
+
+
+def test_openrouter_model_catalog_is_available() -> None:
+    """The pinned models.dev snapshot ships the full OpenRouter catalog."""
+    from forgebench.api import list_provider_models
+
+    data = list_provider_models("openrouter")
+    assert data["name"] == "OpenRouter"
+    assert len(data["models"]) > 100
+    # Namespaced ids are what the adapter sends as `model`.
+    assert any("/" in model_id for model_id in data["models"])
+
+
 def test_task_progress_route_matches_what_the_ui_polls() -> None:
     """The UI polls ``GET /api/tasks/{run_id}/progress`` after starting a run.
 

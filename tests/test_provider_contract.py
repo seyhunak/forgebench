@@ -13,6 +13,7 @@ from forgebench.providers import (
     MistralProvider,
     MockProvider,
     OpenAIProvider,
+    OpenRouterProvider,
     build_provider,
     task_provider_options,
 )
@@ -28,6 +29,7 @@ REAL_PROVIDERS = {
     "openai": OpenAIProvider,
     "anthropic": AnthropicProvider,
     "google": GoogleProvider,
+    "openrouter": OpenRouterProvider,
 }
 
 

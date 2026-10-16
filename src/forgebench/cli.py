@@ -29,7 +29,8 @@ from .credentials import (
     set_value,
     source_of,
 )
-from .providers.mistral import verify_api_key
+from .providers import PROVIDER_ENV_VARS
+from .providers.verify import verify_provider_key
 from .registry import default_datasets_root, list_datasets, validate_dataset
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
@@ -76,7 +77,9 @@ def set_key_cmd(
         help="API key. Prefer the hidden prompt (args land in shell history).",
     ),
     provider: str = typer.Option(
-        "mistral", "--provider", help="Provider: mistral, openai, anthropic, google."
+        "mistral",
+        "--provider",
+        help="Provider: mistral, openai, anthropic, google, openrouter.",
     ),
     model: str = typer.Option(
         "", "--model", help="Also save a default model id (e.g. ministral-8b-2512)."
@@ -88,15 +91,16 @@ def set_key_cmd(
     ),
 ) -> None:
     """Bring your own key: save an API key to the git-ignored .env (mode 0600)."""
-    env_map = {
-        "mistral": "MISTRAL_API_KEY",
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "google": "GOOGLE_API_KEY",
-    }
-    env_var = env_map.get(provider)
+    if provider == "mock":
+        typer.echo("error: the mock provider needs no API key.", err=True)
+        raise typer.Exit(code=1)
+    env_var = PROVIDER_ENV_VARS.get(provider)
     if env_var is None:
-        typer.echo(f"error: unknown provider '{provider}'.", err=True)
+        typer.echo(
+            f"error: unknown provider '{provider}'. "
+            f"Choose from: {', '.join(sorted(PROVIDER_ENV_VARS))}.",
+            err=True,
+        )
         raise typer.Exit(code=1)
 
     if show:
@@ -129,8 +133,8 @@ def set_key_cmd(
         typer.echo(f"saved {model_var}={model} to {target}")
 
     if verify:
-        typer.echo("verifying against api.mistral.ai ...")
-        accepted, detail = verify_api_key(key)
+        typer.echo(f"verifying {provider} key ...")
+        accepted, detail = verify_provider_key(provider, key)
         if accepted:
             typer.echo(f"OK: key {mask(key)} {detail}")
         elif accepted is False:
@@ -193,6 +197,75 @@ def list_datasets_cmd(
         raise typer.Exit(code=1)
     for name in names:
         typer.echo(name)
+
+
+@app.command("models")
+def models_cmd(
+    provider: str = typer.Option(
+        "openrouter",
+        "--provider",
+        help="Provider: mock, mistral, openai, anthropic, google, openrouter.",
+    ),
+    live: bool = typer.Option(
+        False,
+        "--live",
+        help="For OpenRouter, fetch the live catalog instead of the pinned snapshot.",
+    ),
+    search: str = typer.Option(
+        "", "--search", help="Only show models whose id or name contains this text."
+    ),
+    limit: int | None = typer.Option(None, "--limit", min=1, help="Show at most N models."),
+) -> None:
+    """List the models a provider offers (OpenRouter has hundreds)."""
+    if provider == "mock":
+        typer.echo("rule-mock-v1\tRule Mock v1")
+        return
+
+    entries: list[tuple[str, str]] = []
+    source = ""
+
+    if provider == "openrouter" and live:
+        from .providers.openrouter import list_models  # noqa: PLC0415
+
+        try:
+            entries = [(str(m.get("id", "")), str(m.get("name", ""))) for m in list_models()]
+            source = "live catalog (openrouter.ai/api/v1/models)"
+        except Exception as exc:  # noqa: BLE001 - fall back to the snapshot
+            typer.echo(
+                f"note: live fetch failed ({type(exc).__name__}: {exc}); using snapshot",
+                err=True,
+            )
+
+    if not entries:
+        snapshot = Path(__file__).resolve().parent / "static" / "models.json"
+        if not snapshot.exists():
+            typer.echo("error: models.json snapshot not found.", err=True)
+            raise typer.Exit(code=1)
+        data = json.loads(snapshot.read_text(encoding="utf-8"))
+        if provider not in data:
+            typer.echo(
+                f"error: unknown provider '{provider}'. Known: {', '.join(sorted(data))}.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        entries = [
+            (m.get("id", ""), m.get("name", m.get("id", "")))
+            for m in data[provider].get("models", {}).values()
+        ]
+        source = "models.dev snapshot"
+
+    if search:
+        needle = search.lower()
+        entries = [(i, n) for i, n in entries if needle in i.lower() or needle in n.lower()]
+    entries.sort()
+    if limit is not None:
+        entries = entries[:limit]
+
+    typer.echo(f"# {len(entries)} model(s) — {source}")
+    if not entries:
+        typer.echo(f"no models matched '{search}' for {provider}.")
+    for model_id, name in entries:
+        typer.echo(f"{model_id}\t{name}")
 
 
 @app.command("validate-dataset")
@@ -272,7 +345,7 @@ def task_run_cmd(
     provider: str = typer.Option(
         "mock",
         "--provider",
-        help="Provider name (mock, mistral, openai, anthropic, google).",
+        help="Provider name (mock, mistral, openai, anthropic, google, openrouter).",
     ),
     model: str = typer.Option("", "--model", help="Model ID (overrides provider default)."),
     limit: int | None = typer.Option(
@@ -287,7 +360,7 @@ def task_run_cmd(
     judge_provider: str = typer.Option(
         "",
         "--judge-provider",
-        help="Judge provider override (mock, mistral, openai, anthropic, google).",
+        help="Judge provider override (mock, mistral, openai, anthropic, google, openrouter).",
     ),
     judge_model: str = typer.Option(
         "", "--judge-model", help="Judge model override (e.g. gpt-4o-mini)."
@@ -441,7 +514,7 @@ def run_cmd(
         None, "--datasets-root", help="Override dataset location."
     ),
     provider: str | None = typer.Option(
-        None, "--provider", help="Override provider from the config (mock | mistral)."
+        None, "--provider", help="Override provider from the config (e.g. mistral, openrouter)."
     ),
     model: str | None = typer.Option(
         None, "--model", help="Override the model id from the config."

@@ -33,6 +33,8 @@ from .credentials import (
 )
 from .dashboard import list_configs as _list_configs
 from .dashboard import list_runs as _list_runs
+from .providers import PROVIDER_ENV_VARS
+from .providers.verify import verify_provider_key
 from .registry import default_datasets_root, list_datasets, load_dataset, load_split
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
@@ -148,14 +150,7 @@ def credential_status() -> dict[str, Any]:
 @app.post("/api/credentials")
 def save_credential(payload: CredentialSave) -> dict[str, str]:
     """Save API key (+ optional default model) to .env."""
-    env_map = {
-        "mock": "MOCK_API_KEY",
-        "mistral": "MISTRAL_API_KEY",
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "google": "GOOGLE_API_KEY",
-    }
-    env_var = env_map.get(payload.provider, "MISTRAL_API_KEY")
+    env_var = PROVIDER_ENV_VARS.get(payload.provider, "MISTRAL_API_KEY")
     target = set_value(env_var, payload.key)
     if payload.model:
         model_var = env_var.replace("_API_KEY", "_MODEL")
@@ -178,89 +173,17 @@ class CredentialVerify(BaseModel):
 def verify_credential(payload: CredentialVerify) -> dict[str, Any]:
     """Check the saved key against the provider API."""
     load_env_files()
-    env_map = {
-        "mock": "MOCK_API_KEY",
-        "mistral": "MISTRAL_API_KEY",
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "google": "GOOGLE_API_KEY",
-    }
-    env_var = env_map.get(payload.provider, "MISTRAL_API_KEY")
+    env_var = PROVIDER_ENV_VARS.get(payload.provider, "MISTRAL_API_KEY")
     key = get_value(env_var)
     if not key:
         raise HTTPException(status_code=400, detail=f"No key saved for {env_var}.")
 
-    if payload.provider == "mistral":
-        from .providers.mistral import verify_api_key
-
-        accepted, detail = verify_api_key(key)
-    elif payload.provider == "openai":
-        accepted, detail = _verify_openai_key(key)
-    elif payload.provider == "anthropic":
-        accepted, detail = _verify_anthropic_key(key)
-    elif payload.provider == "google":
-        accepted, detail = _verify_google_key(key)
-    else:
-        accepted, detail = None, "verification not supported for this provider"
-
+    accepted, detail = verify_provider_key(payload.provider, key)
     if accepted is True:
         return {"accepted": True, "detail": detail}
     if accepted is False:
         return {"accepted": False, "detail": detail}
     return {"accepted": None, "detail": detail}
-
-
-def _verify_openai_key(key: str) -> tuple[bool | None, str]:
-    try:
-        from openai import OpenAI  # noqa: PLC0415
-    except ImportError:
-        return None, "the 'openai' package is not installed"
-    try:
-        client = OpenAI(api_key=key, timeout=15)
-        client.models.list()
-        return True, "accepted by api.openai.com"
-    except Exception as exc:
-        text = str(exc)
-        if "401" in text or "unauthorized" in text.lower() or "invalid api key" in text.lower():
-            return False, f"rejected: {type(exc).__name__}"
-        return None, f"could not verify ({type(exc).__name__}: {text[:160]})"
-
-
-def _verify_anthropic_key(key: str) -> tuple[bool | None, str]:
-    try:
-        from anthropic import Anthropic  # noqa: PLC0415
-    except ImportError:
-        return None, "the 'anthropic' package is not installed"
-    try:
-        client = Anthropic(api_key=key, timeout=15)
-        client.messages.create(
-            model="claude-3-haiku",
-            max_tokens=1,
-            messages=[{"role": "user", "content": "hi"}],
-        )
-        return True, "accepted by api.anthropic.com"
-    except Exception as exc:
-        text = str(exc)
-        if "401" in text or "unauthorized" in text.lower() or "invalid api key" in text.lower():
-            return False, f"rejected: {type(exc).__name__}"
-        return None, f"could not verify ({type(exc).__name__}: {text[:160]})"
-
-
-def _verify_google_key(key: str) -> tuple[bool | None, str]:
-    try:
-        import google.generativeai as genai  # noqa: PLC0415
-    except ImportError:
-        return None, "the 'google-generativeai' package is not installed"
-    try:
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        model.generate_content("hi")
-        return True, "accepted by generativelanguage.googleapis.com"
-    except Exception as exc:
-        text = str(exc)
-        if "401" in text or "unauthorized" in text.lower() or "invalid api key" in text.lower():
-            return False, f"rejected: {type(exc).__name__}"
-        return None, f"could not verify ({type(exc).__name__}: {text[:160]})"
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +200,7 @@ def list_providers() -> list[dict[str, Any]]:
         {"id": "openai", "name": "OpenAI", "api_key_required": True},
         {"id": "anthropic", "name": "Anthropic", "api_key_required": True},
         {"id": "google", "name": "Google", "api_key_required": True},
+        {"id": "openrouter", "name": "OpenRouter", "api_key_required": True},
     ]
 
 

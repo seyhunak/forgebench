@@ -188,7 +188,7 @@ class JudgeConfig(BaseModel):
 
     provider: str = Field(
         default="mock",
-        description="Judge provider: mock, mistral, openai, anthropic, google.",
+        description="Judge provider: mock, mistral, openai, anthropic, google, openrouter.",
     )
     model: str = Field(
         default="",

@@ -8,6 +8,7 @@ from .google import GoogleProvider
 from .mistral import MistralProvider
 from .mock import MockProvider
 from .openai import OpenAIProvider
+from .openrouter import OpenRouterProvider
 
 __all__ = [
     "ModelProvider",
@@ -17,9 +18,22 @@ __all__ = [
     "OpenAIProvider",
     "AnthropicProvider",
     "GoogleProvider",
+    "OpenRouterProvider",
+    "PROVIDER_ENV_VARS",
     "build_provider",
     "task_provider_options",
 ]
+
+#: Environment variable (and .env key) each provider reads its credential from.
+#: The single source of truth for the CLI and the dashboard.
+PROVIDER_ENV_VARS: dict[str, str] = {
+    "mock": "MOCK_API_KEY",
+    "mistral": "MISTRAL_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "google": "GOOGLE_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+}
 
 
 def task_provider_options(
@@ -54,8 +68,10 @@ def build_provider(name: str, *, model: str, options: dict | None = None) -> Mod
         return AnthropicProvider(model=model, **options)
     if name == "google":
         return GoogleProvider(model=model, **options)
+    if name == "openrouter":
+        return OpenRouterProvider(model=model, **options)
     raise ProviderError(
         f"unknown provider '{name}'. Supported providers: mock, mistral, openai, "
-        "anthropic, google. Add a new adapter in src/forgebench/providers/ "
-        "instead of editing the runner."
+        "anthropic, google, openrouter. Add a new adapter in "
+        "src/forgebench/providers/ instead of editing the runner."
     )

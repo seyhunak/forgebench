@@ -3,7 +3,7 @@
 DeepEval's key insight (G-Eval): let an LLM judge subjective criteria, but
 constrain it with explicit rubrics + strict JSON output + retry/parse logic.
 ForgeBench routes the judge call through the same provider adapters used for
-benchmarking, so any provider (mistral, openai, anthropic, google, mock)
+benchmarking, so any provider (mistral, openai, anthropic, google, openrouter, mock)
 can serve as judge. CI stays green offline because the mock provider returns
 deterministic verdicts.
 """
