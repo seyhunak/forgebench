@@ -165,6 +165,36 @@ class ScoringRule(BaseModel):
         le=1.0,
         description="Pass threshold for fuzzy methods (contains, llm_judge).",
     )
+    criteria: str | None = Field(
+        default=None,
+        description=(
+            "G-Eval-style criterion in plain language for llm_judge scoring. "
+            "Example: 'Determine whether the summary is factually correct.'"
+        ),
+    )
+    evaluation_steps: list[str] | None = Field(
+        default=None,
+        description=(
+            "Chain-of-thought evaluation steps for the judge. "
+            "Provide criteria OR evaluation_steps, not both."
+        ),
+    )
+
+
+class JudgeConfig(BaseModel):
+    """Which provider/model judges subjective scoring rules."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = Field(
+        default="mock",
+        description="Judge provider: mock, mistral, openai, anthropic, google.",
+    )
+    model: str = Field(
+        default="",
+        description="Judge model id. Empty = provider default. "
+        "Prefer a cheap model (e.g. gpt-4o-mini) for judging.",
+    )
 
 
 class TaskCase(BaseModel):
@@ -175,6 +205,14 @@ class TaskCase(BaseModel):
     id: str = Field(pattern=r"^[A-Z]{2,4}-\d{4}$", description="Stable case id.")
     input: dict[str, Any] = Field(description="Field values visible to the model.")
     expected: dict[str, Any] = Field(description="Ground-truth values matching the output schema.")
+    context: list[str] | None = Field(
+        default=None,
+        description="Ideal ground-truth context (RAG goldens).",
+    )
+    retrieval_context: list[str] | None = Field(
+        default=None,
+        description="What the RAG pipeline actually retrieved at runtime.",
+    )
 
 
 class TaskDefinition(BaseModel):
@@ -204,4 +242,8 @@ class TaskDefinition(BaseModel):
     system_prompt: str | None = Field(
         default=None,
         description="System prompt injected for this task.",
+    )
+    judge: JudgeConfig = Field(
+        default_factory=JudgeConfig,
+        description="Provider/model that judges subjective (llm_judge) rules.",
     )

@@ -33,7 +33,7 @@ from .providers.mistral import verify_api_key
 from .registry import default_datasets_root, list_datasets, validate_dataset
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
-from .schemas import PredictionRecord, TaskCase, TaskDefinition
+from .schemas import PredictionRecord, ScoringRule, TaskCase, TaskDefinition
 from .tasks import (
     list_tasks,
     load_task,
@@ -284,6 +284,14 @@ def task_run_cmd(
     output_root: Path | None = typer.Option(
         None, "--output-root", help="Where to write run artifacts."
     ),
+    judge_provider: str = typer.Option(
+        "",
+        "--judge-provider",
+        help="Judge provider override (mock, mistral, openai, anthropic, google).",
+    ),
+    judge_model: str = typer.Option(
+        "", "--judge-model", help="Judge model override (e.g. gpt-4o-mini)."
+    ),
 ) -> None:
     """Run a custom task evaluation end-to-end."""
     try:
@@ -318,14 +326,31 @@ def task_run_cmd(
 
     records: list[PredictionRecord] = []
     start = time.perf_counter()
+
+    # Build a shared judge for llm_judge scoring rules (G-Eval style).
+    judge_instance = None
+    needs_judge = any(r.method == "llm_judge" for r in task.scoring_rules)
+    if needs_judge:
+        from .schemas import JudgeConfig
+
+        judge_cfg = JudgeConfig(
+            provider=judge_provider or task.judge.provider,
+            model=judge_model or task.judge.model,
+        )
+        try:
+            judge_instance = build_provider(judge_cfg.provider, model=judge_cfg.model, options={})
+        except Exception as exc:
+            typer.echo(f"warning: judge unavailable ({exc}); llm_judge rules will fail", err=True)
     for index, case in enumerate(cases, start=1):
         prompt = _build_task_prompt(task, case)
         output_schema = [f.model_dump() for f in task.output_schema]
         try:
             if provider == "mock":
-                response = provider_inst.predict_text(prompt, output_schema)  # type: ignore[attr-defined]
+                response = provider_inst.predict_text(  # type: ignore[attr-defined]
+                    prompt, output_schema=output_schema
+                )
             else:
-                response = provider_inst.predict_text(prompt, output_schema)  # type: ignore[attr-defined]
+                response = provider_inst.predict_text(prompt)  # type: ignore[attr-defined]
         except Exception as exc:
             records.append(
                 PredictionRecord(
@@ -344,7 +369,14 @@ def task_run_cmd(
                 )
             )
         else:
-            score_result = _score_task_output(task, case.expected, response.content)
+            score_result = _score_task_output(
+                task,
+                case.expected,
+                response.content,
+                judge_provider=judge_instance,
+                case_input=case.input,
+                task_case=case,
+            )
             records.append(
                 PredictionRecord(
                     case_id=case.id,
@@ -532,7 +564,15 @@ def _build_task_prompt(task: TaskDefinition, case: TaskCase) -> str:
     return "\n".join(lines)
 
 
-def _score_task_output(task: TaskDefinition, expected: dict, raw_output: str) -> dict:
+def _score_task_output(
+    task: TaskDefinition,
+    expected: dict,
+    raw_output: str,
+    *,
+    judge_provider: Any = None,
+    case_input: dict | None = None,
+    task_case: Any = None,
+) -> dict:
     """Score a raw model output against expected values using scoring rules."""
     import json
 
@@ -545,12 +585,33 @@ def _score_task_output(task: TaskDefinition, expected: dict, raw_output: str) ->
     for rule in task.scoring_rules:
         expected_val = expected.get(rule.field)
         actual_val = parsed.get(rule.field)
-        if not _apply_scoring_rule(rule.method, expected_val, actual_val, rule.threshold):
+        if not _apply_scoring_rule(
+            rule.method,
+            expected_val,
+            actual_val,
+            rule.threshold,
+            rule=rule,
+            task=task,
+            judge_provider=judge_provider,
+            case_input=case_input,
+            task_case=task_case,
+        ):
             all_pass = False
     return {"ok": all_pass}
 
 
-def _apply_scoring_rule(method: str, expected: Any, actual: Any, threshold: float | None) -> bool:
+def _apply_scoring_rule(  # noqa: PLR0911
+    method: str,
+    expected: Any,
+    actual: Any,
+    threshold: float | None,
+    *,
+    rule: ScoringRule | None = None,
+    task: TaskDefinition | None = None,
+    judge_provider: Any = None,
+    case_input: dict | None = None,
+    task_case: Any = None,
+) -> bool:
     if method == "exact_match":
         return expected == actual
     if method == "boolean":
@@ -576,8 +637,151 @@ def _apply_scoring_rule(method: str, expected: Any, actual: Any, threshold: floa
             return f1 >= (threshold or 0.5)
         return expected == actual
     if method == "llm_judge":
-        return type(expected) is type(actual)
+        return _apply_llm_judge(
+            expected,
+            actual,
+            threshold,
+            rule=rule,
+            task=task,
+            judge_provider=judge_provider,
+            case_input=case_input,
+        )
+    if method in ("faithfulness", "answer_relevancy", "contextual_relevancy"):
+        return _apply_rag_metric(
+            method,
+            actual,
+            threshold,
+            rule=rule,
+            task=task,
+            judge_provider=judge_provider,
+            case_input=case_input,
+            task_case=task_case,
+        )
     return False
+
+
+def _apply_rag_metric(
+    method: str,
+    actual: Any,
+    threshold: float | None,
+    *,
+    rule: ScoringRule | None = None,
+    task: TaskDefinition | None = None,
+    judge_provider: Any = None,
+    case_input: dict | None = None,
+    task_case: Any = None,
+) -> bool:
+    """Deterministic lexical RAG metrics (DeepEval RAGAS-style, offline-first).
+
+    - faithfulness: share of the answer grounded in retrieval_context.
+    - answer_relevancy: vocab overlap between answer and question.
+    - contextual_relevancy: share of retrieved chunks relevant to the question.
+
+    Falls back to an LLM judge when no retrieval context is available but a
+    judge is configured.
+    """
+    from .metrics.rag import (
+        contextual_relevancy,
+        lexical_answer_relevancy,
+        lexical_faithfulness,
+    )
+
+    retrieval_context: list[str] = []
+    if task_case is not None:
+        retrieval_context = list(getattr(task_case, "retrieval_context", None) or [])
+    question = ""
+    if task is not None and case_input:
+        first_field = task.input_fields[0] if task.input_fields else None
+        if first_field and first_field in case_input:
+            question = str(case_input[first_field])
+        else:
+            question = " ".join(str(v) for v in case_input.values())
+    answer_text = actual if isinstance(actual, str) else str(actual)
+
+    if method == "faithfulness":
+        if not retrieval_context and judge_provider is not None:
+            return _apply_llm_judge(
+                retrieval_context,
+                answer_text,
+                threshold,
+                rule=rule,
+                task=task,
+                judge_provider=judge_provider,
+                case_input=case_input,
+            )
+        score = lexical_faithfulness(answer_text, retrieval_context)
+    elif method == "answer_relevancy":
+        score = lexical_answer_relevancy(answer_text, question)
+    elif method == "contextual_relevancy":
+        score = contextual_relevancy(retrieval_context, question)
+    else:
+        return False
+    return score >= (threshold if threshold is not None else 0.5)
+
+
+def _apply_llm_judge(
+    expected: Any,
+    actual: Any,
+    threshold: float | None,
+    *,
+    rule: ScoringRule | None = None,
+    task: TaskDefinition | None = None,
+    judge_provider: Any = None,
+    case_input: dict | None = None,
+) -> bool:
+    """G-Eval-style subjective scoring via any configured judge provider."""
+    from .judge import build_judge_prompt, call_judge
+
+    criterion = (
+        rule.criteria if rule and rule.criteria else None
+    ) or "Determine whether the model output for field matches the expected value."
+    evaluation_steps = (
+        rule.evaluation_steps
+        if rule and rule.evaluation_steps
+        else [
+            "Compare the actual output against the expected output.",
+            "Score highly when meaning and key details match; "
+            "heavily penalize contradictions and omissions.",
+            "Vague but non-contradicting phrasing is acceptable.",
+        ]
+    )
+    input_text = None
+    if case_input:
+        input_text = "\n".join(f"{k}: {v}" for k, v in case_input.items())
+    prompt = build_judge_prompt(
+        criterion,
+        input_text=input_text,
+        actual_output=actual,
+        expected_output=expected,
+        evaluation_steps=evaluation_steps,
+    )
+    if judge_provider is None:
+        from .providers import build_provider
+        from .schemas import JudgeConfig
+
+        cfg = task.judge if task and task.judge else JudgeConfig()
+        judge_provider = build_provider(cfg.provider, model=cfg.model, options={})
+    try:
+        from .providers.base import ProviderError
+
+        score, verdict, _reason, _resp = call_judge(_JudgeShim(judge_provider), prompt)
+    except ProviderError:
+        return False
+    cutoff = threshold if threshold is not None else 0.5
+    return verdict and score >= cutoff
+
+
+class _JudgeShim:
+    """Adapt a ModelProvider's predict_text into the judge module's protocol."""
+
+    def __init__(self, provider: Any) -> None:
+        self._provider = provider
+        self.name = getattr(provider, "name", "judge")
+
+    def predict_text(self, prompt: str):  # type: ignore[no-untyped-def]
+        from .judge import JUDGE_SYSTEM_PROMPT
+
+        return self._provider.predict_text(prompt, JUDGE_SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":  # pragma: no cover

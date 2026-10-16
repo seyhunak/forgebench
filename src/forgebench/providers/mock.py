@@ -173,16 +173,43 @@ class MockProvider:
         self,
         prompt: str,
         output_schema: list[dict] | None = None,
+        system: str | None = None,
     ) -> ProviderResponse:
         """Generate a deterministic mock response for custom task evaluation.
 
         Inspects the output schema and produces plausible JSON values for each
-        field. Output is deterministic given the prompt text.
+        field. When called as an LLM judge (prompt contains a scoring criterion
+        and actual/expected outputs), returns a deterministic verdict JSON
+        instead. Output is deterministic given the prompt text.
         """
         import hashlib as _hashlib
 
         digest = _hashlib.sha256(prompt.encode()).digest()
         seed_val = int.from_bytes(digest[:4], "big") / 2**32
+
+        lowered = prompt.lower()
+        is_judge_call = (
+            "criterion:" in lowered
+            and "actual output:" in lowered
+            and "expected output:" in lowered
+        )
+        if is_judge_call:
+            # Deterministic verdict: score in [0.4, 1.0], pass at >= 0.6.
+            score = round(0.4 + seed_val * 0.6, 2)
+            verdict = {
+                "score": score,
+                "reason": "Mock judge verdict (deterministic).",
+                "pass": score >= 0.6,
+            }
+            content = json.dumps(verdict)
+            latency_ms = 12.0 + seed_val * 30.0
+            return ProviderResponse(
+                content=content,
+                latency_ms=latency_ms,
+                input_tokens=max(1, len(prompt) // 4),
+                output_tokens=max(1, len(content) // 4),
+                model=self.model,
+            )
 
         result: dict = {}
         if output_schema:

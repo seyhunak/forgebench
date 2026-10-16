@@ -133,6 +133,48 @@ class OpenAIProvider:
             f"openai call failed for case {case.id} after {attempts} attempt(s): {last_error}"
         ) from last_error
 
+    def predict_text(self, prompt: str, system: str | None = None) -> ProviderResponse:
+        """Free-text completion for LLM-as-judge calls (not benchmark cases)."""
+        import time
+
+        messages = [
+            {"role": "system", "content": system or self.system_prompt},
+            {"role": "user", "content": prompt},
+        ]
+        started = time.perf_counter()
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                request: dict[str, Any] = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": self.temperature,
+                }
+                if self.max_tokens is not None:
+                    request["max_tokens"] = self.max_tokens
+                response = self._client.chat.completions.create(**request)
+                latency_ms = (time.perf_counter() - started) * 1000
+                content = response.choices[0].message.content or ""
+                usage = getattr(response, "usage", None)
+                input_tokens = getattr(usage, "prompt_tokens", None) if usage else None
+                output_tokens = getattr(usage, "completion_tokens", None) if usage else None
+                return ProviderResponse(
+                    content=content,
+                    latency_ms=latency_ms,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    model=getattr(response, "model", self.model) or self.model,
+                )
+            except Exception as exc:  # SDK error types vary by version
+                last_error = exc
+                if attempt >= self.max_retries or not self._retryable(exc):
+                    break
+                time.sleep(min(2.0**attempt, 8.0))
+        attempts = self.max_retries + 1
+        raise ProviderError(
+            f"openai judge call failed after {attempts} attempt(s): {last_error}"
+        ) from last_error
+
     @staticmethod
     def _retryable(exc: Exception) -> bool:
         name = type(exc).__name__.lower()

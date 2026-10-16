@@ -162,6 +162,43 @@ class GoogleProvider:
             f"google call failed for case {case.id} after {attempts} attempt(s): {last_error}"
         ) from last_error
 
+    def predict_text(self, prompt: str, system: str | None = None) -> ProviderResponse:
+        """Free-text completion for LLM-as-judge calls (not benchmark cases)."""
+        started = time.perf_counter()
+        last_error: Exception | None = None
+        full_prompt = (system or self.system_prompt) + "\n\nUser: " + prompt
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = self._client.generate_content(
+                    full_prompt,
+                    generation_config={
+                        "temperature": self.temperature,
+                        "max_output_tokens": self.max_tokens or 4096,
+                    },
+                    request_options={"timeout": self.timeout_seconds},
+                )
+                latency_ms = (time.perf_counter() - started) * 1000
+                content = response.text or ""
+                usage = getattr(response, "usage_metadata", None)
+                input_tokens = getattr(usage, "prompt_token_count", None) if usage else None
+                output_tokens = getattr(usage, "candidates_token_count", None) if usage else None
+                return ProviderResponse(
+                    content=content,
+                    latency_ms=latency_ms,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    model=self.model,
+                )
+            except Exception as exc:  # SDK error types vary by version
+                last_error = exc
+                if attempt >= self.max_retries or not self._retryable(exc):
+                    break
+                time.sleep(min(2.0**attempt, 8.0))
+        attempts = self.max_retries + 1
+        raise ProviderError(
+            f"google judge call failed after {attempts} attempt(s): {last_error}"
+        ) from last_error
+
     @staticmethod
     def _retryable(exc: Exception) -> bool:
         name = type(exc).__name__.lower()

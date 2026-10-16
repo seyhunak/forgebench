@@ -150,6 +150,44 @@ class AnthropicProvider:
             f"anthropic call failed for case {case.id} after {attempts} attempt(s): {last_error}"
         ) from last_error
 
+    def predict_text(self, prompt: str, system: str | None = None) -> ProviderResponse:
+        """Free-text completion for LLM-as-judge calls (not benchmark cases)."""
+        started = time.perf_counter()
+        last_error: Exception | None = None
+        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = self._client.messages.create(
+                    model=self.model,
+                    system=system or self.system_prompt,
+                    messages=messages,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens or 4096,
+                )
+                latency_ms = (time.perf_counter() - started) * 1000
+                content = "".join(
+                    block.text for block in response.content if hasattr(block, "text")
+                )
+                usage = getattr(response, "usage", None)
+                input_tokens = getattr(usage, "input_tokens", None) if usage else None
+                output_tokens = getattr(usage, "output_tokens", None) if usage else None
+                return ProviderResponse(
+                    content=content,
+                    latency_ms=latency_ms,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    model=getattr(response, "model", self.model) or self.model,
+                )
+            except Exception as exc:  # SDK error types vary by version
+                last_error = exc
+                if attempt >= self.max_retries or not self._retryable(exc):
+                    break
+                time.sleep(min(2.0**attempt, 8.0))
+        attempts = self.max_retries + 1
+        raise ProviderError(
+            f"anthropic judge call failed after {attempts} attempt(s): {last_error}"
+        ) from last_error
+
     @staticmethod
     def _retryable(exc: Exception) -> bool:
         name = type(exc).__name__.lower()
