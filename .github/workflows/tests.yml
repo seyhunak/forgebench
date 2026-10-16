@@ -22,13 +22,20 @@ jobs:
         run: ruff check src tests scripts examples
       - name: Format check
         run: ruff format --check src tests scripts examples
-      - name: Test (offline; mock provider only)
+      - name: Test
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: openai/gpt-4o-mini
         run: pytest
       - name: Dataset must be reproducible
         run: |
           python scripts/generate_dataset.py --seed 42 --train 100 --dev 40 --test 60 --out /tmp/regen
           diff -r datasets/finance_v1 /tmp/regen
       - name: End-to-end demo
+        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: openai/gpt-4o-mini
         run: |
           forgebench run --config configs/baseline.yaml --run-id ci-baseline
           forgebench run --config configs/experiments/prompt_v1.yaml --run-id ci-prompt
