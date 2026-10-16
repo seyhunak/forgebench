@@ -33,7 +33,7 @@ from .credentials import (
 )
 from .dashboard import list_configs as _list_configs
 from .dashboard import list_runs as _list_runs
-from .providers import PROVIDER_ENV_VARS
+from .providers import DEFAULT_PROVIDER, PROVIDER_ENV_VARS
 from .providers.verify import verify_provider_key
 from .registry import default_datasets_root, list_datasets, load_dataset, load_split
 from .reporting import load_run, render_comparison, render_report
@@ -69,7 +69,7 @@ class _ProgressReporter:
 class CredentialSave(BaseModel):
     key: str
     model: str | None = None
-    provider: str = "mistral"
+    provider: str = DEFAULT_PROVIDER
 
 
 class RunRequest(BaseModel):
@@ -83,7 +83,7 @@ class RunRequest(BaseModel):
 class TaskRunRequest(BaseModel):
     name: str
     split: str = "test"
-    provider: str = "mock"
+    provider: str = DEFAULT_PROVIDER
     model: str = ""
     judge_provider: str = ""
     judge_model: str = ""
@@ -100,6 +100,21 @@ app = FastAPI(title="ForgeBench API", version=__version__)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIGS_DIR = REPO_ROOT / "configs"
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _resolve_run_dir(run_id: str) -> Path | None:
+    """Resolve a run identifier to its directory, or ``None``.
+
+    The dashboard sends the repo-relative path (``runs/<id>``); the historical
+    API form is the bare directory name (``<id>``). Both are accepted, and the
+    result must stay inside ``runs/`` so a crafted id cannot escape it.
+    """
+    runs_root = (REPO_ROOT / "runs").resolve()
+    for candidate in (REPO_ROOT / run_id, runs_root / run_id):
+        resolved = candidate.resolve()
+        if resolved.is_dir() and (resolved == runs_root or runs_root in resolved.parents):
+            return resolved
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -131,17 +146,47 @@ def get_config(config_path: str) -> dict[str, Any]:
 # Credential endpoints
 # ---------------------------------------------------------------------------
 
+#: Dashboard provider order. OpenRouter leads so it is the default selection.
+_PROVIDER_LABELS: dict[str, str] = {
+    "openrouter": "OpenRouter",
+    "mock": "Mock",
+    "mistral": "Mistral",
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "google": "Google",
+}
+
+
+def _env_var_for(provider: str) -> str:
+    """Credential env var for a provider, tolerant of unknown names."""
+    return PROVIDER_ENV_VARS.get(provider, PROVIDER_ENV_VARS[DEFAULT_PROVIDER])
+
+
+def _configured_provider() -> str:
+    """First provider (OpenRouter first) that actually has a key, else the default."""
+    for pid in _PROVIDER_LABELS:
+        if pid != "mock" and get_value(PROVIDER_ENV_VARS[pid]):
+            return pid
+    return DEFAULT_PROVIDER
+
 
 @app.get("/api/credentials")
-def credential_status() -> dict[str, Any]:
-    """Current key/mask/status without exposing the raw key."""
+def credential_status(provider: str | None = None) -> dict[str, Any]:
+    """Current key/mask/status without exposing the raw key.
+
+    Without ``provider`` the panel reports the first provider with a key
+    configured (OpenRouter first), falling back to the default provider.
+    """
     load_env_files()
-    key = get_value("MISTRAL_API_KEY")
-    model = get_value("MISTRAL_MODEL")
+    provider_id = provider or _configured_provider()
+    env_var = _env_var_for(provider_id)
+    model = get_value(env_var.replace("_API_KEY", "_MODEL"))
+    key = get_value(env_var)
     return {
+        "provider": provider_id,
         "key_set": bool(key),
         "key_masked": mask(key) if key else None,
-        "source": source_of("MISTRAL_API_KEY"),
+        "source": source_of(env_var),
         "model": model,
         "env_file": str(find_env_file()) if find_env_file() else None,
     }
@@ -150,7 +195,7 @@ def credential_status() -> dict[str, Any]:
 @app.post("/api/credentials")
 def save_credential(payload: CredentialSave) -> dict[str, str]:
     """Save API key (+ optional default model) to .env."""
-    env_var = PROVIDER_ENV_VARS.get(payload.provider, "MISTRAL_API_KEY")
+    env_var = _env_var_for(payload.provider)
     target = set_value(env_var, payload.key)
     if payload.model:
         model_var = env_var.replace("_API_KEY", "_MODEL")
@@ -159,21 +204,24 @@ def save_credential(payload: CredentialSave) -> dict[str, str]:
 
 
 @app.delete("/api/credentials")
-def delete_credential() -> dict[str, str | None]:
-    """Remove the saved API key."""
-    removed = delete_value("MISTRAL_API_KEY")
-    return {"removed_from": str(removed) if removed else None}
+def delete_credential(provider: str = DEFAULT_PROVIDER) -> dict[str, str | None]:
+    """Remove the saved API key for one provider."""
+    removed = delete_value(_env_var_for(provider))
+    return {
+        "removed_from": str(removed) if removed else None,
+        "provider": provider,
+    }
 
 
 class CredentialVerify(BaseModel):
-    provider: str = "mistral"
+    provider: str = DEFAULT_PROVIDER
 
 
 @app.post("/api/credentials/verify")
 def verify_credential(payload: CredentialVerify) -> dict[str, Any]:
     """Check the saved key against the provider API."""
     load_env_files()
-    env_var = PROVIDER_ENV_VARS.get(payload.provider, "MISTRAL_API_KEY")
+    env_var = _env_var_for(payload.provider)
     key = get_value(env_var)
     if not key:
         raise HTTPException(status_code=400, detail=f"No key saved for {env_var}.")
@@ -193,14 +241,10 @@ def verify_credential(payload: CredentialVerify) -> dict[str, Any]:
 
 @app.get("/api/providers")
 def list_providers() -> list[dict[str, Any]]:
-    """Available providers with titleized display names."""
+    """Available providers with display names. OpenRouter comes first (default)."""
     return [
-        {"id": "mock", "name": "Mock", "api_key_required": False},
-        {"id": "mistral", "name": "Mistral", "api_key_required": True},
-        {"id": "openai", "name": "OpenAI", "api_key_required": True},
-        {"id": "anthropic", "name": "Anthropic", "api_key_required": True},
-        {"id": "google", "name": "Google", "api_key_required": True},
-        {"id": "openrouter", "name": "OpenRouter", "api_key_required": True},
+        {"id": pid, "name": name, "api_key_required": pid != "mock"}
+        for pid, name in _PROVIDER_LABELS.items()
     ]
 
 
@@ -282,15 +326,15 @@ def get_dataset_split(name: str, split: str) -> dict[str, Any]:
 @app.delete("/api/runs/{run_id:path}")
 def delete_run(run_id: str) -> dict[str, str]:
     """Delete a run directory."""
-    runs_root = REPO_ROOT / "runs"
-    run_dir = runs_root / run_id
-    if not run_dir.is_dir():
+    run_dir = _resolve_run_dir(run_id)
+    if run_dir is None:
         raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
     try:
         shutil.rmtree(run_dir)
-        # Clear from in-memory state if present
+        # Clear from in-memory state if present (either identifier form).
         _run_state.pop(run_id, None)
-        return {"deleted": run_id}
+        _run_state.pop(run_dir.name, None)
+        return {"deleted": run_dir.name}
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -411,9 +455,8 @@ def list_runs() -> list[dict[str, Any]]:
 @app.get("/api/runs/{run_id:path}/report")
 def get_run_report(run_id: str) -> dict[str, str]:
     """Render the Markdown report for a run."""
-    runs_root = REPO_ROOT / "runs"
-    run_dir = runs_root / run_id
-    if not run_dir.is_dir():
+    run_dir = _resolve_run_dir(run_id)
+    if run_dir is None:
         raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
 
     from .dashboard import read_predictions
@@ -429,9 +472,8 @@ def get_run_report(run_id: str) -> dict[str, str]:
 
 @app.get("/api/runs/{run_id:path}/predictions")
 def get_run_predictions(run_id: str) -> list[dict[str, Any]]:
-    runs_root = REPO_ROOT / "runs"
-    run_dir = runs_root / run_id
-    if not run_dir.is_dir():
+    run_dir = _resolve_run_dir(run_id)
+    if run_dir is None:
         raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
 
     from .dashboard import read_predictions
@@ -443,9 +485,8 @@ def get_run_predictions(run_id: str) -> list[dict[str, Any]]:
 @app.get("/api/runs/{run_id:path}")
 def get_run(run_id: str) -> dict[str, Any]:
     """Load one run's manifest + metrics."""
-    runs_root = REPO_ROOT / "runs"
-    run_dir = runs_root / run_id
-    if not run_dir.is_dir():
+    run_dir = _resolve_run_dir(run_id)
+    if run_dir is None:
         raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
     try:
         entry = load_run(str(run_dir))

@@ -51,11 +51,16 @@ const els = {
   resSchemaValidity: document.getElementById("res-schema-validity"),
   btnOpenRun: document.getElementById("btn-open-run"),
   runsGrid: document.getElementById("runs-grid"),
-  runReportView: document.getElementById("run-report-view"),
-  btnBackToRuns: document.getElementById("btn-back-to-runs"),
-  runReportContent: document.getElementById("run-report-content"),
-  btnDownloadReport: document.getElementById("btn-download-report"),
-  btnViewPredictions: document.getElementById("btn-view-predictions"),
+  // Run detail modal
+  runModal: document.getElementById("run-modal"),
+  runModalTitle: document.getElementById("run-modal-title"),
+  runModalMeta: document.getElementById("run-modal-meta"),
+  runModalBody: document.getElementById("run-modal-body"),
+  btnModalClose: document.getElementById("btn-modal-close"),
+  btnModalReport: document.getElementById("btn-modal-report"),
+  btnModalPredictions: document.getElementById("btn-modal-predictions"),
+  btnModalDownloadReport: document.getElementById("btn-modal-download-report"),
+  btnModalDownloadPredictions: document.getElementById("btn-modal-download-predictions"),
   modeSingle: document.getElementById("mode-single"),
   modeCompare: document.getElementById("mode-compare"),
   singleView: document.getElementById("single-view"),
@@ -79,10 +84,6 @@ const els = {
   btnSaveConfig: document.getElementById("btn-save-config"),
   btnResetConfig: document.getElementById("btn-reset-config"),
   configMessage: document.getElementById("config-message"),
-  // Run predictions view
-  runPredictionsView: document.getElementById("run-predictions-view"),
-  btnBackToReport: document.getElementById("btn-back-to-report"),
-  btnDownloadPredictions: document.getElementById("btn-download-predictions"),
   // Task panel
   taskSelect: document.getElementById("task-select"),
   taskSplit: document.getElementById("task-split"),
@@ -175,6 +176,31 @@ function escapeHtml(text) {
 
 // ---------- Providers & Models (from models.dev) ----------
 
+// Preferred default model per provider. Catalog order is arbitrary (OpenAI
+// leads with an image model, OpenRouter with a fine-tune), so each provider
+// gets a sensible starting point. Used only when the id exists in the catalog.
+const PROVIDER_DEFAULT_MODELS = {
+  openrouter: "openai/gpt-4o-mini",
+  mistral: "open-mistral-nemo",
+  openai: "gpt-4o-mini",
+  anthropic: "claude-sonnet-4-5",
+  google: "gemini-flash-latest",
+  mock: "rule-mock-v1",
+};
+
+function preferredModel(providerId, models) {
+  const preferred = PROVIDER_DEFAULT_MODELS[providerId];
+  if (preferred && models[preferred]) return preferred;
+  const ids = Object.keys(models);
+  return ids.length ? ids[0] : "";
+}
+
+function selectOption(select, value) {
+  if (!select) return;
+  const has = Array.from(select.options).some(o => o.value === value);
+  select.value = has ? value : (select.options[0] ? select.options[0].value : "");
+}
+
 async function loadProvidersAndModels() {
   try {
     const [providers, models] = await Promise.all([
@@ -192,7 +218,9 @@ async function loadProvidersAndModels() {
       .map(p => `<option value="${p.id}">${p.name}</option>`)
       .join(""));
 
-    populateModels(providerList[0].id);
+    // OpenRouter is the default provider — one key, every hosted model.
+    selectOption(els.keyProvider, "openrouter");
+    populateModels(els.keyProvider.value);
   } catch (err) {
     setMessage(els.keyMessage, `Failed to load providers: ${err.message}`, "error");
   }
@@ -211,6 +239,9 @@ function populateModels(providerId) {
   safeInnerHTML(els.modelSelect, Object.values(models)
     .map(m => `<option value="${m.id}">${m.name || m.id}</option>`)
     .join(""));
+
+  const preferred = preferredModel(providerId, models);
+  if (preferred) els.modelSelect.value = preferred;
 
   showModelDetails(providerId, els.modelSelect.value);
 }
@@ -259,21 +290,20 @@ function showModelDetails(providerId, modelId) {
 
 // ---------- Credentials ----------
 
-async function loadCredentialStatus() {
+async function loadCredentialStatus(provider) {
   try {
-    const data = await fetchJSON("/api/credentials");
+    const query = provider ? `?provider=${encodeURIComponent(provider)}` : "";
+    const data = await fetchJSON(`/api/credentials${query}`);
     els.statusKey.textContent = data.key_masked || "(not set)";
     els.statusSource.textContent = data.source || "—";
     els.statusModel.textContent = data.model || "(not set)";
     els.statusFile.textContent = data.env_file || "—";
 
-    const source = data.source || "";
-    if (source.includes("OPENROUTER")) els.keyProvider.value = "openrouter";
-    else if (source.includes("OPENAI")) els.keyProvider.value = "openai";
-    else if (source.includes("ANTHROPIC")) els.keyProvider.value = "anthropic";
-    else if (source.includes("GOOGLE")) els.keyProvider.value = "google";
-    else if (source.includes("MISTRAL")) els.keyProvider.value = "mistral";
-    populateModels(els.keyProvider.value);
+    // With no explicit provider, switch to whichever provider has a key.
+    if (!provider && data.provider && els.keyProvider.value !== data.provider) {
+      selectOption(els.keyProvider, data.provider);
+      populateModels(els.keyProvider.value);
+    }
   } catch (err) {
     setMessage(els.keyMessage, `Failed to load status: ${err.message}`, "error");
   }
@@ -281,6 +311,7 @@ async function loadCredentialStatus() {
 
 els.keyProvider.addEventListener("change", () => {
   populateModels(els.keyProvider.value);
+  loadCredentialStatus(els.keyProvider.value);
 });
 
 els.modelSelect.addEventListener("change", () => {
@@ -302,7 +333,7 @@ els.btnSaveKey.addEventListener("click", async () => {
     });
     setMessage(els.keyMessage, "Saved to .env (chmod 600).", "ok");
     els.keyInput.value = "";
-    await loadCredentialStatus();
+    await loadCredentialStatus(provider);
     dlog('Credential status loaded');
   } catch (err) {
     setMessage(els.keyMessage, `Save failed: ${err.message}`, "error");
@@ -329,10 +360,11 @@ els.btnVerifyKey.addEventListener("click", async () => {
 });
 
 els.btnRemoveKey.addEventListener("click", async () => {
+  const provider = els.keyProvider.value;
   try {
-    await fetchJSON("/api/credentials", { method: "DELETE" });
+    await fetchJSON(`/api/credentials?provider=${encodeURIComponent(provider)}`, { method: "DELETE" });
     setMessage(els.keyMessage, "Key removed.", "ok");
-    await loadCredentialStatus();
+    await loadCredentialStatus(provider);
     dlog('Credential status loaded');
   } catch (err) {
     setMessage(els.keyMessage, `Remove failed: ${err.message}`, "error");
@@ -504,7 +536,7 @@ function renderRunsGrid(runs) {
     const dataset = run.dataset || {};
 
     return `
-      <article class="run-card" onclick="viewRunReport('${escapeHtml(run.path)}')">
+      <article class="run-card" role="button" tabindex="0" onclick="viewRunReport('${escapeHtml(run.path)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();viewRunReport('${escapeHtml(run.path)}')}">
         <div class="run-card--actions">
           <button class="btn-delete-run" title="Delete run" onclick="event.stopPropagation(); deleteRun('${escapeHtml(run.path)}')">🗑️</button>
         </div>
@@ -545,71 +577,134 @@ function populateCompareSelect(runs) {
 
 window.viewRunReport = async (runPath) => {
   try {
-    const data = await fetchJSON(`/api/runs/${runPath}/report`);
-    els.runReportContent.textContent = data.markdown;
-    hide(els.runsGrid);
-    show(els.runReportView);
-    els.btnDownloadReport.onclick = () => {
-      const blob = new Blob([data.markdown], { type: "text/markdown" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${runPath.replace(/\//g, "-")}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
-    };
+    const [report, run] = await Promise.all([
+      fetchJSON(`/api/runs/${runPath}/report`),
+      fetchJSON(`/api/runs/${runPath}`).catch(() => null),
+    ]);
+    openRunModal(runPath, run, report.markdown);
   } catch (err) {
     setMessage(els.runMessage, `Failed to load report: ${err.message}`, "error");
   }
 };
 
-els.btnBackToRuns.addEventListener("click", () => {
-  hide(els.runReportView);
-  show(els.runsGrid);
-});
+// ---------- Run detail modal ----------
 
-// ---------- Predictions viewer ----------
+let currentRun = null;
 
-els.btnViewPredictions.addEventListener("click", async () => {
-  const runPath = els.btnOpenRun.onclick.toString().match(/\/api\/runs\/([^\/]+)\/report/);
-  if (!runPath) return;
-  try {
-    hide(els.runReportView);
-    const data = await fetchJSON(`/api/runs/${runPath[1]}/predictions`);
-    renderPredictionsTable(data);
-    show(els.runPredictionsView);
-  } catch (err) {
-    setMessage(els.runMessage, `Failed to load predictions: ${err.message}`, "error");
-    show(els.runReportView);
+function pct(value) {
+  return value != null ? (value * 100).toFixed(1) + "%" : "—";
+}
+
+function openRunModal(runPath, run, markdown) {
+  const manifest = (run && run.manifest) || {};
+  const provider = manifest.provider || {};
+  const dataset = manifest.dataset || {};
+  const m = (run && run.metrics) || {};
+
+  currentRun = { path: runPath, markdown: markdown || "", predictions: null };
+
+  els.runModalTitle.textContent = (run && run.run_id) || runPath.replace(/^runs\//, "");
+  els.runModalMeta.innerHTML = [
+    provider.name || "unknown",
+    provider.model || "unknown",
+    `${dataset.name || "unknown"} v${dataset.version || "?"}`,
+    `accuracy ${pct(m.accuracy)}`,
+    `macro-F1 ${pct(m.macro_f1)}`,
+    `schema valid ${pct(m.schema_validity)}`,
+    manifest.created_at_utc || "",
+  ]
+    .filter(Boolean)
+    .map((chip) => `<span class="modal-chip">${escapeHtml(chip)}</span>`)
+    .join("");
+
+  showModalReport();
+  els.runModal.hidden = false;
+  document.body.classList.add("modal-open");
+  if (els.btnModalClose) els.btnModalClose.focus();
+}
+
+function closeRunModal() {
+  if (!els.runModal || els.runModal.hidden) return;
+  els.runModal.hidden = true;
+  document.body.classList.remove("modal-open");
+  currentRun = null;
+}
+
+function showModalReport() {
+  if (!els.runModalBody) return;
+  els.runModalBody.classList.remove("modal-body--table");
+  els.runModalBody.textContent = (currentRun && currentRun.markdown) || "(no report)";
+  els.btnModalReport.classList.add("is-active");
+  els.btnModalPredictions.classList.remove("is-active");
+}
+
+async function loadCurrentPredictions() {
+  if (!currentRun) return null;
+  if (!currentRun.predictions) {
+    currentRun.predictions = await fetchJSON(`/api/runs/${currentRun.path}/predictions`);
   }
-});
+  return currentRun.predictions;
+}
 
-els.btnBackToReport.addEventListener("click", () => {
-  hide(els.runPredictionsView);
-  show(els.runReportView);
-});
-
-els.btnDownloadPredictions.addEventListener("click", async () => {
-  const runPath = els.btnOpenRun.onclick.toString().match(/\/api\/runs\/([^\/]+)\/report/);
-  if (!runPath) return;
+async function showModalPredictions() {
+  if (!currentRun) return;
+  els.runModalBody.classList.add("modal-body--table");
+  els.btnModalReport.classList.remove("is-active");
+  els.btnModalPredictions.classList.add("is-active");
+  els.runModalBody.innerHTML = '<p class="modal-empty">Loading predictions…</p>';
   try {
-    const data = await fetchJSON(`/api/runs/${runPath[1]}/predictions`);
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${runPath[1].replace(/\//g, "-")}-predictions.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    renderPredictionsTable(els.runModalBody, await loadCurrentPredictions());
+  } catch (err) {
+    els.runModalBody.innerHTML = `<p class="modal-empty">Failed to load predictions: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function downloadBlob(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+els.btnModalReport.addEventListener("click", showModalReport);
+els.btnModalPredictions.addEventListener("click", showModalPredictions);
+
+els.btnModalDownloadReport.addEventListener("click", () => {
+  if (!currentRun) return;
+  downloadBlob(`${currentRun.path.replace(/\//g, "-")}.md`, currentRun.markdown || "", "text/markdown");
+});
+
+els.btnModalDownloadPredictions.addEventListener("click", async () => {
+  if (!currentRun) return;
+  try {
+    const data = await loadCurrentPredictions();
+    downloadBlob(
+      `${currentRun.path.replace(/\//g, "-")}-predictions.json`,
+      JSON.stringify(data, null, 2),
+      "application/json"
+    );
   } catch (err) {
     setMessage(els.runMessage, `Download failed: ${err.message}`, "error");
   }
 });
 
-function renderPredictionsTable(records) {
-  const container = document.getElementById("run-predictions-content");
+els.runModal.addEventListener("click", (e) => {
+  if (e.target.hasAttribute("data-modal-close")) closeRunModal();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && els.runModal && !els.runModal.hidden) {
+    e.preventDefault();
+    closeRunModal();
+  }
+});
+
+function renderPredictionsTable(container, records) {
   if (!records || records.length === 0) {
-    container.innerHTML = `<p style="color: var(--fg-muted); text-align:center; padding: 2rem;">No predictions found.</p>`;
+    container.innerHTML = '<p class="modal-empty">No predictions found.</p>';
     return;
   }
 
@@ -726,7 +821,7 @@ function showRunResult(result) {
   els.resMacroF1.textContent = m.macro_f1 != null ? (m.macro_f1 * 100).toFixed(1) + "%" : "—";
   els.resSchemaValidity.textContent = m.schema_validity != null ? (m.schema_validity * 100).toFixed(1) + "%" : "—";
   els.btnOpenRun.onclick = () => {
-    window.location.href = `/api/runs/${result.run_id}/report`;
+    viewRunReport(result.run_id);
   };
 }
 
@@ -849,6 +944,18 @@ window.downloadComparison = async (runDirs) => {
 
 // ---------- Tasks ----------
 
+/** The model the Tasks form should send for a provider (never empty). */
+function preferredModelFor(providerId) {
+  if (providerId === "mock") return "rule-mock-v1";
+  const provider = modelsData && modelsData[providerId];
+  return preferredModel(providerId, (provider && provider.models) || {});
+}
+
+function syncTaskModel(providerSelect, modelInput) {
+  if (!providerSelect || !modelInput) return;
+  modelInput.value = preferredModelFor(providerSelect.value);
+}
+
 async function loadTasks() {
   try {
     const taskNames = await fetchJSON("/api/tasks");
@@ -869,6 +976,11 @@ async function loadTasks() {
       els.taskProvider.appendChild(opt.cloneNode(true));
       els.taskJudgeProvider.appendChild(opt.cloneNode(true));
     }
+    // OpenRouter is the default provider — prefill a model id that works.
+    selectOption(els.taskProvider, "openrouter");
+    selectOption(els.taskJudgeProvider, "openrouter");
+    syncTaskModel(els.taskProvider, els.taskModel);
+    syncTaskModel(els.taskJudgeProvider, els.taskJudgeModel);
     await loadTaskRuns();
   } catch (err) {
     setMessage(els.taskMessage, `Failed to load tasks: ${err.message}`, "error");
@@ -975,7 +1087,7 @@ function showResult(result) {
   els.taskResCases.textContent = result.metrics?.n_cases ?? "—";
   els.taskResValid.textContent = result.metrics?.n_valid ?? "—";
   els.taskBtnOpenRun.onclick = () => {
-    window.location.href = `/api/runs/${encodeURIComponent(result.run_id)}/report`;
+    viewRunReport(result.run_id);
   };
 }
 
@@ -988,7 +1100,7 @@ async function loadTaskRuns() {
     }
     const rows = runs.map(r => {
       const m = r.metrics || {};
-      return `<div class="run-card" onclick="window.location.href='/api/runs/${encodeURIComponent(r.path)}/report'"><div class="run-card--header"><div class="run-card--id">${escapeHtml(r.run_id)}</div><span style="font-size:0.75rem;color:var(--fg-muted);">${escapeHtml(r.task ?? '')}</span></div><div class="run-card--meta"><div>Split: ${escapeHtml(r.split)}</div><div>Cases: ${m.n_cases ?? '—'} | Valid: ${m.n_valid ?? '—'}</div><div>${r.created_at || '—'}</div></div></div>`;
+      return `<div class="run-card" role="button" tabindex="0" onclick="viewRunReport('${escapeHtml(r.path)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();viewRunReport('${escapeHtml(r.path)}')}"><div class="run-card--header"><div class="run-card--id">${escapeHtml(r.run_id)}</div><span style="font-size:0.75rem;color:var(--fg-muted);">${escapeHtml(r.task ?? '')}</span></div><div class="run-card--meta"><div>Split: ${escapeHtml(r.split)}</div><div>Cases: ${m.n_cases ?? '—'} | Valid: ${m.n_valid ?? '—'}</div><div>${r.created_at || '—'}</div></div></div>`;
     }).join("");
     els.taskRunsGrid.innerHTML = `<div style="display:flex;flex-direction:column;gap:0.5rem;">${rows}</div>`;
   } catch (err) {
@@ -998,6 +1110,9 @@ async function loadTaskRuns() {
 
 els.btnValidateTask.addEventListener("click", validateTask);
 els.btnRunTask.addEventListener("click", startTaskRun);
+els.taskProvider.addEventListener("change", () => syncTaskModel(els.taskProvider, els.taskModel));
+els.taskJudgeProvider.addEventListener("change", () =>
+  syncTaskModel(els.taskJudgeProvider, els.taskJudgeModel));
 
 // ---------- Init ----------
 
@@ -1018,14 +1133,16 @@ async function init() {
     const critical = ['key-provider', 'key-input', 'model-select', 'model-details',
       'btn-save-key', 'btn-verify-key', 'btn-remove-key', 'key-message',
       'config-select', 'run-limit', 'run-id', 'btn-run', 'run-message',
-      'runs-grid', 'run-report-view', 'btn-back-to-runs', 'run-report-content',
+      'runs-grid', 'run-modal', 'run-modal-title', 'run-modal-meta', 'run-modal-body',
+      'btn-modal-close', 'btn-modal-report', 'btn-modal-predictions',
+      'btn-modal-download-report', 'btn-modal-download-predictions',
       'mode-single', 'mode-compare', 'single-view', 'compare-view',
       'compare-select', 'btn-compare', 'compare-view-container',
       'dataset-select', 'dataset-split', 'dataset-info', 'dataset-cases-container',
       'dataset-table-body', 'btn-download-dataset', 'dataset-message',
       'config-editor-select', 'config-editor', 'config-editor-loading',
       'btn-save-config', 'btn-reset-config', 'config-message',
-      'btn-theme-toggle', 'btn-download-report', 'btn-view-predictions',
+      'btn-theme-toggle',
       'task-select', 'task-split', 'task-provider', 'task-model',
       'task-judge-provider', 'task-judge-model', 'task-limit',
       'btn-validate-task', 'btn-run-task', 'task-message',

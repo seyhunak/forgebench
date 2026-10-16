@@ -29,7 +29,7 @@ from .credentials import (
     set_value,
     source_of,
 )
-from .providers import PROVIDER_ENV_VARS
+from .providers import DEFAULT_PROVIDER, PROVIDER_ENV_VARS
 from .providers.verify import verify_provider_key
 from .registry import default_datasets_root, list_datasets, validate_dataset
 from .reporting import load_run, render_comparison, render_report
@@ -77,7 +77,7 @@ def set_key_cmd(
         help="API key. Prefer the hidden prompt (args land in shell history).",
     ),
     provider: str = typer.Option(
-        "mistral",
+        DEFAULT_PROVIDER,
         "--provider",
         help="Provider: mistral, openai, anthropic, google, openrouter.",
     ),
@@ -343,7 +343,7 @@ def task_run_cmd(
     name: str = typer.Argument(..., help="Task name to run."),
     split: str = typer.Option("test", "--split", help="Dataset split to evaluate."),
     provider: str = typer.Option(
-        "mock",
+        DEFAULT_PROVIDER,
         "--provider",
         help="Provider name (mock, mistral, openai, anthropic, google, openrouter).",
     ),

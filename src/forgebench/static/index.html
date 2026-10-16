@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=2">
+<link rel="stylesheet" href="/static/style.css?v=3">
 </head>
 <body>
 
@@ -274,7 +274,7 @@
           <p class="view-kicker">05 · Inspect</p>
           <h2 class="view-title">Results</h2>
         </div>
-        <p class="view-lede">View single-run reports or compare multiple runs.</p>
+        <p class="view-lede">Tap a run to open its report, browse predictions and download artifacts.</p>
       </header>
 
       <div class="view-body">
@@ -285,23 +285,6 @@
 
         <div id="single-view">
           <div class="runs-grid" id="runs-grid"></div>
-          <div id="run-report-view" class="report-shell" style="display:none;">
-            <div class="report-header">
-              <button class="button button--quiet" id="btn-back-to-runs">← Back to runs</button>
-              <div class="button-group" style="margin:0;">
-                <button class="button button--quiet" id="btn-download-report">Download Markdown</button>
-                <button class="button button--quiet" id="btn-view-predictions">View predictions</button>
-              </div>
-            </div>
-            <div id="run-report-content" class="report-content"></div>
-            <div id="run-predictions-view" class="report-shell" style="display:none;">
-              <div class="report-header">
-                <button class="button button--quiet" id="btn-back-to-report">← Back to report</button>
-                <button class="button button--quiet" id="btn-download-predictions">Download JSON</button>
-              </div>
-              <div id="run-predictions-content" class="table-container"></div>
-            </div>
-          </div>
         </div>
 
         <div id="compare-view" style="display:none;">
@@ -421,6 +404,31 @@
   </main>
 </div>
 
+<!-- ===== Run detail modal ===== -->
+<div class="modal" id="run-modal" role="dialog" aria-modal="true" aria-labelledby="run-modal-title" hidden>
+  <div class="modal-scrim" data-modal-close></div>
+  <div class="modal-panel" role="document">
+    <div class="modal-head">
+      <div class="modal-heading">
+        <p class="modal-kicker">Run detail</p>
+        <h3 class="modal-title" id="run-modal-title">Run</h3>
+      </div>
+      <button class="modal-close" id="btn-modal-close" type="button" aria-label="Close" data-modal-close>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-meta" id="run-modal-meta"></div>
+    <div class="modal-actions">
+      <button class="button button--quiet" id="btn-modal-report">View report</button>
+      <button class="button button--quiet" id="btn-modal-predictions">View predictions</button>
+      <span class="modal-actions-spacer"></span>
+      <button class="button button--quiet" id="btn-modal-download-report">Download report (.md)</button>
+      <button class="button button--quiet" id="btn-modal-download-predictions">Download predictions (.json)</button>
+    </div>
+    <div class="modal-body" id="run-modal-body"></div>
+  </div>
+</div>
+
 <!-- ===== Command palette (⌘K) ===== -->
 <div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Jump to a section" hidden>
   <div class="palette-scrim" data-palette-close></div>
@@ -434,7 +442,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=7"></script>
+<script src="/static/app.js?v=8"></script>
 <script src="/static/shell.js?v=1"></script>
 </body>
 </html>

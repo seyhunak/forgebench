@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .cli import _build_task_prompt, _score_task_output
-from .providers import build_provider, task_provider_options
+from .providers import DEFAULT_PROVIDER, build_provider, task_provider_options
 from .schemas import (
     Category,
     JudgeConfig,
@@ -37,7 +37,7 @@ class TaskRunResult:
 def run_task_experiment(
     name: str,
     split: str = "test",
-    provider: str = "mock",
+    provider: str = DEFAULT_PROVIDER,
     model: str = "",
     judge_provider: str = "",
     judge_model: str = "",

@@ -20,9 +20,15 @@ __all__ = [
     "GoogleProvider",
     "OpenRouterProvider",
     "PROVIDER_ENV_VARS",
+    "DEFAULT_PROVIDER",
     "build_provider",
     "task_provider_options",
 ]
+
+#: Provider preselected by interactive surfaces (the dashboard and the CLI).
+#: OpenRouter fronts many vendors behind a single key, so it is the sensible
+#: starting point; ``mock`` stays the offline fallback for configs and CI.
+DEFAULT_PROVIDER = "openrouter"
 
 #: Environment variable (and .env key) each provider reads its credential from.
 #: The single source of truth for the CLI and the dashboard.
