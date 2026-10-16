@@ -1,0 +1,28 @@
+# Baseline run against the legal_v1 dataset using the mock provider.
+experiment:
+  name: legal-baseline
+  dataset: legal_v1
+  dataset_version: "1.0.0"
+  split: test
+
+provider:
+  name: mock
+  model: rule-mock-v1
+  options:
+    defect_rate: 0.10
+    invalid_rate: 0.05
+
+inference:
+  temperature: 0
+  max_retries: 2
+  timeout_seconds: 30
+
+evaluation:
+  metrics:
+    - accuracy
+    - macro_f1
+    - critical_false_match_rate
+    - escalation_recall
+    - schema_validity
+    - latency
+    - estimated_cost
