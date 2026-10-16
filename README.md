@@ -13,7 +13,7 @@ ForgeBench is a reproducible, provider-agnostic benchmark harness for answering 
 
 The first benchmark domain is **financial and transaction operations**: synthetic banking, accounting, claims, and e-commerce scenarios (transaction exception classification and reconciliation triage). No private data, no GPU, no API key required to run the pipeline.
 
-![ForgeBench dashboard — API key view](docs/screenshots/dashboard.png)
+![ForgeBench dashboard — API key view with Mistral selected and its default model](docs/screenshots/dashboard.png)
 
 ## ✨ Key Features
 
@@ -100,7 +100,7 @@ forgebench dashboard   # http://127.0.0.1:8502
 
 The dashboard is a single-page app served by FastAPI. Navigate with the left rail, or press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> to jump straight to any view:
 
-- **01 API key** — provider selector (Mock, Mistral, OpenAI, Anthropic, Google, OpenRouter), model dropdown populated from [models.dev](https://models.dev), key save/verify/remove, live masked status.
+- **01 API key** — provider selector (Mock, Mistral, OpenAI, Anthropic, Google, OpenRouter). Picking a provider fills the model dropdown with its full catalog from [models.dev](https://models.dev) and defaults to the provider's default model (the screenshot shows Mistral and its default, `open-mistral-nemo`). Save, verify, or remove a key, with live masked status and cost/context details for the selected model.
 - **02 Datasets** — browse datasets and splits, inspect case tables, download JSON.
 - **03 Config** — edit experiment YAML, validated before saving.
 - **04 Run** — pick a config, optional case limit, live progress bar, run id.
@@ -115,7 +115,7 @@ It ships a dark-first **Cobalt** theme with a light mode (toggle, top-right), an
 | **Datasets** | **Custom tasks** |
 | ![Dataset browser](docs/screenshots/datasets.png) | ![Custom tasks view](docs/screenshots/tasks.png) |
 | **Light theme** | **Narrow layout** |
-| ![Light theme](docs/screenshots/theme-light.png) | ![Narrow layout](docs/screenshots/mobile.png) |
+| ![Light theme](docs/screenshots/theme-light.png) | ![Narrow layout — API key view with Mistral and its default model](docs/screenshots/mobile.png) |
 
 ## 📋 CLI Reference
 
