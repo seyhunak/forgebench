@@ -1,11 +1,15 @@
 # ForgeBench
 
-[![PyPI version](https://badge.fury.io/py/forgebench.svg)](https://badge.fury.io/py/forgebench)
+[![CI](https://github.com/seyhunak/forgebench/actions/workflows/tests.yml/badge.svg)](https://github.com/seyhunak/forgebench/actions/workflows/tests.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/seyhunak/forgebench/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Tests: pytest](https://img.shields.io/badge/tests-pytest-0A0A0A.svg)](https://docs.pytest.org/)
 [![Contributor Covenant](https://img.shields.io/badge/contributor%20covenant-v2.1-ff69b4.svg)](CODE_OF_CONDUCT.md)
+[![GitHub stars](https://img.shields.io/github/stars/seyhunak/forgebench?style=social)](https://github.com/seyhunak/forgebench/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/seyhunak/forgebench)](https://github.com/seyhunak/forgebench/issues)
+[![Last commit](https://img.shields.io/github/last-commit/seyhunak/forgebench)](https://github.com/seyhunak/forgebench/commits/main)
 
 **Measure domain adaptation, not just model intelligence.**
 
