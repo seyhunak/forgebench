@@ -8,8 +8,10 @@ frontend can drive the benchmark without Streamlit.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import threading
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +40,20 @@ from .task_runner import run_task_experiment
 from .tasks import list_tasks, load_task_with_cases, validate_task
 
 _run_state: dict[str, dict[str, Any]] = {}
+
+_TASK_STATE_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _task_state_id(name: str, provider: str, model: str) -> str:
+    """A unique, URL-safe handle for a task run's progress state.
+
+    The name/provider/model triple alone is not unique: two models on the same
+    provider (e.g. ``ministral-8b`` vs ``ministral-3b``) — or the same model run
+    twice — would collide and let one run's progress overwrite another's, so a
+    short random token is appended.
+    """
+    stem = _TASK_STATE_UNSAFE.sub("-", f"{name}-{provider}-{model or 'default'}").strip("-")
+    return f"{stem}-{uuid.uuid4().hex[:8]}"
 
 
 class _ProgressReporter:
@@ -588,7 +604,7 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, str]:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    run_id = f"{name}-{payload.provider}"
+    run_id = _task_state_id(name, payload.provider, payload.model)
 
     _run_state[run_id] = {
         "status": "running",
@@ -629,8 +645,10 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, str]:
     return {"run_id": run_id, "status": "started"}
 
 
-@app.get("/api/tasks/{name}/runs/{run_id:path}/progress")
-def task_run_progress(name: str, run_id: str) -> dict[str, Any]:
+# Mirrors "/api/run/{run_id}/progress" — the flat shape the UI polls after
+# POST /api/tasks/{name}/run returns its run_id.
+@app.get("/api/tasks/{run_id}/progress")
+def task_run_progress(run_id: str) -> dict[str, Any]:
     state = _run_state.get(run_id)
     if state is None or state.get("type") != "task":
         raise HTTPException(status_code=404, detail=f"task run not found: {run_id}")
