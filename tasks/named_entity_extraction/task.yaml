@@ -1,0 +1,32 @@
+name: named_entity_extraction
+version: "1.0.0"
+description: "Extract typed entities from free text and report their count and dominant type."
+input_fields:
+  - text
+  - domain
+output_schema:
+  - name: entities
+    type: list[string]
+    description: "Entities as normalized TYPE:value strings, e.g. PERSON:Jane Doe."
+  - name: entity_count
+    type: number
+    description: "Total number of entities extracted."
+  - name: primary_type
+    type: enum
+    enum_values: ["person", "organization", "location", "date", "product"]
+    description: "The most prominent entity type in the text."
+scoring_rules:
+  - field: entities
+    method: f1
+    weight: 2.0
+  - field: entity_count
+    method: exact_match
+    weight: 1.0
+  - field: primary_type
+    method: exact_match
+    weight: 1.0
+system_prompt: |
+  You are a named-entity recognition expert. Extract every named entity from
+  the text and normalize each as UPPERCASE TYPE:value, where TYPE is one of
+  PERSON, ORGANIZATION, LOCATION, DATE, or PRODUCT. Report the total count and
+  the dominant entity type. Output must be valid JSON matching the schema.
