@@ -18,7 +18,27 @@ __all__ = [
     "AnthropicProvider",
     "GoogleProvider",
     "build_provider",
+    "task_provider_options",
 ]
+
+
+def task_provider_options(
+    name: str,
+    *,
+    output_schema: list[dict] | None = None,
+    system_prompt: str | None = None,
+) -> dict:
+    """Constructor options that are safe to forward for a custom-task provider.
+
+    The mock adapter absorbs the task output schema through ``**kwargs`` so it
+    can fabricate schema-shaped JSON. The real adapters reject unknown keyword
+    arguments, so they receive only ``system_prompt`` — the schema still reaches
+    the model as prompt text. Leaking the schema knobs to a real provider raised
+    ``TypeError`` at run start.
+    """
+    if name == "mock":
+        return {"system_prompt": system_prompt, "output_schema": output_schema or []}
+    return {"system_prompt": system_prompt} if system_prompt else {}
 
 
 def build_provider(name: str, *, model: str, options: dict | None = None) -> ModelProvider:

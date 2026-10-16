@@ -310,18 +310,17 @@ def task_run_cmd(
     import time
     from datetime import UTC, datetime
 
-    from .providers import build_provider
+    from .providers import build_provider, task_provider_options
     from .schemas import Category, PredictionRecord
 
     provider_inst = build_provider(
         provider,
         model=model or "",
-        options={
-            "input_fields": task.input_fields,
-            "output_schema": [f.model_dump() for f in task.output_schema],
-            "scoring_rules": [r.model_dump() for r in task.scoring_rules],
-            "system_prompt": task.system_prompt,
-        },
+        options=task_provider_options(
+            provider,
+            output_schema=[f.model_dump() for f in task.output_schema],
+            system_prompt=task.system_prompt,
+        ),
     )
 
     records: list[PredictionRecord] = []

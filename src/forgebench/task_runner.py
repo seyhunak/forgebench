@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .cli import _build_task_prompt, _score_task_output
-from .providers import build_provider
+from .providers import build_provider, task_provider_options
 from .schemas import (
     Category,
     JudgeConfig,
@@ -58,12 +58,11 @@ def run_task_experiment(
     provider_inst = build_provider(
         provider,
         model=model or "",
-        options={
-            "input_fields": task.input_fields,
-            "output_schema": [f.model_dump() for f in task.output_schema],
-            "scoring_rules": [r.model_dump() for r in task.scoring_rules],
-            "system_prompt": task.system_prompt,
-        },
+        options=task_provider_options(
+            provider,
+            output_schema=[f.model_dump() for f in task.output_schema],
+            system_prompt=task.system_prompt,
+        ),
     )
 
     # Build a shared judge for llm_judge scoring rules (G-Eval style).

@@ -2,17 +2,64 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 
 import pytest
 
-from forgebench.providers import MistralProvider, MockProvider, build_provider
+from forgebench.providers import (
+    AnthropicProvider,
+    GoogleProvider,
+    MistralProvider,
+    MockProvider,
+    OpenAIProvider,
+    build_provider,
+    task_provider_options,
+)
 from forgebench.providers.base import ModelProvider, ProviderError
 from forgebench.schemas import Category
 
 from .conftest import make_case
 
 ALL_CATEGORIES = list(Category)
+
+REAL_PROVIDERS = {
+    "mistral": MistralProvider,
+    "openai": OpenAIProvider,
+    "anthropic": AnthropicProvider,
+    "google": GoogleProvider,
+}
+
+
+@pytest.mark.parametrize("name", sorted(REAL_PROVIDERS))
+def test_task_provider_options_are_accepted_by_real_adapters(name: str) -> None:
+    """Real adapters must never receive kwargs they do not declare.
+
+    Passing the task schema knobs straight through raised
+    ``MistralProvider.__init__() got an unexpected keyword argument
+    'input_fields'`` the moment a task ran on a real provider.
+    """
+    options = task_provider_options(
+        name, output_schema=[{"name": "sentiment"}], system_prompt="be terse"
+    )
+    params = inspect.signature(REAL_PROVIDERS[name].__init__).parameters
+    accepts_kwargs = any(p.kind is p.VAR_KEYWORD for p in params.values())
+    unknown = [k for k in options if k not in params]
+    assert not unknown or accepts_kwargs, f"{name} would reject {unknown}"
+
+
+def test_task_provider_options_keep_schema_for_mock_only() -> None:
+    schema = [{"name": "sentiment", "type": "enum"}]
+    mock = task_provider_options("mock", output_schema=schema, system_prompt="sys")
+    assert mock["output_schema"] == schema
+
+    real = task_provider_options("mistral", output_schema=schema, system_prompt="sys")
+    assert real == {"system_prompt": "sys"}
+    assert "output_schema" not in real
+
+
+def test_task_provider_options_for_real_provider_omit_blank_system_prompt() -> None:
+    assert task_provider_options("openai", system_prompt=None) == {}
 
 
 @pytest.mark.parametrize("category", [c for c in ALL_CATEGORIES if c is not Category.AMBIGUOUS])
