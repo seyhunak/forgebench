@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .cli import _build_task_prompt, _score_task_output
-from .providers import DEFAULT_PROVIDER, build_provider, task_provider_options
+from .providers import build_provider, task_provider_options
 from .schemas import (
     Category,
     JudgeConfig,
@@ -37,7 +37,7 @@ class TaskRunResult:
 def run_task_experiment(
     name: str,
     split: str = "test",
-    provider: str = DEFAULT_PROVIDER,
+    provider: str = "",
     model: str = "",
     judge_provider: str = "",
     judge_model: str = "",
@@ -47,6 +47,23 @@ def run_task_experiment(
     on_progress: Callable[[int, int], None] | None = None,
 ) -> TaskRunResult:
     """Execute one custom-task evaluation end-to-end."""
+    if not provider:
+        from .credentials import get_value
+        from .providers import PROVIDER_ENV_VARS
+
+        resolved = None
+        for pid in ("openrouter", "mistral", "openai", "anthropic", "google", "ollama"):
+            if get_value(PROVIDER_ENV_VARS.get(pid, "")):
+                resolved = pid
+                break
+        provider = resolved or provider or "openrouter"
+    if not model:
+        from .credentials import get_value
+        from .providers import PROVIDER_ENV_VARS
+
+        env_var = PROVIDER_ENV_VARS.get(provider, "")
+        if env_var:
+            model = (get_value(env_var.replace("_API_KEY", "_MODEL")) or "").strip()
     try:
         task, cases = load_task_with_cases(name, split, tasks_root)
     except FileNotFoundError as exc:

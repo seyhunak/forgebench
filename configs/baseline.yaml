@@ -1,9 +1,9 @@
-# Reference baseline for the mock provider.
+# Reference baseline for the openrouter provider.
 #
-# The mock is a deterministic rule engine, not a model. defect_rate/invalid_rate
-# inject seeded imperfections so the validity metrics and the comparison
-# workflow are demonstrable offline. Numbers from this config validate the
-# pipeline; they say nothing about model quality.
+# Uses a real provider to run benchmark cases through OpenRouter. The
+# defect_rate/invalid_rate knob is removed because it is specific to the
+# Real providers are configured via the provider model and
+# options in the environment.
 experiment:
   name: baseline
   dataset: finance_v1
@@ -11,11 +11,10 @@ experiment:
   split: test
 
 provider:
-  name: mock
-  model: rule-mock-v1
+  name: openrouter
+  model: openai/gpt-4o-mini
   options:
-    defect_rate: 0.10
-    invalid_rate: 0.05
+    temperature: 0.0
 
 inference:
   temperature: 0

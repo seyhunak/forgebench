@@ -386,6 +386,12 @@ async function loadCredentialStatus(provider) {
       populateModels(els.keyProvider.value);
       if (els.keyProvider.value === "ollama") onProviderChange();
     }
+    // Credentials drive the default model: preselect the saved one when it
+    // exists in the catalog, so the section is the source of truth.
+    if (data.model) {
+      selectOption(els.modelSelect, data.model);
+      showModelDetails(els.keyProvider.value, els.modelSelect.value);
+    }
   } catch (err) {
     setMessage(els.keyMessage, `Failed to load status: ${err.message}`, "error");
   }
@@ -1287,11 +1293,22 @@ async function loadTasks() {
       els.taskProvider.appendChild(opt.cloneNode(true));
       els.taskJudgeProvider.appendChild(opt.cloneNode(true));
     }
-    // OpenRouter is the default provider — prefill a model id that works.
-    selectOption(els.taskProvider, "openrouter");
-    selectOption(els.taskJudgeProvider, "openrouter");
+    // Credentials section drives the default provider/model selection.
+    let defaultProvider = "openrouter";
+    let defaultModel = "";
+    try {
+      const cred = await fetchJSON("/api/credentials");
+      if (cred && cred.provider) defaultProvider = cred.provider;
+      if (cred && cred.model) defaultModel = cred.model;
+    } catch (err) { /* fall back to openrouter */ }
+    selectOption(els.taskProvider, defaultProvider);
+    selectOption(els.taskJudgeProvider, defaultProvider);
     await syncTaskModel(els.taskProvider, els.taskModel);
     await syncTaskModel(els.taskJudgeProvider, els.taskJudgeModel);
+    if (defaultModel) {
+      selectOption(els.taskModel, defaultModel);
+      selectOption(els.taskJudgeModel, defaultModel);
+    }
     await loadTaskRuns();
   } catch (err) {
     setMessage(els.taskMessage, `Failed to load tasks: ${err.message}`, "error");

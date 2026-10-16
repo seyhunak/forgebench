@@ -16,9 +16,12 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from bleach import clean
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from markdown_it import MarkdownIt
+from mdit_py_plugins.gfm import gfm_plugin
 from pydantic import BaseModel, Field
 
 from . import __version__
@@ -43,10 +46,6 @@ from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
 from .task_runner import run_task_experiment
 from .tasks import list_tasks, load_task_with_cases, validate_task
-
-from bleach import clean
-from markdown_it import MarkdownIt
-from mdit_py_plugins.gfm import gfm_plugin
 
 _run_state: dict[str, dict[str, Any]] = {}
 
@@ -81,7 +80,7 @@ class CredentialSave(BaseModel):
 
 class RunRequest(BaseModel):
     config: str
-    provider: str = "mock"
+    provider: str = ""
     limit: int | None = None
     run_id: str | None = None
     output_root: str = "runs"
@@ -90,7 +89,7 @@ class RunRequest(BaseModel):
 class TaskRunRequest(BaseModel):
     name: str
     split: str = "test"
-    provider: str = DEFAULT_PROVIDER
+    provider: str = ""
     model: str = ""
     judge_provider: str = ""
     judge_model: str = ""
@@ -112,19 +111,42 @@ STATIC_DIR = Path(__file__).parent / "static"
 # HTML tags allowed in the rendered report (whitelist for XSS prevention).
 ALLOWED_HTML_TAGS = {
     # Text formatting
-    "strong", "b", "em", "i", "code", "s", "u",
+    "strong",
+    "b",
+    "em",
+    "i",
+    "code",
+    "s",
+    "u",
     # Headings
-    "h1", "h2", "h3", "h4", "h5", "h6",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
     # Lists
-    "ul", "ol", "li",
+    "ul",
+    "ol",
+    "li",
     # Tables
-    "table", "thead", "tbody", "tr", "th", "td",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
     # Paragraphs and line breaks
-    "p", "br", "hr",
+    "p",
+    "br",
+    "hr",
     # Blockquotes and code blocks
-    "blockquote", "pre", "div",
+    "blockquote",
+    "pre",
+    "div",
     # Links and spans
-    "a", "span",
+    "a",
+    "span",
     # Images (src is sanitized by the renderer)
     "img",
 }
@@ -199,6 +221,12 @@ def _configured_provider() -> str:
         if get_value(PROVIDER_ENV_VARS[pid]):
             return pid
     return DEFAULT_PROVIDER
+
+
+def _configured_model(provider_id: str) -> str:
+    """Default model saved in credentials for ``provider_id`` (if any)."""
+    env_var = _env_var_for(provider_id)
+    return (get_value(env_var.replace("_API_KEY", "_MODEL")) or "").strip()
 
 
 def _remember(name: str, value: str | None) -> None:
@@ -577,9 +605,29 @@ def start_run(payload: RunRequest) -> dict[str, str]:
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Override provider if explicitly requested from the UI.
-    if payload.provider and payload.provider != "mock":
-        experiment.provider.name = payload.provider
+    # Resolve the provider from the request or, failing that, from the
+    # credentials section (the user's selected default). Mock is never chosen
+    # implicitly: an empty request uses the configured provider.
+    requested_provider = (payload.provider or "").strip() or _configured_provider()
+    # No run may end up on the mock provider: an explicit mock config or
+    # request is upgraded to the selected provider.
+    if experiment.provider.name == "mock" or requested_provider == "mock":
+        if requested_provider == "mock":
+            requested_provider = _configured_provider()
+    if requested_provider and requested_provider != experiment.provider.name:
+        experiment.provider.name = requested_provider
+    if experiment.provider.name == "mock":
+        experiment.provider.name = _configured_provider()
+
+    # Keep the provider and its configured default model in sync. A switch of
+    # provider (or a missing/unusable model left over from a mock config) would
+    # otherwise send an invalid model id such as ``rule-mock-v1`` to the API.
+    model = experiment.provider.model
+    if experiment.provider.name != "mock":
+        if not model or model == "rule-mock-v1":
+            model = _configured_model(experiment.provider.name)
+        if model:
+            experiment.provider.model = model
 
     run_id = payload.run_id or f"{experiment.experiment.name}-{experiment.provider.name}"
 
@@ -794,7 +842,19 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, str]:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    run_id = _task_state_id(name, payload.provider, payload.model)
+    # Resolve the provider/model from the credentials section when the request
+    # does not name them, so the task runner never falls back to Mock/empty.
+    provider = (payload.provider or "").strip() or _configured_provider()
+    model = (payload.model or "").strip() or _configured_model(provider)
+
+    judge_provider = (payload.judge_provider or "").strip()
+    if not judge_provider:
+        judge_provider = provider
+    judge_model = (payload.judge_model or "").strip()
+    if not judge_model:
+        judge_model = _configured_model(judge_provider) or model
+
+    run_id = _task_state_id(name, provider, model)
 
     _run_state[run_id] = {
         "status": "running",
@@ -810,10 +870,10 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, str]:
             result = run_task_experiment(
                 name=name,
                 split=payload.split,
-                provider=payload.provider,
-                model=payload.model,
-                judge_provider=payload.judge_provider,
-                judge_model=payload.judge_model,
+                provider=provider,
+                model=model,
+                judge_provider=judge_provider,
+                judge_model=judge_model,
                 limit=payload.limit,
                 output_root=Path(payload.output_root),
                 on_progress=reporter,

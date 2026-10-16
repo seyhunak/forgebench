@@ -62,27 +62,58 @@ def build_few_shot_examples(train_cases: list[BenchmarkCase], count: int) -> lis
     return examples
 
 
+_DEFAULT_MODELS_FOR_PROVIDER = {
+    "openrouter": "openai/gpt-4o-mini",
+    "mistral": "ministral-8b-2512",
+    "openai": "gpt-4o-mini",
+    "anthropic": "claude-sonnet-4-5",
+    "google": "gemini-flash-latest",
+    "ollama": "llama3.1:8b",
+}
+
+
+def _resolve_provider_and_model(config: ExperimentConfig) -> tuple[str, str]:
+    """Never run on the mock provider: upgrade it to the selected provider."""
+    from .credentials import get_value
+    from .providers import PROVIDER_ENV_VARS
+
+    name = config.provider.name
+    model = config.provider.model
+    if name == "mock":
+        resolved = None
+        for pid in _DEFAULT_MODELS_FOR_PROVIDER:
+            if get_value(PROVIDER_ENV_VARS.get(pid, "")):
+                resolved = pid
+                break
+        name = resolved or "openrouter"
+    if name == "mock":
+        name = "openrouter"
+    if not model or model == "rule-mock-v1":
+        env_var = PROVIDER_ENV_VARS.get(name, "")
+        if env_var:
+            model = (get_value(env_var.replace("_API_KEY", "_MODEL")) or "").strip()
+        if not model:
+            model = _DEFAULT_MODELS_FOR_PROVIDER.get(name, "openai/gpt-4o-mini")
+    return name, model
+
+
 def _make_provider(config: ExperimentConfig, examples: list[dict[str, Any]]) -> ModelProvider:
+    provider_name, provider_model = _resolve_provider_and_model(config)
     options = dict(config.provider.options)
     # Mock-specific options must not leak into real providers.
     MOCK_ONLY = {"defect_rate", "invalid_rate"}
-    if config.provider.name != "mock":
-        for key in MOCK_ONLY:
-            options.pop(key, None)
-        # Common inference settings apply to every real provider (not mock).
-        options.setdefault("temperature", config.inference.temperature)
-        options.setdefault("max_retries", config.inference.max_retries)
-        options.setdefault("timeout_seconds", config.inference.timeout_seconds)
-        options.setdefault("max_tokens", config.inference.max_tokens)
-        if config.prompt.system:
-            options.setdefault("system_prompt", config.prompt.system)
-        if examples:
-            options.setdefault("examples", examples)
-    else:
-        options.setdefault("seed", config.experiment.seed)
-        if config.prompt.system:
-            options.setdefault("system_prompt", config.prompt.system)
-    return build_provider(config.provider.name, model=config.provider.model, options=options)
+    for key in MOCK_ONLY:
+        options.pop(key, None)
+    # Common inference settings apply to every real provider.
+    options.setdefault("temperature", config.inference.temperature)
+    options.setdefault("max_retries", config.inference.max_retries)
+    options.setdefault("timeout_seconds", config.inference.timeout_seconds)
+    options.setdefault("max_tokens", config.inference.max_tokens)
+    if config.prompt.system:
+        options.setdefault("system_prompt", config.prompt.system)
+    if examples:
+        options.setdefault("examples", examples)
+    return build_provider(provider_name, model=provider_model, options=options)
 
 
 def _git_sha(cwd: Path) -> str | None:

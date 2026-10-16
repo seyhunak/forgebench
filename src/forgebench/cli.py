@@ -374,7 +374,8 @@ def task_run_cmd(
     judge_provider: str = typer.Option(
         "",
         "--judge-provider",
-        help="Judge provider: one of mistral/openai/anthropic/google/openrouter/ollama.",    ),
+        help="Judge provider: one of mistral/openai/anthropic/google/openrouter/ollama.",
+    ),
     judge_model: str = typer.Option(
         "", "--judge-model", help="Judge model override (e.g. gpt-4o-mini)."
     ),

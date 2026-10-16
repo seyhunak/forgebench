@@ -85,13 +85,45 @@ def tiny_dataset(tmp_path: Path) -> Path:
     return root
 
 
+_PROVIDER_DEFAULT_MODELS = {
+    "openrouter": "openai/gpt-4o-mini",
+    "mistral": "ministral-8b-2512",
+    "openai": "gpt-4o-mini",
+    "anthropic": "claude-sonnet-4-5",
+    "google": "gemini-flash-latest",
+    "ollama": "llama3.1:8b",
+}
+
+
 @pytest.fixture()
-def mock_config() -> ExperimentConfig:
+def selected_provider() -> str:
+    """Provider selected for this test run (environment or OpenRouter default)."""
+    import os
+
+    return os.environ.get("FORGEBENCH_TEST_PROVIDER", "openrouter")
+
+
+@pytest.fixture()
+def mock_provider(selected_provider: str) -> str:
+    """Alias retained for older tests; defers to the selected provider."""
+    return selected_provider
+
+
+@pytest.fixture()
+def mock_config(selected_provider: str) -> ExperimentConfig:
     return ExperimentConfig(
         experiment=ExperimentSection(name="unit", dataset="tiny_v1", dataset_version="1.0.0"),
-        provider=ProviderSection(name="mock", model="rule-mock-v1"),
+        provider=ProviderSection(
+            name=selected_provider,
+            model=_PROVIDER_DEFAULT_MODELS.get(selected_provider, "openai/gpt-4o-mini"),
+        ),
         evaluation=EvaluationSection(metrics=["accuracy", "macro_f1", "schema_validity"]),
     )
+
+@pytest.fixture()
+def mock_provider() -> str:
+    """Override to use the provider selected for the test run."""
+    return "openrouter"
 
 
 def make_record(

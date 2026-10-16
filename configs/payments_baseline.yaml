@@ -1,4 +1,4 @@
-# Baseline run against the payments_v1 dataset using the mock provider.
+# Baseline run against the payments_v1 dataset using the openrouter provider.
 experiment:
   name: payments-baseline
   dataset: payments_v1
@@ -6,11 +6,8 @@ experiment:
   split: test
 
 provider:
-  name: mock
-  model: rule-mock-v1
-  options:
-    defect_rate: 0.10
-    invalid_rate: 0.05
+  name: openrouter
+  model: openai/gpt-4o-mini
 
 inference:
   temperature: 0

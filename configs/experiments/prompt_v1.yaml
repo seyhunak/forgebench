@@ -1,4 +1,4 @@
-# Prompt-variant experiment (mock provider).
+# Prompt-variant experiment.
 #
 # Same pipeline as baseline with a lower simulated defect rate, so
 # `forgebench compare` has two honest-looking, fully offline runs to diff.
@@ -14,11 +14,10 @@ experiment:
   split: test
 
 provider:
-  name: mock
-  model: rule-mock-v1
+  name: openrouter
+  model: openai/gpt-4o-mini
   options:
-    defect_rate: 0.04
-    invalid_rate: 0.0
+    temperature: 0.0
 
 inference:
   temperature: 0
