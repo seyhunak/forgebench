@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 
-from forgebench.config import ExperimentConfig, PromptSection
+from forgebench.config import (
+    EvaluationSection,
+    ExperimentConfig,
+    ExperimentSection,
+    PromptSection,
+    ProviderSection,
+)
 from forgebench.providers.base import ProviderError
 from forgebench.registry import load_dataset, load_split
 from forgebench.runner import build_few_shot_examples, run_experiment, score_case
@@ -16,24 +23,40 @@ from forgebench.schemas import BenchmarkCase, Category, ProviderResponse
 from .conftest import make_case
 
 
-def test_full_run_with_mock_writes_every_artifact(
-    tiny_dataset: Path, mock_config: ExperimentConfig, tmp_path: Path
+def test_full_run_writes_every_artifact(
+    tiny_dataset: Path,
+    mock_config: ExperimentConfig,
+    tmp_path: Path,
+    deterministic_provider: dict[str, int],
 ) -> None:
     result = run_experiment(
         mock_config, datasets_root=tiny_dataset, output_root=tmp_path, run_id="unit-run"
     )
     files = {p.name for p in result.run_dir.iterdir()}
-    assert files == {"predictions.jsonl", "metrics.json", "manifest.json", "report.md"}
+    assert files == {
+        "predictions.jsonl",
+        "metrics.json",
+        "manifest.json",
+        "report.md",
+        "trace.jsonl",
+    }
     assert result.metrics["n_cases"] == 6
     assert result.metrics["n_valid"] == 6
-    # The rule-based mock cannot resolve ambiguous cases by construction.
-    assert result.metrics["accuracy"] == pytest.approx(5 / 6)
-    assert result.metrics["per_class"]["ambiguous"]["f1"] == 0.0
+    # The injected provider answers every case correctly.
+    assert deterministic_provider["n"] == 6
+    assert result.metrics["accuracy"] == 1.0
+    assert result.metrics["per_class"]["ambiguous"]["f1"] == 1.0
 
     manifest = json.loads((result.run_dir / "manifest.json").read_text())
     assert manifest["dataset"]["version"] == "1.0.0"
     assert manifest["dataset"]["split_sha256"]
-    assert manifest["config"]["provider"]["name"] == "mock"
+    # No run ever resolves to the mock provider: the config's provider is
+    # honoured, and whatever actually answered is recorded separately.
+    assert manifest["config"]["provider"]["name"] == "openrouter"
+    assert manifest["provider"]["name"] == "fake"
+    assert manifest["prompt"]["source"] == "provider_default"
+    assert len(manifest["prompt"]["effective_sha256"]) == 64
+    assert manifest["trace"] == {"file": "trace.jsonl", "n_cases": 6}
     report = (result.run_dir / "report.md").read_text()
     assert "Limitations" in report and "unit-run" in report
 
@@ -46,7 +69,10 @@ def test_full_run_with_mock_writes_every_artifact(
 
 
 def test_run_is_reproducible(
-    tiny_dataset: Path, mock_config: ExperimentConfig, tmp_path: Path
+    tiny_dataset: Path,
+    mock_config: ExperimentConfig,
+    tmp_path: Path,
+    deterministic_provider: dict[str, int],
 ) -> None:
     first = run_experiment(
         mock_config, datasets_root=tiny_dataset, output_root=tmp_path, run_id="a"
@@ -61,10 +87,14 @@ def test_run_is_reproducible(
 
 
 def test_limit_evaluates_first_n_cases(
-    tiny_dataset: Path, mock_config: ExperimentConfig, tmp_path: Path
+    tiny_dataset: Path,
+    mock_config: ExperimentConfig,
+    tmp_path: Path,
+    deterministic_provider: dict[str, int],
 ) -> None:
     result = run_experiment(mock_config, datasets_root=tiny_dataset, output_root=tmp_path, limit=2)
     assert result.metrics["n_cases"] == 2
+    assert deterministic_provider["n"] == 2
 
 
 def test_dataset_version_mismatch_fails_loudly(
@@ -135,12 +165,43 @@ def test_few_shot_examples_come_from_gold_labels() -> None:
 
 
 def test_few_shot_count_is_recorded_in_manifest(
-    tiny_dataset: Path, mock_config: ExperimentConfig, tmp_path: Path
+    tiny_dataset: Path,
+    mock_config: ExperimentConfig,
+    tmp_path: Path,
+    deterministic_provider: dict[str, int],
 ) -> None:
     mock_config.experiment.dataset = "tiny_v1"
     mock_config.prompt = PromptSection(few_shot_count=2)
     result = run_experiment(mock_config, datasets_root=tiny_dataset, output_root=tmp_path)
     assert result.manifest["few_shot_examples"] == 2
+
+
+@pytest.mark.skipif(
+    not os.environ.get("OPENROUTER_API_KEY"),
+    reason="live smoke test needs OPENROUTER_API_KEY",
+)
+def test_live_run_produces_a_real_trace(tmp_path: Path) -> None:
+    """One real case through the selected provider: the live path stays wired.
+
+    Everything else in this file runs offline against an injected fake. This
+    single test proves the real adapter, retries, and token accounting still
+    work end to end — skipped (not failed) when no key is available.
+    """
+    from forgebench.tracing import TRACE_FILENAME, read_traces
+
+    config = ExperimentConfig(
+        experiment=ExperimentSection(name="live-smoke", dataset="finance_v1", split="test"),
+        provider=ProviderSection(name="openrouter", model="openai/gpt-4o-mini"),
+        evaluation=EvaluationSection(metrics=["accuracy", "schema_validity"]),
+    )
+    result = run_experiment(config, output_root=tmp_path, limit=1, run_id="live-smoke")
+
+    assert result.metrics["n_cases"] == 1
+    assert (result.run_dir / "predictions.jsonl").is_file()
+    (trace,) = read_traces(result.run_dir)
+    assert {span["name"] for span in trace["spans"]} >= {"provider_call", "score"}
+    assert trace["total_ms"] > 0
+    assert (result.run_dir / TRACE_FILENAME).is_file()
 
 
 def test_load_dataset_exposes_hashes(tiny_dataset: Path) -> None:

@@ -30,7 +30,8 @@ def test_validate_unknown_dataset_fails() -> None:
     assert result.exit_code == 1
 
 
-def test_run_compare_report_cycle(tmp_path: Path) -> None:
+def test_run_compare_report_cycle(tmp_path: Path, deterministic_provider: dict) -> None:
+    """run -> run -> compare -> report, entirely offline (fake provider)."""
     baseline = runner.invoke(
         app,
         [
@@ -65,6 +66,7 @@ def test_run_compare_report_cycle(tmp_path: Path) -> None:
         ],
     )
     assert improved.exit_code == 0, improved.output
+    assert deterministic_provider["n"] == 40  # 20 cases per run, no network
 
     comparison = runner.invoke(app, ["compare", str(run_dir), str(tmp_path / "cli-prompt")])
     assert comparison.exit_code == 0
@@ -92,24 +94,37 @@ def test_compare_needs_two_runs(tmp_path: Path) -> None:
 def test_set_key_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """save -> show (masked) -> clear, all inside a throwaway directory."""
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    # The environment must not answer for the saved file: a CI job that exports
+    # *_MODEL would otherwise mask what this test actually wrote to .env.
+    for variable in ("MISTRAL_API_KEY", "MISTRAL_MODEL", "OPENROUTER_MODEL"):
+        monkeypatch.delenv(variable, raising=False)
 
     saved = runner.invoke(
         app,
-        ["set-key", "--key", "sk-test-abcdef123456", "--model", "ministral-8b-2512", "--no-verify"],
+        [
+            "set-key",
+            "--provider",
+            "mistral",
+            "--key",
+            "sk-test-abcdef123456",
+            "--model",
+            "ministral-8b-2512",
+            "--no-verify",
+        ],
     )
     assert saved.exit_code == 0, saved.output
     assert "chmod 600" in saved.output
     assert (tmp_path / ".env").exists()
     assert "sk-test-abcdef123456" in (tmp_path / ".env").read_text()
+    assert "MISTRAL_MODEL=ministral-8b-2512" in (tmp_path / ".env").read_text()
 
-    shown = runner.invoke(app, ["set-key", "--show"])
+    shown = runner.invoke(app, ["set-key", "--provider", "mistral", "--show"])
     assert shown.exit_code == 0
     assert "sk-test-abcdef123456" not in shown.output  # never the full secret
     assert "sk-********3456" in shown.output  # masked form keeps prefix + suffix
     assert "ministral-8b-2512" in shown.output
 
-    cleared = runner.invoke(app, ["set-key", "--clear"])
+    cleared = runner.invoke(app, ["set-key", "--provider", "mistral", "--clear"])
     assert cleared.exit_code == 0
     assert "MISTRAL_API_KEY=" not in (tmp_path / ".env").read_text()
     assert "cleared" in cleared.output

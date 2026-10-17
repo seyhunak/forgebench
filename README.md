@@ -422,7 +422,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Most tests run offline against the deterministic rule engine. A handful of end-to-end tests exercise a real provider, so CI injects `OPENROUTER_API_KEY`; locally they simply need a key exported, or run the rest with `pytest -k "not requires_key"`.
+The suite runs offline: tests that exercise the run pipeline inject a deterministic fake at the provider seam, so nothing spends API credits or flakes on the network. One smoke test hits a real provider and skips unless `OPENROUTER_API_KEY` is set.
 
 ## 🤝 Contributing
 

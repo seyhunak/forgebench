@@ -121,6 +121,55 @@ def mock_config(selected_provider: str) -> ExperimentConfig:
     )
 
 
+@pytest.fixture()
+def deterministic_provider(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
+    """Inject an offline, deterministic provider at the runner's seam.
+
+    Runs never use the mock provider — it was removed from every runtime path —
+    so tests that exercise the *pipeline* (artifacts, manifest, trace, compare)
+    substitute a fake that answers every case correctly. That keeps the suite
+    offline, deterministic, and free of API credits; the live path is covered
+    separately by the smoke test that needs a real key.
+    """
+    import json
+    from types import SimpleNamespace
+
+    calls = {"n": 0}
+
+    class FakeProvider:
+        """A perfect, silent model: correct JSON every time, constant timing."""
+
+        name = "fake"
+        model = "fake-1"
+
+        def __init__(self, system_prompt: str | None = None) -> None:
+            self.system_prompt = system_prompt or "deterministic test prompt"
+
+        def predict(self, case):
+            calls["n"] += 1
+            content = json.dumps(
+                {
+                    "category": case.expected.category.value,
+                    "requires_review": case.expected.requires_review,
+                    "reason": "deterministic fake",
+                    # Evidence must name at least one field present in the case.
+                    "evidence_fields": [next(iter(case.input))],
+                }
+            )
+            return SimpleNamespace(
+                content=content,
+                latency_ms=5.0,
+                input_tokens=12,
+                output_tokens=8,
+            )
+
+    def _make(config, examples, system_text=None):  # noqa: ANN001 - runner-internal shapes
+        return FakeProvider(system_text)
+
+    monkeypatch.setattr("forgebench.runner._make_provider", _make)
+    return calls
+
+
 def make_record(
     expected: Category,
     predicted: Category | None,

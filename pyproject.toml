@@ -38,6 +38,10 @@ dependencies = [
 dev = [
   "pytest>=8.0",
   "ruff>=0.6",
+  # API tests (api.py, /api/prompts, /api/baselines, /api/runs/*/trace) skip
+  # without these, so CI installs them — the endpoints are part of the product.
+  "fastapi>=0.115",
+  "httpx>=0.27",
 ]
 ui = [
   "streamlit>=1.40",
