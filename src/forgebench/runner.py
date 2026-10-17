@@ -7,6 +7,7 @@ debugging). Concurrency can be added later behind the same contract.
 
 from __future__ import annotations
 
+import hashlib
 import platform
 import subprocess
 import sys
@@ -22,6 +23,7 @@ from .config import ExperimentConfig
 from .evidence import default_evidence_fields
 from .metrics import compute_metrics
 from .parsing import parse_prediction
+from .prompts import resolve_system_prompt
 from .providers import build_provider
 from .providers.base import ModelProvider, ProviderError
 from .registry import DatasetInfo, default_datasets_root, load_dataset, load_split
@@ -98,7 +100,11 @@ def _resolve_provider_and_model(config: ExperimentConfig) -> tuple[str, str]:
     return name, model
 
 
-def _make_provider(config: ExperimentConfig, examples: list[dict[str, Any]]) -> ModelProvider:
+def _make_provider(
+    config: ExperimentConfig,
+    examples: list[dict[str, Any]],
+    system_text: str | None = None,
+) -> ModelProvider:
     provider_name, provider_model = _resolve_provider_and_model(config)
     options = dict(config.provider.options)
     # Mock-specific options must not leak into real providers.
@@ -110,11 +116,39 @@ def _make_provider(config: ExperimentConfig, examples: list[dict[str, Any]]) -> 
     options.setdefault("max_retries", config.inference.max_retries)
     options.setdefault("timeout_seconds", config.inference.timeout_seconds)
     options.setdefault("max_tokens", config.inference.max_tokens)
-    if config.prompt.system:
-        options.setdefault("system_prompt", config.prompt.system)
+    # ``system_text`` is the resolved prompt: registry body when
+    # ``prompt.name`` is set, otherwise the inline ``prompt.system``.
+    if system_text:
+        options["system_prompt"] = system_text
     if examples:
         options.setdefault("examples", examples)
     return build_provider(provider_name, model=provider_model, options=options)
+
+
+def _effective_prompt_meta(
+    provider: ModelProvider, prompt_meta: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Record the system prompt a provider will *actually* send.
+
+    A manifest that only says what the config asked for can still lie: the
+    provider may have substituted its built-in default (the ``source: none``
+    case) or appended instructions of its own. Hashing the text the provider
+    holds closes that gap — ``effective_sha256`` is the number to compare
+    across runs.
+    """
+    meta = dict(prompt_meta or {})
+    effective = getattr(provider, "system_prompt", None)
+    if not isinstance(effective, str) or not effective:
+        return meta
+    meta["effective_sha256"] = hashlib.sha256(effective.encode("utf-8")).hexdigest()
+    if meta.get("source") in (None, "none"):
+        meta["source"] = "provider_default"
+        meta["chars"] = len(effective)
+    elif meta.get("sha256") and meta["sha256"] != meta["effective_sha256"]:
+        # The provider altered the text (e.g. appended instructions): keep both
+        # digests so the discrepancy is visible rather than silently absorbed.
+        meta["effective_differs"] = True
+    return meta
 
 
 def _git_sha(cwd: Path) -> str | None:
@@ -214,11 +248,17 @@ def run_experiment(
         cases = cases[:limit]
 
     examples: list[dict[str, Any]] = []
+    build_started = time.perf_counter()
     if config.prompt.few_shot_count:
         train_cases = load_split(config.experiment.dataset, "train", root)
         examples = build_few_shot_examples(train_cases, config.prompt.few_shot_count)
 
-    provider = _make_provider(config, examples)
+    system_text, prompt_meta = resolve_system_prompt(
+        config.prompt.name, config.prompt.version, config.prompt.system
+    )
+    provider = _make_provider(config, examples, system_text)
+    prompt_build_ms = (time.perf_counter() - build_started) * 1000.0
+    prompt_meta = _effective_prompt_meta(provider, prompt_meta)
 
     recorder = TraceRecorder()
     records: list[PredictionRecord] = []
@@ -298,6 +338,8 @@ def run_experiment(
             "git_sha": _git_sha(Path(__file__).resolve().parents[2]),
         },
         "few_shot_examples": len(examples),
+        "prompt": prompt_meta,
+        "prompt_build_ms": round(prompt_build_ms, 3),
         "trace": {"file": TRACE_FILENAME, "n_cases": total},
         "command": " ".join(sys.argv) or None,
     }

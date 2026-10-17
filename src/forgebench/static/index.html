@@ -245,6 +245,41 @@
         </div>
 
         <div id="config-message" class="message"></div>
+
+        <div class="prompt-registry" id="prompt-registry">
+          <div class="prompt-registry-head">
+            <h3 class="panel-title">Prompt registry</h3>
+            <span class="prompt-registry-hint">Versions are immutable; a run records the exact digest it used.</span>
+          </div>
+
+          <div class="form-grid prompt-registry-controls">
+            <div class="form-field compact">
+              <label class="form-label" for="prompt-select">Prompt</label>
+              <select id="prompt-select"></select>
+            </div>
+            <div class="form-field compact">
+              <label class="form-label" for="prompt-version-select">Version</label>
+              <select id="prompt-version-select"></select>
+            </div>
+            <div class="form-field compact">
+              <label class="form-label" for="prompt-name-input">New prompt name</label>
+              <input id="prompt-name-input" type="text" placeholder="classify_v1" spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="prompt-meta" id="prompt-meta"></div>
+
+          <textarea id="prompt-body-editor" class="code-editor code-editor--short" spellcheck="false"
+            placeholder="Select a prompt, or type a name above to create one…"></textarea>
+
+          <div class="button-group">
+            <button class="button button--primary" id="btn-prompt-save">Save as new version</button>
+            <button class="button" id="btn-prompt-use">Use in this config</button>
+            <button class="button" id="btn-prompt-create">Create prompt</button>
+          </div>
+
+          <div id="prompt-message" class="message"></div>
+        </div>
       </div>
     </section>
 

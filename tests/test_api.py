@@ -291,3 +291,70 @@ def test_trace_of_a_run_without_a_trace_file_is_empty(
 
     assert payload["traces"] == []
     assert payload["summary"] == {"n_cases": 0}
+
+
+def test_prompt_endpoints_round_trip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "prompts"
+    root.mkdir()
+    monkeypatch.setenv("FORGEBENCH_PROMPTS_ROOT", str(root))
+
+    from forgebench.api import (
+        PromptCreate,
+        PromptLabelUpdate,
+        create_prompt_version,
+        get_prompt_endpoint,
+        list_prompts_endpoint,
+        put_prompt_label,
+    )
+
+    assert list_prompts_endpoint() == []
+
+    created = create_prompt_version("classify", PromptCreate(body="v1 body", note="seed"))
+    assert created["version"] == 1
+    assert created["body"] == "v1 body"
+
+    create_prompt_version("classify", PromptCreate(body="v2 body"))
+    catalog = list_prompts_endpoint()
+    assert len(catalog) == 1
+    assert catalog[0]["versions"] == [1, 2]
+
+    latest = get_prompt_endpoint("classify")
+    assert latest["body"] == "v2 body"
+    assert get_prompt_endpoint("classify", version=1)["body"] == "v1 body"
+
+    labelled = put_prompt_label("classify", PromptLabelUpdate(label="production", version=1))
+    assert labelled["labels"] == {"production": 1}
+    assert "production" in get_prompt_endpoint("classify", version=1)["labels"]
+
+    # Removing the label (null version) must not touch the version itself.
+    removed = put_prompt_label("classify", PromptLabelUpdate(label="production", version=None))
+    assert removed["labels"] == {}
+
+
+def test_prompt_endpoints_report_missing_things_honestly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "prompts"
+    root.mkdir()
+    monkeypatch.setenv("FORGEBENCH_PROMPTS_ROOT", str(root))
+
+    from forgebench.api import (
+        PromptCreate,
+        PromptLabelUpdate,
+        create_prompt_version,
+        get_prompt_endpoint,
+        put_prompt_label,
+    )
+
+    with pytest.raises(HTTPException) as missing_prompt:
+        get_prompt_endpoint("ghost")
+    assert missing_prompt.value.status_code == 404
+
+    with pytest.raises(HTTPException) as missing_label_target:
+        put_prompt_label("ghost", PromptLabelUpdate(label="production", version=1))
+    assert missing_label_target.value.status_code == 404
+
+    create_prompt_version("classify", PromptCreate(body="v1"))
+    with pytest.raises(HTTPException) as missing_version:
+        get_prompt_endpoint("classify", version=5)
+    assert missing_version.value.status_code == 404

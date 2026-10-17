@@ -1092,6 +1092,52 @@ select[multiple] {
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
 }
 
+/* ---------- Prompt registry ---------- */
+.prompt-registry {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: var(--rule);
+}
+
+.prompt-registry-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.prompt-registry-head h3 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.prompt-registry-hint {
+  color: var(--ink-3);
+  font-size: var(--step--1);
+}
+
+.prompt-registry-controls {
+  margin-bottom: var(--space-sm);
+}
+
+.prompt-meta {
+  margin-bottom: var(--space-xs);
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  overflow-wrap: anywhere;
+}
+
+.code-editor--short {
+  min-height: 180px;
+  margin-top: 0;
+}
+
 /* ---------- Loading skeleton ---------- */
 .loading-skeleton {
   display: flex;

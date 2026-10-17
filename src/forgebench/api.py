@@ -39,6 +39,13 @@ from .credentials import (
 from .dashboard import list_configs as _list_configs
 from .dashboard import list_runs as _list_runs
 from .ollama_probe import ollama_status
+from .prompts import (
+    PromptNotFound,
+    load_prompt,
+    prompt_catalog,
+    save_prompt_version,
+    set_label,
+)
 from .providers import DEFAULT_PROVIDER, PROVIDER_ENV_VARS
 from .providers.verify import ollama_verdict, verify_provider_key
 from .registry import default_datasets_root, list_datasets, load_dataset, load_split
@@ -542,6 +549,65 @@ def get_dataset_split(name: str, split: str) -> dict[str, Any]:
         }
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Prompt registry endpoints
+# ---------------------------------------------------------------------------
+
+
+class PromptCreate(BaseModel):
+    """A new immutable version of a registry prompt."""
+
+    body: str = Field(min_length=1, description="Full system-prompt body.")
+    note: str = Field(default="", description="Why this version exists.")
+    label: str = Field(default="", description="Optional label to move onto it.")
+
+
+class PromptLabelUpdate(BaseModel):
+    label: str = Field(min_length=1, description="e.g. production")
+    version: int | None = Field(default=None, ge=1, description="null removes the label.")
+
+
+@app.get("/api/prompts")
+def list_prompts_endpoint() -> list[dict[str, Any]]:
+    """Every prompt in the registry: versions, labels, latest digest."""
+    return prompt_catalog()
+
+
+@app.get("/api/prompts/{name}")
+def get_prompt_endpoint(name: str, version: int | None = None) -> dict[str, Any]:
+    """One prompt version (default: latest) with its body and provenance."""
+    try:
+        return load_prompt(name, version).to_dict()
+    except (PromptNotFound, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/prompts/{name}", status_code=201)
+def create_prompt_version(name: str, payload: PromptCreate) -> dict[str, Any]:
+    """Write the next version. Versions are immutable: this never overwrites."""
+    try:
+        prompt = save_prompt_version(name, payload.body, note=payload.note)
+        if payload.label:
+            set_label(name, payload.label, prompt.version)
+    except (PromptNotFound, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return prompt.to_dict()
+
+
+@app.put("/api/prompts/{name}/labels")
+def put_prompt_label(name: str, payload: PromptLabelUpdate) -> dict[str, Any]:
+    """Move (or remove) a named pointer such as ``production``."""
+    try:
+        labels = set_label(name, payload.label, payload.version)
+    except PromptNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"name": name, "labels": labels}
 
 
 # ---------------------------------------------------------------------------

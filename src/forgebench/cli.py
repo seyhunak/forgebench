@@ -29,6 +29,13 @@ from .credentials import (
     set_value,
     source_of,
 )
+from .prompts import (
+    PromptNotFound,
+    load_prompt,
+    prompt_catalog,
+    save_prompt_version,
+    set_label,
+)
 from .providers import DEFAULT_PROVIDER, PROVIDER_ENV_VARS
 from .providers.verify import verify_provider_key
 from .registry import default_datasets_root, list_datasets, validate_dataset
@@ -301,6 +308,110 @@ def validate_dataset_cmd(
     for problem in report.problems:
         typer.echo(f"PROBLEM: {problem}")
     raise typer.Exit(code=1)
+
+
+@app.command("prompt-list")
+def prompt_list_cmd(
+    prompts_root: Path | None = typer.Option(
+        None, "--prompts-root", help="Override prompt registry location."
+    ),
+) -> None:
+    """List versioned prompts in the registry."""
+    entries = prompt_catalog(_root_option(prompts_root))
+    if not entries:
+        typer.echo("No prompts yet. Create one with: forgebench prompt-save <name> --file body.md")
+        return
+    for entry in entries:
+        labels = ", ".join(f"{k}={v}" for k, v in entry["labels"].items()) or "-"
+        typer.echo(
+            f"  {entry['name']}  latest=v{entry['latest']}  "
+            f"versions={len(entry['versions'])}  labels={labels}  "
+            f"sha256={entry['latest_sha256'][:12]}"
+        )
+
+
+@app.command("prompt-show")
+def prompt_show_cmd(
+    name: str = typer.Argument(..., help="Prompt name."),
+    version: int | None = typer.Option(
+        None, "--version", "-v", min=1, help="Version (default: latest)."
+    ),
+    prompts_root: Path | None = typer.Option(
+        None, "--prompts-root", help="Override prompt registry location."
+    ),
+) -> None:
+    """Print one prompt version (body first, metadata to stderr)."""
+    try:
+        prompt = load_prompt(name, version, root=_root_option(prompts_root))
+    except (PromptNotFound, ValueError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        f"# {prompt.name}@v{prompt.version}  sha256={prompt.sha256[:12]}  "
+        f"{prompt.chars} chars  labels={','.join(prompt.labels) or '-'}",
+        err=True,
+    )
+    if prompt.note:
+        typer.echo(f"# note: {prompt.note}", err=True)
+    typer.echo(prompt.body)
+
+
+@app.command("prompt-save")
+def prompt_save_cmd(
+    name: str = typer.Argument(..., help="Prompt name."),
+    file: Path | None = typer.Option(
+        None, "--file", "-f", help="File to read the body from (default: stdin)."
+    ),
+    note: str = typer.Option("", "--note", help="Why this version exists."),
+    label: str = typer.Option("", "--label", help="Also point this label at the new version."),
+    prompts_root: Path | None = typer.Option(
+        None, "--prompts-root", help="Override prompt registry location."
+    ),
+) -> None:
+    """Write a new immutable version of a prompt."""
+    body = (
+        file.read_text(encoding="utf-8")
+        if file is not None
+        else typer.prompt("prompt body")
+    )
+    if not body.strip():
+        typer.echo("error: empty prompt body", err=True)
+        raise typer.Exit(code=1)
+    try:
+        prompt = save_prompt_version(name, body, note=note, root=_root_option(prompts_root))
+    except (ValueError, OSError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        f"saved {prompt.name}@v{prompt.version}  sha256={prompt.sha256[:12]}  {prompt.chars} chars"
+    )
+    if label:
+        set_label(name, label, prompt.version, root=_root_option(prompts_root))
+        typer.echo(f"label '{label}' -> v{prompt.version}")
+
+
+@app.command("prompt-label")
+def prompt_label_cmd(
+    name: str = typer.Argument(..., help="Prompt name."),
+    label: str = typer.Argument(..., help="Label to move, e.g. production."),
+    version: int = typer.Argument(
+        ..., min=1, help="Version to point at (0 removes the label)."
+    ),
+    prompts_root: Path | None = typer.Option(
+        None, "--prompts-root", help="Override prompt registry location."
+    ),
+) -> None:
+    """Point a label at a version (version 0 removes the label)."""
+    root = _root_option(prompts_root)
+    try:
+        labels = set_label(name, label, None if version == 0 else version, root=root)
+    except (PromptNotFound, ValueError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    if labels:
+        typer.echo("labels: " + ", ".join(f"{k}=v{v}" for k, v in sorted(labels.items())))
+    else:
+        typer.echo("labels: (none)")
 
 
 @app.command("task-list")

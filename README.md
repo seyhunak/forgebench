@@ -27,8 +27,10 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 | **Pluggable provider interface** | Mock (deterministic, offline), Mistral, OpenAI, Anthropic, Google, and OpenRouter adapters share the same contract. OpenRouter — one key, every hosted model — is the default in the dashboard and CLI. |
 | **Strict output validation** | A plausible explanation is not a correct answer. Unknown categories, malformed JSON, and invalid evidence fields are rejected. |
 | **Risk-aware metrics** | Critical false-match rate and escalation recall are tracked separately — accuracy alone hides the expensive errors. |
-| **Full run manifests** | Dataset hash, config, model id, versions, timestamps, git SHA, and environment are captured for every run. |
-| **Machine-readable + human-readable results** | `predictions.jsonl`, `metrics.json`, `manifest.json`, and `report.md` per run. |
+| **Full run manifests** | Dataset hash, config, model id, versions, timestamps, git SHA, and environment are captured for every run — including the prompt that actually ran (`name@version`, SHA-256, provider default vs. registry vs. inline). |
+| **Per-case trace waterfall** | Every run writes `trace.jsonl`: wall-clock spans per case (provider call with token counts, parse & score, judge). The run modal's *View trace* tab renders it, so "which step cost the time" is an answer, not a guess. |
+| **Versioned prompt registry** | Prompts live in `prompts/<name>/vN.md` with immutable versions and labels (`production`). Pin one from a config with `prompt: {name: …, version: …}` or from the dashboard, and the run records the exact bytes it used. |
+| **Machine-readable + human-readable results** | `predictions.jsonl`, `metrics.json`, `manifest.json`, `trace.jsonl`, and `report.md` per run. |
 | **Bring-your-own-key (BYOK)** | API keys saved to a git-ignored `.env` (chmod 600), verified against the provider API, never committed, never in run artifacts. |
 | **Local dashboard** | FastAPI-served, Hallmark-designed UI with a dark-first Cobalt theme, side-rail navigation, and a ⌘K jump palette — environment setup with per-provider key entry, key management, dataset browsing, run launching, and results browsing where every run opens a detail modal (report, predictions, downloadable artifacts) plus cross-run comparison. |
 | **Deterministic dataset generator** | Same seed, byte-identical files. Regenerate `finance_v1` or add new datasets with `scripts/generate_dataset.py`. |
@@ -143,6 +145,10 @@ It ships a dark-first **Cobalt** theme with a light mode (toggle, top-right), an
 | `forgebench task-validate <name> [--tasks-root <path>]` | Validate a task manifest and its case files |
 | `forgebench task-run <name> [--split <s>] [--provider <p>] [--model <id>] [--limit N] [--judge-provider <p>] [--judge-model <id>]` | Run a custom task evaluation end-to-end. Default provider: `openrouter` |
 | `forgebench run --config <yaml> [--provider <name>] [--model <id>] [--limit N] [--run-id <id>] [--datasets-root <path>] [--output-root <path>]` | Execute one benchmark end-to-end |
+| `forgebench prompt-list [--prompts-root <path>]` | List versioned prompts in the registry (`prompts/`) |
+| `forgebench prompt-show <name> [--version N] [--prompts-root <path>]` | Print one prompt version (default: latest) |
+| `forgebench prompt-save <name> [--file <path>] [--note <text>] [--label <text>] [--prompts-root <path>]` | Write the next immutable version of a prompt |
+| `forgebench prompt-label <name> <label> <version> [--prompts-root <path>]` | Point a label (e.g. `production`) at a version; `0` removes the label |
 | `forgebench compare <run-a> <run-b> [...] [--out <file>]` | N-way comparison with deltas vs. the first run (baseline) |
 | `forgebench report <run-dir> [--out <file>]` | (Re)generate the Markdown report for a run |
 | `forgebench dashboard` | Launch the local web UI |
@@ -300,8 +306,8 @@ forgebench/
 ├── .env.example                 # Environment variable template (git-ignored .env)
 ├── .gitignore                   # Python, secrets, run artifacts
 ├── configs/                     # Experiment YAML configs
-│   ├── baseline.yaml            # Mock baseline
-│   ├── legal_baseline.yaml      # Mock baselines for the legal, payments,
+│   ├── baseline.yaml            # OpenRouter reference baseline
+│   ├── legal_baseline.yaml      # OpenRouter baselines for the legal, payments,
 │   ├── payments_baseline.yaml   #   procurement and subscriptions datasets
 │   ├── procurement_baseline.yaml
 │   ├── subscriptions_baseline.yaml
@@ -309,6 +315,8 @@ forgebench/
 │   └── experiments/
 │       ├── prompt_v1.yaml       # Prompt variant
 │       └── fewshot_v1.yaml      # Few-shot variant
+├── prompts/                     # Versioned prompt registry (immutable vN.md + labels.json)
+│   └── reconciler/              # Provider default system prompt, pinned as v1
 ├── datasets/                    # Versioned synthetic datasets
 │   ├── finance_v1/              # Bank/ledger exception classification
 │   ├── healthcare_v1/           # Medical claims reconciliation

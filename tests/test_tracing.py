@@ -106,7 +106,9 @@ def test_run_artifacts_include_trace(tmp_path, mock_config, tiny_dataset, monkey
             )
 
     # No network in tests: replace provider construction, keep the real loop.
-    monkeypatch.setattr("forgebench.runner._make_provider", lambda cfg, ex: FakeProvider())
+    monkeypatch.setattr(
+        "forgebench.runner._make_provider", lambda cfg, ex, system_text=None: FakeProvider()
+    )
 
     result = run_experiment(
         mock_config,

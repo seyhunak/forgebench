@@ -143,3 +143,45 @@ def test_set_key_rejects_empty_input(tmp_path: Path, monkeypatch: pytest.MonkeyP
     combined = result.output + (result.stderr or "")
     assert "empty key" in combined or "Aborted" in combined
     assert not (tmp_path / ".env").exists()
+
+
+def test_prompt_save_list_show_and_label(tmp_path: Path) -> None:
+    """Registry lifecycle from the terminal: save -> list -> show -> label."""
+    root = tmp_path / "prompts"
+    body = tmp_path / "body.md"
+    body.write_text("Classify the case.", encoding="utf-8")
+    opts = ["--prompts-root", str(root)]
+
+    saved = runner.invoke(
+        app, ["prompt-save", "classify", "--file", str(body), "--note", "seed", *opts]
+    )
+    assert saved.exit_code == 0, saved.output
+    assert "saved classify@v1" in saved.output
+
+    body.write_text("Classify the case, carefully.", encoding="utf-8")
+    second = runner.invoke(app, ["prompt-save", "classify", "--file", str(body), *opts])
+    assert second.exit_code == 0, second.output
+    assert "saved classify@v2" in second.output
+
+    listing = runner.invoke(app, ["prompt-list", *opts])
+    assert listing.exit_code == 0
+    assert "classify" in listing.output
+    assert "latest=v2" in listing.output
+
+    shown = runner.invoke(app, ["prompt-show", "classify", "--version", "1", *opts])
+    assert shown.exit_code == 0
+    assert "Classify the case." in shown.output
+
+    latest = runner.invoke(app, ["prompt-show", "classify", *opts])
+    assert latest.exit_code == 0
+    assert "carefully" in latest.output
+
+    labelled = runner.invoke(app, ["prompt-label", "classify", "production", "2", *opts])
+    assert labelled.exit_code == 0, labelled.output
+    assert "production=v2" in labelled.output
+
+
+def test_prompt_show_of_unknown_prompt_fails(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["prompt-show", "ghost", "--prompts-root", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "error:" in result.output

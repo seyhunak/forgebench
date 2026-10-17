@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 _ENV_RE = re.compile(r"\$\{([A-Z0-9_]+)\}")
 
@@ -49,7 +49,21 @@ class PromptSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     system: str | None = None
+    #: Registry-managed prompt: when set, its body replaces ``system``.
+    name: str | None = Field(default=None, max_length=60)
+    #: Pin a version (``null``/omitted = latest).
+    version: int | None = Field(default=None, ge=1)
     few_shot_count: int = Field(default=0, ge=0, le=20)
+
+    @model_validator(mode="after")
+    def _check_name(self) -> PromptSection:
+        if self.name is not None and not re.match(r"^[a-z0-9][a-z0-9._-]*$", self.name):
+            raise ValueError(
+                f"prompt.name {self.name!r} must use letters, digits, '.', '_' or '-'"
+            )
+        if self.version is not None and not self.name:
+            raise ValueError("prompt.version requires prompt.name")
+        return self
 
 
 class EvaluationSection(BaseModel):

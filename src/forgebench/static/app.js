@@ -96,6 +96,15 @@ const els = {
   btnSaveConfig: document.getElementById("btn-save-config"),
   btnResetConfig: document.getElementById("btn-reset-config"),
   configMessage: document.getElementById("config-message"),
+  promptSelect: document.getElementById("prompt-select"),
+  promptVersionSelect: document.getElementById("prompt-version-select"),
+  promptNameInput: document.getElementById("prompt-name-input"),
+  promptMeta: document.getElementById("prompt-meta"),
+  promptBodyEditor: document.getElementById("prompt-body-editor"),
+  btnPromptSave: document.getElementById("btn-prompt-save"),
+  btnPromptUse: document.getElementById("btn-prompt-use"),
+  btnPromptCreate: document.getElementById("btn-prompt-create"),
+  promptMessage: document.getElementById("prompt-message"),
   // Task panel
   taskSelect: document.getElementById("task-select"),
   taskSplit: document.getElementById("task-split"),
@@ -789,6 +798,126 @@ els.btnSaveConfig.addEventListener("click", async () => {
     dlog('Configs loaded');
   } catch (err) {
     setMessage(els.configMessage, `Save failed: ${err.message}`, "error");
+  }
+});
+
+// ---------- Prompt registry ----------
+
+let promptCatalogCache = [];
+
+async function loadPromptRegistry(preferredName) {
+  try {
+    promptCatalogCache = await fetchJSON("/api/prompts");
+  } catch (err) {
+    setMessage(els.promptMessage, `Failed to load prompt registry: ${err.message}`, "error");
+    return;
+  }
+  if (!promptCatalogCache.length) {
+    els.promptSelect.innerHTML = '<option value="">(no prompts yet)</option>';
+    els.promptVersionSelect.innerHTML = "";
+    els.promptMeta.textContent = "Registry is empty — type a name above and press Create prompt.";
+    return;
+  }
+  els.promptSelect.innerHTML = promptCatalogCache
+    .map(p => `<option value="${escapeAttr(p.name)}">${escapeHtml(p.name)} · v${p.latest}</option>`)
+    .join("");
+  if (preferredName && promptCatalogCache.some(p => p.name === preferredName)) {
+    els.promptSelect.value = preferredName;
+  }
+  await selectPrompt(els.promptSelect.value);
+}
+
+async function selectPrompt(name, version) {
+  const entry = promptCatalogCache.find(p => p.name === name);
+  if (!entry) return;
+  // Newest first: the version you just saved should be the one on screen.
+  els.promptVersionSelect.innerHTML = entry.versions.slice().reverse()
+    .map(v => `<option value="${v}">v${v}</option>`)
+    .join("");
+  if (version) els.promptVersionSelect.value = String(version);
+  await showPromptBody();
+}
+
+async function showPromptBody() {
+  const name = els.promptSelect.value;
+  const version = Number(els.promptVersionSelect.value);
+  if (!name || !version) return;
+  try {
+    const prompt = await fetchJSON(`/api/prompts/${encodeURIComponent(name)}?version=${version}`);
+    els.promptBodyEditor.value = prompt.body;
+    const labels = (prompt.labels || []).join(", ") || "none";
+    els.promptMeta.textContent =
+      `${prompt.name}@v${prompt.version} · sha256 ${prompt.sha256.slice(0, 12)} · ` +
+      `${prompt.chars} chars · labels: ${labels}` + (prompt.note ? ` · ${prompt.note}` : "");
+  } catch (err) {
+    setMessage(els.promptMessage, `Failed to load prompt: ${err.message}`, "error");
+  }
+}
+
+els.promptSelect.addEventListener("change", () => selectPrompt(els.promptSelect.value));
+els.promptVersionSelect.addEventListener("change", showPromptBody);
+
+els.btnPromptCreate.addEventListener("click", async () => {
+  const name = (els.promptNameInput.value || "").trim();
+  if (!name) {
+    setMessage(els.promptMessage, "Enter a prompt name first (e.g. classify_v1).", "error");
+    return;
+  }
+  await savePromptVersion(name, "New prompt — edit me.");
+});
+
+els.btnPromptSave.addEventListener("click", async () => {
+  const name = els.promptSelect.value;
+  if (!name) {
+    setMessage(els.promptMessage, "No prompt selected.", "error");
+    return;
+  }
+  await savePromptVersion(name, "Updated from the dashboard.");
+});
+
+async function savePromptVersion(name, note) {
+  const body = els.promptBodyEditor.value;
+  if (!body.trim()) {
+    setMessage(els.promptMessage, "Prompt body is empty; nothing saved.", "error");
+    return;
+  }
+  try {
+    const saved = await fetchJSON(`/api/prompts/${encodeURIComponent(name)}`, {
+      method: "POST",
+      body: JSON.stringify({ body, note }),
+    });
+    setMessage(els.promptMessage, `Saved ${saved.name}@v${saved.version}.`, "ok");
+    await loadPromptRegistry(saved.name);
+    await selectPrompt(saved.name, saved.version);
+  } catch (err) {
+    setMessage(els.promptMessage, `Save failed: ${err.message}`, "error");
+  }
+}
+
+els.btnPromptUse.addEventListener("click", () => {
+  const name = els.promptSelect.value;
+  const version = Number(els.promptVersionSelect.value);
+  const entry = promptCatalogCache.find(p => p.name === name);
+  if (!name || !entry) {
+    setMessage(els.promptMessage, "No prompt selected.", "error");
+    return;
+  }
+  if (!els.configEditor.value.trim()) {
+    setMessage(els.promptMessage, "Open a config first — the editor is empty.", "error");
+    return;
+  }
+  try {
+    const config = JSON.parse(els.configEditor.value);
+    if (!config.prompt || typeof config.prompt !== "object") config.prompt = {};
+    config.prompt.name = name;
+    // Pin a version only when it is not the latest: latest is the default
+    // and pinning it would silently freeze future improvements.
+    if (version !== entry.latest) config.prompt.version = version;
+    else delete config.prompt.version;
+    els.configEditor.value = JSON.stringify(config, null, 2);
+    setMessage(els.promptMessage, `Config now uses ${name}@v${version}. Save the config to keep it.`, "ok");
+  } catch (err) {
+    setMessage(els.promptMessage, `Config editor must hold valid JSON to insert a prompt: ${err.message}`, "error");
   }
 });
 
@@ -1650,6 +1779,10 @@ async function init() {
       'dataset-table-body', 'btn-download-dataset', 'dataset-message',
       'config-editor-select', 'config-editor', 'config-editor-loading',
       'btn-save-config', 'btn-reset-config', 'config-message',
+      'btn-modal-trace',
+      'prompt-select', 'prompt-version-select', 'prompt-name-input',
+      'prompt-meta', 'prompt-body-editor', 'btn-prompt-save',
+      'btn-prompt-use', 'btn-prompt-create', 'prompt-message',
       'btn-theme-toggle',
       'task-select', 'task-split', 'task-provider', 'task-model',
       'task-judge-provider', 'task-judge-model', 'task-limit',
@@ -1674,6 +1807,8 @@ async function init() {
     dlog('Environment loaded');
     await loadConfigs();
     dlog('Configs loaded');
+    await loadPromptRegistry();
+    dlog('Prompt registry loaded');
     await loadDatasets();
     dlog('Datasets loaded');
     await loadRuns();
