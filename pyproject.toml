@@ -27,7 +27,11 @@ dependencies = [
   "python-dotenv>=1.0",
   "mistralai>=1.0",
   "bleach>=6.0",
-  "mdit-py-plugins>=1.0",
+  # Markdown rendering of run reports (api.py: markdown-it + GFM tables).
+  # mdit-py-plugins has no 1.x releases — it was pinned to an impossible
+  # version, which made every fresh install fail dependency resolution.
+  "markdown-it-py>=3.0",
+  "mdit-py-plugins>=0.4",
 ]
 
 [project.optional-dependencies]
