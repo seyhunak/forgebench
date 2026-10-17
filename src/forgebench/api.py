@@ -106,6 +106,7 @@ class TaskRunRequest(BaseModel):
     split: str = "test"
     provider: str = ""
     model: str = ""
+    model_2: str | None = None
     judge_provider: str = ""
     judge_model: str = ""
     limit: int | None = None
@@ -942,6 +943,7 @@ def list_task_runs() -> list[dict[str, Any]]:
                         "path": str(p.relative_to(REPO_ROOT)),
                         "task": manifest.get("task", {}),
                         "split": manifest.get("split", ""),
+                        "provider": manifest.get("provider", {}),
                         "metrics": entry["metrics"],
                         "created_at": manifest.get("created_at_utc"),
                     }
@@ -998,8 +1000,13 @@ def validate_task_endpoint(name: str) -> dict[str, Any]:
 
 
 @app.post("/api/tasks/{name}/run")
-def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, str]:
-    """Start a custom-task evaluation run in a background thread."""
+def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, Any]:
+    """Start a custom-task evaluation run in a background thread.
+
+    When ``model_2`` is provided and differs from ``model``, both models are
+    evaluated sequentially against the same task split so they can be
+    benchmarked side by side under a single run handle.
+    """
     try:
         task, _ = load_task_with_cases(name, payload.split)
     except FileNotFoundError as exc:
@@ -1009,6 +1016,9 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, str]:
     # does not name them, so the task runner never falls back to Mock/empty.
     provider = (payload.provider or "").strip() or _configured_provider()
     model = (payload.model or "").strip() or _configured_model(provider)
+    model_2 = (payload.model_2 or "").strip() or None
+    if model_2 == model:
+        model_2 = None  # avoid a duplicate run
 
     judge_provider = (payload.judge_provider or "").strip()
     if not judge_provider:
@@ -1018,6 +1028,7 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, str]:
         judge_model = _configured_model(judge_provider) or model
 
     run_id = _task_state_id(name, provider, model)
+    run_id_2 = _task_state_id(name, provider, model_2) if model_2 else None
 
     _run_state[run_id] = {
         "status": "running",
@@ -1029,33 +1040,59 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, str]:
 
     def _worker() -> None:
         try:
-            reporter = _ProgressReporter(run_id)
-            result = run_task_experiment(
-                name=name,
-                split=payload.split,
-                provider=provider,
-                model=model,
-                judge_provider=judge_provider,
-                judge_model=judge_model,
-                limit=payload.limit,
-                output_root=Path(payload.output_root),
-                on_progress=reporter,
-            )
+            _, cases = load_task_with_cases(name, payload.split)
+            n_cases = len(cases)
+            models = [model] + ([model_2] if model_2 else [])
+            total = n_cases * len(models)
+            results: list[dict[str, Any]] = []
+            for index, mdl in enumerate(models):
+                base = index * n_cases
+
+                def reporter(done: int, chunk_total: int, base: int = base) -> None:
+                    state = _run_state.get(run_id)
+                    if state is not None:
+                        state["progress"] = {"done": base + done, "total": total}
+
+                result = run_task_experiment(
+                    name=name,
+                    split=payload.split,
+                    provider=provider,
+                    model=mdl,
+                    judge_provider=judge_provider,
+                    judge_model=judge_model,
+                    limit=payload.limit,
+                    output_root=Path(payload.output_root),
+                    on_progress=reporter,
+                )
+                results.append(
+                    {
+                        "run_id": result.run_id,
+                        "run_dir": str(result.run_dir),
+                        "metrics": result.metrics,
+                        "manifest": result.manifest,
+                        "model": mdl,
+                    }
+                )
             _run_state[run_id]["status"] = "done"
+            primary = results[0]
+            secondary = results[1] if len(results) > 1 else None
             _run_state[run_id]["result"] = {
-                "run_id": result.run_id,
-                "run_dir": str(result.run_dir),
-                "metrics": result.metrics,
-                "manifest": result.manifest,
+                "run_id": primary["run_id"],
+                "run_id_2": secondary["run_id"] if secondary else None,
+                "runs": results,
+                "metrics": primary["metrics"],
+                "manifest": primary["manifest"],
             }
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
+            import traceback
+
             _run_state[run_id]["status"] = "error"
-            _run_state[run_id]["error"] = str(exc)
+            _run_state[run_id]["error"] = traceback.format_exc()
 
     thread = threading.Thread(target=_worker, daemon=True)
     thread.start()
 
-    return {"run_id": run_id, "status": "started"}
+    return {"run_id": run_id, "run_id_2": run_id_2, "status": "started"}
 
 
 # Mirrors "/api/run/{run_id}/progress" — the flat shape the UI polls after

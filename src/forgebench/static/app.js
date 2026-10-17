@@ -111,6 +111,7 @@ const els = {
   taskSplit: document.getElementById("task-split"),
   taskProvider: document.getElementById("task-provider"),
   taskModel: document.getElementById("task-model"),
+  taskModelB: document.getElementById("task-model-2"),
   taskJudgeProvider: document.getElementById("task-judge-provider"),
   taskJudgeModel: document.getElementById("task-judge-model"),
   taskLimit: document.getElementById("task-limit"),
@@ -1210,16 +1211,22 @@ function openRunModal(runPath, run, report) {
     dataset: dataset.name || "",
   };
 
+  const isTask = !!manifest.task;
   els.runModalTitle.textContent = (run && run.run_id) || runPath.replace(/^runs\//, "");
-  els.runModalMeta.innerHTML = [
+  const chips = [
     provider.name || "unknown",
     provider.model || "unknown",
-    `${dataset.name || "unknown"} v${dataset.version || "?"}`,
-    `accuracy ${pct(m.accuracy)}`,
-    `macro-F1 ${pct(m.macro_f1)}`,
-    `schema valid ${pct(m.schema_validity)}`,
-    manifest.created_at_utc || "",
-  ]
+    isTask
+      ? `${manifest.task} v${manifest.task_version ?? "?"} · split ${manifest.split ?? "test"}`
+      : `${dataset.name || "unknown"} v${dataset.version || "?"}`,
+  ];
+  if (isTask) {
+    chips.push(`cases ${m.n_cases ?? "—"}`, `valid ${m.n_valid ?? "—"}`);
+  } else {
+    chips.push(`accuracy ${pct(m.accuracy)}`, `macro-F1 ${pct(m.macro_f1)}`, `schema valid ${pct(m.schema_validity)}`);
+  }
+  chips.push(manifest.created_at_utc || "");
+  els.runModalMeta.innerHTML = chips
     .filter(Boolean)
     .map((chip) => `<span class="modal-chip">${escapeHtml(chip)}</span>`)
     .join("");
@@ -1843,6 +1850,7 @@ async function startTaskRun() {
     split: els.taskSplit.value,
     provider: els.taskProvider.value,
     model: els.taskModel.value.trim(),
+    model_2: els.taskModelB.value.trim() || undefined,
     judge_provider: els.taskJudgeProvider.value,
     judge_model: els.taskJudgeModel.value.trim(),
     limit: els.taskLimit.value ? parseInt(els.taskLimit.value, 10) : undefined,
@@ -1902,11 +1910,28 @@ async function pollTaskProgress(runId) {
 function showResult(result) {
   if (!result) return;
   show(els.taskResult);
-  els.taskResRunId.textContent = result.run_id;
-  els.taskResCases.textContent = result.metrics?.n_cases ?? "—";
-  els.taskResValid.textContent = result.metrics?.n_valid ?? "—";
+  const runs = result.runs || [{ run_id: result.run_id, model: null, metrics: result.metrics }];
+  const primary = runs[0];
+  const secondary = runs.length > 1 ? runs[1] : null;
+  const m = primary.metrics || {};
+  const modelRows = [
+    `<tr><td class="label">Model</td><td class="value">${escapeHtml(primary.model || "—")}</td></tr>`,
+    secondary ? `<tr><td class="label">Comparison model</td><td class="value">${escapeHtml(secondary.model || "—")}</td></tr>` : "",
+  ].join("");
+  const table = els.taskResult.querySelector(".result-table");
+  table.innerHTML = [
+    `<tr><td class="label">Run id</td><td class="value" id="task-res-run-id">${escapeHtml(primary.run_id)}</td></tr>`,
+    `<tr><td class="label">Cases</td><td class="value" id="task-res-cases">${m.n_cases ?? "—"}</td></tr>`,
+    `<tr><td class="label">Valid</td><td class="value" id="task-res-valid">${m.n_valid ?? "—"}</td></tr>`,
+    modelRows,
+    `<tr><td class="label">Artifacts</td><td class="value" id="task-res-artifacts"><button class="button button--quiet" id="task-btn-open-run">Open run dir</button></td></tr>`,
+  ].join("");
+  els.taskResRunId = table.querySelector("#task-res-run-id");
+  els.taskResCases = table.querySelector("#task-res-cases");
+  els.taskResValid = table.querySelector("#task-res-valid");
+  els.taskBtnOpenRun = table.querySelector("#task-btn-open-run");
   els.taskBtnOpenRun.onclick = () => {
-    viewRunReport(result.run_id);
+    viewRunReport(primary.run_id);
   };
 }
 
@@ -1919,7 +1944,7 @@ async function loadTaskRuns() {
     }
     const rows = runs.map(r => {
       const m = r.metrics || {};
-      return `<div class="run-card" role="button" tabindex="0" onclick="viewRunReport('${escapeHtml(r.path)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();viewRunReport('${escapeHtml(r.path)}')}"><div class="run-card--header"><div class="run-card--id">${escapeHtml(r.run_id)}</div><span style="font-size:0.75rem;color:var(--fg-muted);">${escapeHtml(r.task ?? '')}</span></div><div class="run-card--meta"><div>Split: ${escapeHtml(r.split)}</div><div>Cases: ${m.n_cases ?? '—'} | Valid: ${m.n_valid ?? '—'}</div><div>${r.created_at || '—'}</div></div></div>`;
+      return `<div class="run-card" role="button" tabindex="0" onclick="viewRunReport('${escapeHtml(r.path)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();viewRunReport('${escapeHtml(r.path)}')}"><div class="run-card--header"><div class="run-card--id">${escapeHtml(r.run_id)}</div><span style="font-size:0.75rem;color:var(--fg-muted);">${escapeHtml(r.task ?? '')}</span></div><div class="run-card--meta"><div>Split: ${escapeHtml(r.split)} · ${escapeHtml(r.provider?.model || '—')}</div><div>Cases: ${m.n_cases ?? '—'} | Valid: ${m.n_valid ?? '—'}</div><div>${r.created_at || '—'}</div></div></div>`;
     }).join("");
     els.taskRunsGrid.innerHTML = `<div style="display:flex;flex-direction:column;gap:0.5rem;">${rows}</div>`;
   } catch (err) {

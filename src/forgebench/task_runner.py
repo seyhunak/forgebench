@@ -7,6 +7,7 @@ drive the same loop so results are identical regardless of entry point.
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -205,7 +206,8 @@ def run_task_experiment(
 
     metrics = {"n_cases": len(cases), "n_valid": sum(1 for r in records if r.ok)}
     created_at = datetime.now(UTC)
-    run_id = f"{name}-{provider}-{created_at.strftime('%Y%m%dT%H%M%SZ')}"
+    model_slug = re.sub(r"[^a-z0-9]+", "-", (provider_inst.model or provider).lower()).strip("-") or "model"
+    run_id = f"{name}-{provider}-{model_slug}-{created_at.strftime('%Y%m%dT%H%M%SZ')}"
     run_dir = (output_root or Path("runs")) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 

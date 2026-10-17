@@ -100,6 +100,94 @@ def test_task_state_ids_are_unique_per_model_and_run() -> None:
     assert "/" not in _task_state_id("t", "openrouter", "meta-llama/llama-3-70b")
 
 
+def test_start_task_run_executes_both_models_when_model_2_is_set(monkeypatch) -> None:
+    """``model_2`` makes the worker evaluate a second model under the same
+    run handle so two models can be benchmarked against one task split."""
+    import time
+
+    import forgebench.api as api
+    from forgebench.api import TaskRunRequest
+    from forgebench.task_runner import TaskRunResult
+
+    calls: list[str] = []
+
+    def fake(name, split, provider, model, judge_provider, judge_model, limit, output_root, on_progress):
+        calls.append(model)
+        for i in (1, 2):
+            on_progress(i, 2)
+        return TaskRunResult(
+            run_id=f"{name}-{provider}-{model}-T",
+            run_dir=Path("runs") / "fake",
+            n_cases=2,
+            n_valid=2,
+            metrics={"n_cases": 2, "n_valid": 2},
+            manifest={"task": name, "task_version": "1.0.0", "split": split,
+                      "provider": {"name": provider, "model": model}},
+        )
+
+    monkeypatch.setattr(api, "run_task_experiment", fake)
+    api._run_state.clear()
+
+    out = api.start_task_run("summarization_qa", TaskRunRequest(
+        name="summarization_qa", split="test", provider="ollama",
+        model="nemotron-3-nano:4b", model_2="gpt-oss:20b-cloud"))
+    assert out["status"] == "started"
+    assert out["run_id_2"] and out["run_id_2"] != out["run_id"]
+
+    state = None
+    for _ in range(200):
+        st = api._run_state.get(out["run_id"])
+        if st and st["status"] != "running":
+            state = st
+            break
+        time.sleep(0.01)
+    assert state is not None and state["status"] == "done"
+    assert state["progress"]["done"] == state["progress"]["total"] == 4
+
+    result = state["result"]
+    assert len(result["runs"]) == 2
+    assert [r["model"] for r in result["runs"]] == ["nemotron-3-nano:4b", "gpt-oss:20b-cloud"]
+    assert [c for c in calls] == ["nemotron-3-nano:4b", "gpt-oss:20b-cloud"]
+    assert result["run_id"] == result["runs"][0]["run_id"]
+    assert result["run_id_2"] == result["runs"][1]["run_id"]
+
+
+def test_start_task_run_single_model_unchanged(monkeypatch) -> None:
+    """Without ``model_2`` the run behaves as before (one model, no run_id_2)."""
+    import forgebench.api as api
+    from forgebench.api import TaskRunRequest
+    from forgebench.task_runner import TaskRunResult
+
+    def fake(name, split, provider, model, judge_provider, judge_model, limit, output_root, on_progress):
+        on_progress(2, 2)
+        return TaskRunResult(
+            run_id=f"{name}-{provider}-{model}-T",
+            run_dir=Path("runs") / "fake",
+            n_cases=2, n_valid=2,
+            metrics={"n_cases": 2, "n_valid": 2},
+            manifest={"task": name, "task_version": "1.0.0", "split": split,
+                      "provider": {"name": provider, "model": model}},
+        )
+
+    monkeypatch.setattr(api, "run_task_experiment", fake)
+    api._run_state.clear()
+
+    out = api.start_task_run("summarization_qa", TaskRunRequest(
+        name="summarization_qa", split="test", provider="ollama", model="nemotron-3-nano:4b"))
+    assert out["run_id_2"] is None
+
+    import time
+    state = None
+    for _ in range(200):
+        st = api._run_state.get(out["run_id"])
+        if st and st["status"] != "running":
+            state = st
+            break
+        time.sleep(0.01)
+    assert state is not None and state["status"] == "done"
+    assert len(state["result"]["runs"]) == 1
+
+
 # ---------------------------------------------------------------------------
 # Setup view: environment variables
 # ---------------------------------------------------------------------------
