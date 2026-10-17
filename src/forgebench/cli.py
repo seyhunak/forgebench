@@ -369,11 +369,7 @@ def prompt_save_cmd(
     ),
 ) -> None:
     """Write a new immutable version of a prompt."""
-    body = (
-        file.read_text(encoding="utf-8")
-        if file is not None
-        else typer.prompt("prompt body")
-    )
+    body = file.read_text(encoding="utf-8") if file is not None else typer.prompt("prompt body")
     if not body.strip():
         typer.echo("error: empty prompt body", err=True)
         raise typer.Exit(code=1)
@@ -394,9 +390,7 @@ def prompt_save_cmd(
 def prompt_label_cmd(
     name: str = typer.Argument(..., help="Prompt name."),
     label: str = typer.Argument(..., help="Label to move, e.g. production."),
-    version: int = typer.Argument(
-        ..., min=1, help="Version to point at (0 removes the label)."
-    ),
+    version: int = typer.Argument(..., min=1, help="Version to point at (0 removes the label)."),
     prompts_root: Path | None = typer.Option(
         None, "--prompts-root", help="Override prompt registry location."
     ),

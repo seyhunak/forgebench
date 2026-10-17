@@ -129,8 +129,14 @@ class _CaseSpanBuilder:
         self._recorder.record(self._trace)
         return False
 
-    def add(self, name: str, duration_ms: float, *, error: str | None = None,
-            detail: dict[str, Any] | None = None) -> Span:
+    def add(
+        self,
+        name: str,
+        duration_ms: float,
+        *,
+        error: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> Span:
         span = Span(
             name=name,
             duration_ms=max(0.0, duration_ms),

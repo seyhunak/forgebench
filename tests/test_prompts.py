@@ -188,9 +188,10 @@ def test_run_manifest_records_prompt_provenance(
     # No prompt configured -> the provider's own default is what really ran,
     # and the manifest says so instead of claiming an inline prompt.
     assert prompt_meta["source"] == "provider_default"
-    assert prompt_meta["effective_sha256"] == __import__("hashlib").sha256(
-        b"the prompt actually sent"
-    ).hexdigest()
+    assert (
+        prompt_meta["effective_sha256"]
+        == __import__("hashlib").sha256(b"the prompt actually sent").hexdigest()
+    )
     assert manifest["prompt_build_ms"] >= 0
 
 

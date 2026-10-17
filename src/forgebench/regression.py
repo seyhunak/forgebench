@@ -281,9 +281,7 @@ def pin_baseline(
     if manifest is None:
         manifest_path = run_dir / "manifest.json"
         manifest = (
-            json.loads(manifest_path.read_text(encoding="utf-8"))
-            if manifest_path.is_file()
-            else {}
+            json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else {}
         )
     provider = manifest.get("provider") or {}
     pin = {

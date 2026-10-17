@@ -278,9 +278,7 @@ def test_api_baseline_pin_and_regression_flow(two_runs, monkeypatch: pytest.Monk
     assert "pin" in missing.json()["detail"]
 
     # Pin the baseline, then the comparison resolves without an explicit id.
-    pinned = client.post(
-        "/api/baselines", json={"dataset": "finance_v1", "run_id": candidate.name}
-    )
+    pinned = client.post("/api/baselines", json={"dataset": "finance_v1", "run_id": candidate.name})
     assert pinned.status_code == 201
     # Pinning the *candidate* would compare it with itself — reject that.
     assert client.get(f"/api/runs/{candidate.name}/regression").status_code == 400

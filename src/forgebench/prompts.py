@@ -146,9 +146,7 @@ def load_prompt(
     if version is None:
         version = available[-1]
     if version not in available:
-        raise PromptNotFound(
-            f"prompt {name!r} has no version {version} (available: {available})"
-        )
+        raise PromptNotFound(f"prompt {name!r} has no version {version} (available: {available})")
 
     body = (directory / f"v{version}.md").read_text(encoding="utf-8")
     note, created_at = "", ""

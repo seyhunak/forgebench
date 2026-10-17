@@ -32,11 +32,16 @@ jobs:
           python scripts/generate_dataset.py --seed 42 --train 100 --dev 40 --test 60 --out /tmp/regen
           diff -r datasets/finance_v1 /tmp/regen
       - name: End-to-end demo
-        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
+        # ``secrets`` cannot be read in an ``if:`` expression, so the guard
+        # lives in the step body: no secret -> skip, never fail.
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: openai/gpt-4o-mini
         run: |
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "OPENROUTER_API_KEY secret is not set; skipping the end-to-end demo."
+            exit 0
+          fi
           forgebench run --config configs/baseline.yaml --run-id ci-baseline
           forgebench run --config configs/experiments/prompt_v1.yaml --run-id ci-prompt
           forgebench compare runs/ci-baseline runs/ci-prompt

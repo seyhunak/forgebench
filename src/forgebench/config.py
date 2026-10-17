@@ -58,9 +58,7 @@ class PromptSection(BaseModel):
     @model_validator(mode="after")
     def _check_name(self) -> PromptSection:
         if self.name is not None and not re.match(r"^[a-z0-9][a-z0-9._-]*$", self.name):
-            raise ValueError(
-                f"prompt.name {self.name!r} must use letters, digits, '.', '_' or '-'"
-            )
+            raise ValueError(f"prompt.name {self.name!r} must use letters, digits, '.', '_' or '-'")
         if self.version is not None and not self.name:
             raise ValueError("prompt.version requires prompt.name")
         return self
