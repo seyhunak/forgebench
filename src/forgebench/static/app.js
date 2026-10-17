@@ -77,6 +77,7 @@ const els = {
   btnCompare: document.getElementById("btn-compare"),
   btnClearResults: document.getElementById("btn-clear-results"),
   btnDownloadResults: document.getElementById("btn-download-results"),
+  resultsMessage: document.getElementById("results-message"),
   compareViewContainer: document.getElementById("compare-view-container"),
   btnThemeToggle: document.getElementById("btn-theme-toggle"),
   // Dataset panel
@@ -1130,39 +1131,63 @@ els.modeCompare.addEventListener("click", () => {
 });
 
 // ---------- Clear / Download results ----------
+// These live in the view header, so feedback goes to #results-message
+// (visible in both Single and Compare tabs — #compare-message is hidden
+// whenever the Compare tab is inactive).
+
+function isCompareActive() {
+  return els.modeCompare.classList.contains("mode-button--active");
+}
 
 els.btnClearResults.addEventListener("click", () => {
-  // Clear the comparison view and any rendered results
   safeInnerHTML(els.compareViewContainer, "");
   hide(els.compareViewContainer);
-  // Clear single run view
-  els.compareSelect.selectedIndex = -1;
-  setMessage(document.getElementById("compare-message"), "Results cleared.", "info");
+  for (const opt of Array.from(els.compareSelect.options)) opt.selected = false;
+  setMessage(els.resultsMessage, "Results cleared.", "info");
 });
 
 els.btnDownloadResults.addEventListener("click", async () => {
-  const selected = Array.from(els.compareSelect.selectedOptions).map(o => o.value);
-  if (selected.length < 2) {
-    setMessage(document.getElementById("compare-message"), "Select two or more runs to download results.", "error");
+  if (isCompareActive()) {
+    // Download the currently rendered comparison (or the selected runs).
+    const selected = Array.from(els.compareSelect.selectedOptions).map(o => o.value);
+    if (selected.length < 2) {
+      setMessage(els.resultsMessage, "Select two or more runs to compare first.", "error");
+      return;
+    }
+    try {
+      const data = await fetchJSON("/api/compare", {
+        method: "POST",
+        body: JSON.stringify({ run_dirs: selected }),
+      });
+      downloadTextFile("comparison.md", data.markdown, "text/markdown");
+      setMessage(els.resultsMessage, "Downloaded comparison.md", "ok");
+    } catch (err) {
+      setMessage(els.resultsMessage, `Download failed: ${err.message}`, "error");
+    }
     return;
   }
-  try {
-    const data = await fetchJSON("/api/compare", {
-      method: "POST",
-      body: JSON.stringify({ run_dirs: selected }),
-    });
-    const blob = new Blob([data.markdown], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "comparison.md";
-    a.click();
-    URL.revokeObjectURL(url);
-    setMessage(document.getElementById("compare-message"), "Results downloaded as comparison.md", "ok");
-  } catch (err) {
-    setMessage(document.getElementById("compare-message"), `Download failed: ${err.message}`, "error");
+
+  // Single tab: download the report of the currently opened run (if any).
+  if (currentRun && currentRun.markdown) {
+    const id = (currentRun.path || "run").replace(/^runs\//, "");
+    downloadTextFile(`${id}-report.md`, currentRun.markdown, "text/markdown");
+    setMessage(els.resultsMessage, `Downloaded ${id}-report.md`, "ok");
+    return;
   }
+  setMessage(els.resultsMessage, "Open a run first, then download it.", "error");
 });
+
+function downloadTextFile(filename, text, mime) {
+  const blob = new Blob([text], { type: mime || "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 // ---------- Compare (HTML table) ----------
 
