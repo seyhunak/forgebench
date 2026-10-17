@@ -75,6 +75,8 @@ const els = {
   compareView: document.getElementById("compare-view"),
   compareSelect: document.getElementById("compare-select"),
   btnCompare: document.getElementById("btn-compare"),
+  btnClearResults: document.getElementById("btn-clear-results"),
+  btnDownloadResults: document.getElementById("btn-download-results"),
   compareViewContainer: document.getElementById("compare-view-container"),
   btnThemeToggle: document.getElementById("btn-theme-toggle"),
   // Dataset panel
@@ -1125,6 +1127,41 @@ els.modeCompare.addEventListener("click", () => {
   els.modeSingle.classList.remove("mode-button--active");
   els.singleView.style.display = "none";
   els.compareView.style.display = "";
+});
+
+// ---------- Clear / Download results ----------
+
+els.btnClearResults.addEventListener("click", () => {
+  // Clear the comparison view and any rendered results
+  safeInnerHTML(els.compareViewContainer, "");
+  hide(els.compareViewContainer);
+  // Clear single run view
+  els.compareSelect.selectedIndex = -1;
+  setMessage(document.getElementById("compare-message"), "Results cleared.", "info");
+});
+
+els.btnDownloadResults.addEventListener("click", async () => {
+  const selected = Array.from(els.compareSelect.selectedOptions).map(o => o.value);
+  if (selected.length < 2) {
+    setMessage(document.getElementById("compare-message"), "Select two or more runs to download results.", "error");
+    return;
+  }
+  try {
+    const data = await fetchJSON("/api/compare", {
+      method: "POST",
+      body: JSON.stringify({ run_dirs: selected }),
+    });
+    const blob = new Blob([data.markdown], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "comparison.md";
+    a.click();
+    URL.revokeObjectURL(url);
+    setMessage(document.getElementById("compare-message"), "Results downloaded as comparison.md", "ok");
+  } catch (err) {
+    setMessage(document.getElementById("compare-message"), `Download failed: ${err.message}`, "error");
+  }
 });
 
 // ---------- Compare (HTML table) ----------

@@ -1,27 +1,29 @@
-# Baseline run against the subscriptions_v1 dataset using the selected provider.
 experiment:
   name: subscriptions-baseline
   dataset: subscriptions_v1
-  dataset_version: "1.0.0"
+  dataset_version: 1.0.0
   split: test
-
+  seed: 42
 provider:
   name: openrouter
   model: openai/gpt-4o-mini
   options:
-    temperature: 0.0
-
+    temperature: 0
 inference:
   temperature: 0
   max_retries: 2
   timeout_seconds: 30
-
+  max_tokens: 1024
+prompt:
+  system: null
+  few_shot_count: 0
 evaluation:
   metrics:
-    - accuracy
-    - macro_f1
-    - critical_false_match_rate
-    - escalation_recall
-    - schema_validity
-    - latency
-    - estimated_cost
+  - accuracy
+  - macro_f1
+  - critical_false_match_rate
+  - escalation_recall
+  - schema_validity
+  - latency
+  - estimated_cost
+
