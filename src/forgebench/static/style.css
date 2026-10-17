@@ -1767,6 +1767,62 @@ select[multiple] {
   }
 }
 
+/* ---------- Regression vs baseline ---------- */
+.regression-table {
+  min-width: 480px;
+  margin-bottom: var(--space-md);
+}
+
+.regression-table .num {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.delta-up {
+  color: var(--success);
+}
+
+.delta-down {
+  color: var(--danger);
+}
+
+.verdict-badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+.verdict-badge--regressed {
+  border-color: color-mix(in oklab, var(--danger) 55%, var(--line));
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+  color: var(--danger);
+}
+
+.verdict-badge--improved {
+  border-color: color-mix(in oklab, var(--success) 55%, var(--line));
+  background: color-mix(in oklab, var(--success) 10%, transparent);
+  color: var(--success);
+}
+
+.verdict-badge--added,
+.verdict-badge--removed {
+  color: var(--ink-3);
+}
+
+.regression-actions {
+  margin-top: var(--space-sm);
+}
+
+.regression-actions .button {
+  font-size: 0.75rem;
+}
+
 body.modal-open {
   overflow: hidden;
 }

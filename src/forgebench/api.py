@@ -49,6 +49,13 @@ from .prompts import (
 from .providers import DEFAULT_PROVIDER, PROVIDER_ENV_VARS
 from .providers.verify import ollama_verdict, verify_provider_key
 from .registry import default_datasets_root, list_datasets, load_dataset, load_split
+from .regression import (
+    clear_baseline,
+    compare_runs,
+    list_baselines,
+    pin_baseline,
+    run_dataset_name,
+)
 from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
 from .task_runner import run_task_experiment
@@ -611,6 +618,80 @@ def put_prompt_label(name: str, payload: PromptLabelUpdate) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Regression endpoints (baseline pins + case-level deltas)
+# ---------------------------------------------------------------------------
+
+
+class BaselinePinRequest(BaseModel):
+    dataset: str = Field(min_length=1, description="Dataset the pin belongs to.")
+    run_id: str = Field(min_length=1, description="Run directory name (or runs/<id>).")
+
+
+def _runs_root() -> Path:
+    return REPO_ROOT / "runs"
+
+
+@app.get("/api/baselines")
+def list_baselines_endpoint() -> dict[str, Any]:
+    """Pinned baseline per dataset (local state; runs/ is git-ignored)."""
+    return list_baselines(_runs_root())
+
+
+@app.post("/api/baselines", status_code=201)
+def pin_baseline_endpoint(payload: BaselinePinRequest) -> dict[str, Any]:
+    """Pin a run as the baseline its dataset is compared against."""
+    run_dir = _resolve_run_dir(payload.run_id)
+    if run_dir is None:
+        raise HTTPException(status_code=404, detail=f"run not found: {payload.run_id}")
+    return pin_baseline(payload.dataset, run_dir, _runs_root())
+
+
+@app.delete("/api/baselines/{dataset}")
+def clear_baseline_endpoint(dataset: str) -> dict[str, Any]:
+    """Remove the pin for one dataset."""
+    if not clear_baseline(dataset, _runs_root()):
+        raise HTTPException(status_code=404, detail=f"no baseline pinned for {dataset}")
+    return {"dataset": dataset, "cleared": True}
+
+
+@app.get("/api/runs/{run_id:path}/regression")
+def get_run_regression(run_id: str, baseline: str | None = None) -> dict[str, Any]:
+    """Case-level deltas between a run and its baseline.
+
+    ``baseline`` may name any run; without it the pin for this run's dataset is
+    used. No pin and no explicit baseline is a 404 with a message that says
+    what to do, not a stack trace.
+    """
+    run_dir = _resolve_run_dir(run_id)
+    if run_dir is None:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+
+    baseline_dir: Path | None = None
+    if baseline:
+        baseline_dir = _resolve_run_dir(baseline)
+        if baseline_dir is None:
+            raise HTTPException(status_code=404, detail=f"baseline run not found: {baseline}")
+    else:
+        dataset = run_dataset_name(run_dir)
+        pin = list_baselines(_runs_root()).get(dataset or "")
+        if pin:
+            baseline_dir = _resolve_run_dir(str(pin.get("run_id", "")))
+        if baseline_dir is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"no baseline pinned for dataset '{dataset or 'unknown'}' — "
+                    "pin one with POST /api/baselines {dataset, run_id}"
+                ),
+            )
+
+    if baseline_dir.resolve() == run_dir.resolve():
+        raise HTTPException(status_code=400, detail="baseline and candidate are the same run")
+
+    return compare_runs(baseline_dir, run_dir).to_dict()
+
+
+# ---------------------------------------------------------------------------
 # Run management endpoints
 # ---------------------------------------------------------------------------
 
@@ -988,7 +1069,7 @@ def task_run_progress(run_id: str) -> dict[str, Any]:
 
 
 @app.post("/api/compare")
-def compare_runs(payload: CompareRequest) -> dict[str, str]:
+def compare_runs_markdown(payload: CompareRequest) -> dict[str, str]:
     if len(payload.run_dirs) < 2:
         raise HTTPException(status_code=400, detail="compare needs at least two run directories")
     entries = []

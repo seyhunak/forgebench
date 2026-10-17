@@ -68,6 +68,7 @@ const els = {
   btnModalReport: document.getElementById("btn-modal-report"),
   btnModalPredictions: document.getElementById("btn-modal-predictions"),
   btnModalTrace: document.getElementById("btn-modal-trace"),
+  btnModalRegression: document.getElementById("btn-modal-regression"),
   btnModalDownloadReport: document.getElementById("btn-modal-download-report"),
   btnModalDownloadPredictions: document.getElementById("btn-modal-download-predictions"),
   modeSingle: document.getElementById("mode-single"),
@@ -670,12 +671,29 @@ async function loadConfigs() {
     const configs = await fetchJSON("/api/configs");
     safeInnerHTML(els.configSelect, configs.map(c => `<option value="${c.path}">${c.name}</option>`).join(""));
     safeInnerHTML(els.configEditorSelect, configs.map(c => `<option value="${c.path}">${c.name}</option>`).join(""));
+    // The select defaults to the first config; open it rather than showing an
+    // empty editor beside a chosen filename.
+    if (configs.length) {
+      currentConfigPath = els.configEditorSelect.value;
+      await loadConfigEditor(currentConfigPath);
+    }
   } catch (err) {
     setMessage(els.runMessage, `Failed to load configs: ${err.message}`, "error");
   }
 }
 
 // ---------- Datasets ----------
+
+let baselinesCache = {};
+
+async function loadBaselines() {
+  try {
+    baselinesCache = await fetchJSON("/api/baselines");
+  } catch (err) {
+    console.error("Failed to load baselines:", err);
+    baselinesCache = {};
+  }
+}
 
 async function loadDatasets() {
   try {
@@ -708,9 +726,13 @@ async function loadDatasetDetails(name, split) {
     ]);
 
     // Show info
+    const baselinePin = baselinesCache[name];
     safeInnerHTML(els.datasetInfo,  `
       <h3>${escapeHtml(info.name)}</h3>
       <p><strong>Version:</strong> ${escapeHtml(info.version)} &nbsp;|&nbsp; <strong>Task:</strong> ${escapeHtml(info.task)} &nbsp;|&nbsp; <strong>License:</strong> ${escapeHtml(info.license)}</p>
+      <p><strong>Baseline:</strong> ${baselinePin
+        ? `${escapeHtml(baselinePin.run_id)}${baselinePin.provider ? ` · ${escapeHtml(baselinePin.provider)}` : ""}`
+        : "none pinned — open a run and choose “Vs baseline” to pin one"}</p>
       <p><strong>Families:</strong> ${info.families.map(f => `<span style="background:var(--bg-input);padding:0.1rem 0.4rem;border-radius:4px;font-size:0.75rem;border:1px solid var(--border);">${escapeHtml(f)}</span>`).join(" ")}</p>
       <p><strong>Splits:</strong> ${Object.entries(info.splits).map(([s, c]) => `${escapeHtml(s)}: ${c}`).join(", ")}</p>
     `);
@@ -921,6 +943,172 @@ els.btnPromptUse.addEventListener("click", () => {
   }
 });
 
+// ---------- Regression vs baseline ----------
+
+// Metrics where a smaller number is the win: latency, cost, error counts.
+const LOWER_IS_BETTER = /latency|cost|error|invalid|false_match|false_negative|tokens|usd|duration|_ms/i;
+
+const VERDICT_LABELS = {
+  regressed: "Regressed",
+  improved: "Improved",
+  added: "New case",
+  removed: "No longer present",
+  unchanged_correct: "Still correct",
+  unchanged_wrong: "Still wrong",
+};
+
+async function loadCurrentRegression() {
+  if (!currentRun) return null;
+  if (!currentRun.regression) {
+    currentRun.regression = await fetchJSON(`/api/runs/${currentRun.path}/regression`);
+  }
+  return currentRun.regression;
+}
+
+function renderRegression(container, data) {
+  const counts = data.counts || {};
+  const verdictText = {
+    improved: "Beats baseline",
+    regressed: "Worse than baseline",
+    unchanged: "Matches baseline",
+  }[data.verdict] || data.verdict;
+
+  // Hide only metrics that genuinely did not move; a metric present on one
+  // side alone (delta null) still matters — that is a new or vanished error.
+  const metricRows = Object.entries(data.metrics || {})
+    .filter(([, m]) => m.delta !== 0)
+    .sort((a, b) => Math.abs(b[1].delta ?? 0) - Math.abs(a[1].delta ?? 0))
+    .map(([name, m]) => {
+      // Colour follows meaning, not arithmetic: a latency that grew is bad,
+      // an accuracy that grew is good.
+      const lowerIsBetter = LOWER_IS_BETTER.test(name);
+      const good = m.delta > 0 ? !lowerIsBetter : lowerIsBetter;
+      const tone = m.delta === 0 || m.delta == null ? "" : (good ? "delta-up" : "delta-down");
+      return `
+      <tr>
+        <td class="code-mono">${escapeHtml(name)}</td>
+        <td class="num">${formatMetric(name, m.baseline)}</td>
+        <td class="num">${formatMetric(name, m.candidate)}</td>
+        <td class="num ${tone}">${m.delta > 0 ? "+" : ""}${formatMetric(name, m.delta)}</td>
+      </tr>`;
+    }).join("");
+
+  const flipped = (data.cases || []).filter(c =>
+    c.verdict === "regressed" || c.verdict === "improved" || c.verdict === "removed" || c.verdict === "added");
+  const caseRows = flipped.slice(0, 200).map(c => `
+    <tr class="case-delta case-delta--${escapeAttr(c.verdict)}">
+      <td class="code-mono">${escapeHtml(c.case_id)}</td>
+      <td><span class="verdict-badge verdict-badge--${escapeAttr(c.verdict)}">${escapeHtml(VERDICT_LABELS[c.verdict] || c.verdict)}</span></td>
+      <td>${c.scenario_family ? escapeHtml(c.scenario_family) : "—"}</td>
+      <td class="num">${c.baseline_correct == null ? "—" : (c.baseline_correct ? "correct" : "wrong")}</td>
+      <td class="num">${c.candidate_correct == null ? "—" : (c.candidate_correct ? "correct" : "wrong")}</td>
+    </tr>`).join("");
+
+  const unreadable = data.unreadable || {};
+  const degraded = (unreadable.baseline || 0) + (unreadable.candidate || 0);
+
+  container.innerHTML = `
+    <div class="trace-summary">
+      <span class="trace-chip ${data.verdict === "regressed" ? "trace-chip--error" : ""}"><b>${escapeHtml(verdictText)}</b></span>
+      <span class="trace-chip"><b>${counts.improved || 0}</b> improved</span>
+      <span class="trace-chip ${counts.regressed ? "trace-chip--error" : ""}"><b>${counts.regressed || 0}</b> regressed</span>
+      <span class="trace-chip"><b>${counts.unchanged_correct || 0}</b> still correct</span>
+      <span class="trace-chip"><b>${counts.unchanged_wrong || 0}</b> still wrong</span>
+      <span class="trace-chip">vs <b>${escapeHtml(data.baseline_run)}</b></span>
+      ${degraded ? `<span class="trace-chip trace-chip--error"><b>${degraded}</b> unreadable lines</span>` : ""}
+    </div>
+
+    ${metricRows ? `<table class="data-table regression-table">
+      <thead><tr><th>Metric</th><th class="num">Baseline</th><th class="num">Candidate</th><th class="num">Δ</th></tr></thead>
+      <tbody>${metricRows}</tbody>
+    </table>` : '<p class="modal-empty">No metric moved between these runs.</p>'}
+
+    ${caseRows ? `<table class="data-table regression-table">
+      <thead><tr><th>Case</th><th>Change</th><th>Family</th><th class="num">Baseline</th><th class="num">Candidate</th></tr></thead>
+      <tbody>${caseRows}</tbody>
+    </table>${flipped.length > 200 ? `<p class="modal-empty">Showing 200 of ${flipped.length} changed cases.</p>` : ""}`
+      : '<p class="modal-empty">No cases changed sides — every case kept its verdict.</p>'}
+
+    <div class="button-group regression-actions">
+      <button class="button" id="btn-regression-pin">Pin this run as baseline</button>
+      <button class="button button--quiet" id="btn-regression-clear">Clear baseline pin</button>
+    </div>
+    <div id="regression-message" class="message"></div>`;
+
+  container.querySelector("#btn-regression-pin").addEventListener("click", pinCurrentRunAsBaseline);
+  container.querySelector("#btn-regression-clear").addEventListener("click", clearCurrentBaseline);
+}
+
+function renderRegressionEmpty(container, reason) {
+  // The API's message names HTTP endpoints; a person wants the next step.
+  const friendly = /no baseline pinned/i.test(reason)
+    ? "No baseline pinned for this dataset yet. Pin this run (or an earlier one) below and the comparison appears immediately."
+    : reason;
+  container.innerHTML = `
+    <p class="modal-empty">${escapeHtml(friendly)}</p>
+    <div class="button-group regression-actions">
+      <button class="button button--primary" id="btn-regression-pin">Pin this run as baseline</button>
+    </div>
+    <div id="regression-message" class="message"></div>`;
+  container.querySelector("#btn-regression-pin").addEventListener("click", pinCurrentRunAsBaseline);
+}
+
+async function pinCurrentRunAsBaseline() {
+  if (!currentRun || !currentRun.dataset) {
+    setMessage(document.getElementById("regression-message"), "This run has no dataset recorded.", "error");
+    return;
+  }
+  try {
+    await fetchJSON("/api/baselines", {
+      method: "POST",
+      body: JSON.stringify({ dataset: currentRun.dataset, run_id: currentRun.path }),
+    });
+    currentRun.regression = null;
+    await loadBaselines();
+    await showModalRegression();
+  } catch (err) {
+    setMessage(document.getElementById("regression-message"), `Pin failed: ${err.message}`, "error");
+  }
+}
+
+async function clearCurrentBaseline() {
+  if (!currentRun || !currentRun.dataset) return;
+  try {
+    await fetchJSON(`/api/baselines/${encodeURIComponent(currentRun.dataset)}`, { method: "DELETE" });
+    currentRun.regression = null;
+    await loadBaselines();
+    await showModalRegression();
+  } catch (err) {
+    setMessage(document.getElementById("regression-message"), `Clear failed: ${err.message}`, "error");
+  }
+}
+
+function formatMetric(name, value) {
+  if (value == null) return "—";
+  if (/rate|score|f1|accuracy|recall|precision|validity|valid/i.test(name) && Math.abs(value) <= 1) {
+    return (value * 100).toFixed(2) + "%";
+  }
+  if (/(_ms|mean_ms)$/.test(name)) return value.toFixed(1) + " ms";
+  if (Number.isInteger(value)) return String(value);
+  return value.toFixed(3);
+}
+
+async function showModalRegression() {
+  if (!currentRun) return;
+  // Comparison tables need the horizontal scroll the predictions view uses.
+  els.runModalBody.classList.add("modal-body--table");
+  els.btnModalReport.classList.remove("is-active");
+  els.btnModalPredictions.classList.remove("is-active");
+  els.btnModalTrace.classList.remove("is-active");
+  els.btnModalRegression.classList.add("is-active");
+  els.runModalBody.innerHTML = '<p class="modal-empty">Loading comparison…</p>';
+  try {
+    renderRegression(els.runModalBody, await loadCurrentRegression());
+  } catch (err) {
+    renderRegressionEmpty(els.runModalBody, `No baseline comparison yet: ${err.message}`);
+  }
+}
+
 // ---------- Runs (card-based UI) ----------
 
 async function loadRuns() {
@@ -1018,6 +1206,8 @@ function openRunModal(runPath, run, report) {
     markdown: (report && report.markdown) || "",
     html: (report && report.html) || "",
     predictions: null,
+    regression: null,
+    dataset: dataset.name || "",
   };
 
   els.runModalTitle.textContent = (run && run.run_id) || runPath.replace(/^runs\//, "");
@@ -1056,6 +1246,7 @@ function showModalReport() {
   els.btnModalReport.classList.add("is-active");
   els.btnModalPredictions.classList.remove("is-active");
   els.btnModalTrace.classList.remove("is-active");
+  els.btnModalRegression.classList.remove("is-active");
 }
 
 async function loadCurrentPredictions() {
@@ -1072,6 +1263,7 @@ async function showModalPredictions() {
   els.btnModalReport.classList.remove("is-active");
   els.btnModalPredictions.classList.add("is-active");
   els.btnModalTrace.classList.remove("is-active");
+  els.btnModalRegression.classList.remove("is-active");
   els.runModalBody.innerHTML = '<p class="modal-empty">Loading predictions…</p>';
   try {
     renderPredictionsTable(els.runModalBody, await loadCurrentPredictions());
@@ -1174,6 +1366,7 @@ async function showModalTrace() {
   els.btnModalReport.classList.remove("is-active");
   els.btnModalPredictions.classList.remove("is-active");
   els.btnModalTrace.classList.add("is-active");
+  els.btnModalRegression.classList.remove("is-active");
   els.runModalBody.innerHTML = '<p class="modal-empty">Loading trace…</p>';
   try {
     renderTrace(els.runModalBody, await loadCurrentTrace());
@@ -1195,6 +1388,7 @@ function downloadBlob(filename, content, type) {
 els.btnModalReport.addEventListener("click", showModalReport);
 els.btnModalPredictions.addEventListener("click", showModalPredictions);
 els.btnModalTrace.addEventListener("click", showModalTrace);
+els.btnModalRegression.addEventListener("click", showModalRegression);
 
 els.btnModalDownloadReport.addEventListener("click", () => {
   if (!currentRun) return;
@@ -1780,6 +1974,7 @@ async function init() {
       'config-editor-select', 'config-editor', 'config-editor-loading',
       'btn-save-config', 'btn-reset-config', 'config-message',
       'btn-modal-trace',
+      'btn-modal-regression',
       'prompt-select', 'prompt-version-select', 'prompt-name-input',
       'prompt-meta', 'prompt-body-editor', 'btn-prompt-save',
       'btn-prompt-use', 'btn-prompt-create', 'prompt-message',
@@ -1809,6 +2004,8 @@ async function init() {
     dlog('Configs loaded');
     await loadPromptRegistry();
     dlog('Prompt registry loaded');
+    await loadBaselines();
+    dlog('Baselines loaded');
     await loadDatasets();
     dlog('Datasets loaded');
     await loadRuns();
