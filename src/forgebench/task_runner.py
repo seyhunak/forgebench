@@ -22,6 +22,13 @@ from .schemas import (
     PredictionRecord,
 )
 from .tasks import load_task_with_cases
+from .tracing import (
+    SPAN_PROVIDER_CALL,
+    SPAN_SCORE,
+    TRACE_FILENAME,
+    SpanProxyProvider,
+    TraceRecorder,
+)
 
 
 @dataclass
@@ -98,57 +105,101 @@ def run_task_experiment(
             judge_instance = None
 
     records: list[PredictionRecord] = []
+    recorder = TraceRecorder()
     start = time.perf_counter()
     total = len(cases)
 
     for index, case in enumerate(cases, start=1):
         prompt = _build_task_prompt(task, case)
-        try:
-            response = provider_inst.predict_text(prompt)  # type: ignore[attr-defined]
-        except Exception as exc:
-            records.append(
-                PredictionRecord(
-                    case_id=case.id,
-                    scenario_family="custom",
-                    ok=False,
-                    category=None,
-                    requires_review=None,
-                    expected_category=Category.MATCHED,
-                    expected_requires_review=False,
-                    correct=None,
-                    raw_content=str(exc),
-                    error_kind="provider_error",
+        with recorder.case(case.id) as trace:
+            call_started = time.perf_counter()
+            try:
+                response = provider_inst.predict_text(prompt)  # type: ignore[attr-defined]
+            except Exception as exc:
+                trace.add(
+                    SPAN_PROVIDER_CALL,
+                    (time.perf_counter() - call_started) * 1000.0,
                     error=str(exc),
-                    latency_ms=0.0,
+                    detail={"provider": provider, "model": provider_inst.model or provider},
                 )
-            )
-        else:
-            score_result = _score_task_output(
-                task,
-                case.expected,
-                response.content,
-                judge_provider=judge_instance,
-                case_input=case.input,
-                task_case=case,
-            )
-            records.append(
-                PredictionRecord(
-                    case_id=case.id,
-                    scenario_family="custom",
-                    ok=score_result["ok"],
-                    category=None,
-                    requires_review=None,
-                    expected_category=Category.MATCHED,
-                    expected_requires_review=False,
-                    correct=score_result["ok"],
-                    raw_content=response.content,
-                    error_kind=None,
-                    error=None,
-                    latency_ms=response.latency_ms,
-                    input_tokens=response.input_tokens,
-                    output_tokens=response.output_tokens,
+                records.append(
+                    PredictionRecord(
+                        case_id=case.id,
+                        scenario_family="custom",
+                        ok=False,
+                        category=None,
+                        requires_review=None,
+                        expected_category=Category.MATCHED,
+                        expected_requires_review=False,
+                        correct=None,
+                        raw_content=str(exc),
+                        error_kind="provider_error",
+                        error=str(exc),
+                        latency_ms=0.0,
+                    )
                 )
-            )
+            else:
+                trace.add(
+                    SPAN_PROVIDER_CALL,
+                    (time.perf_counter() - call_started) * 1000.0,
+                    detail={
+                        "provider": provider,
+                        "model": provider_inst.model or provider,
+                        "reported_ms": round(response.latency_ms, 3),
+                        "input_tokens": response.input_tokens,
+                        "output_tokens": response.output_tokens,
+                    },
+                )
+                # The judge runs *inside* scoring, so its span must be
+                # subtracted from the score span or the waterfall double-counts.
+                judge_ms = [0.0]
+                judge_for_case = (
+                    SpanProxyProvider(
+                        judge_instance,
+                        trace,
+                        # Default-arg binding keeps this lambda tied to this
+                        # case's accumulator rather than a later loop value.
+                        on_ms=lambda ms, acc=judge_ms: acc.__setitem__(0, acc[0] + ms),
+                    )
+                    if judge_instance is not None
+                    else None
+                )
+                score_started = time.perf_counter()
+                score_result = _score_task_output(
+                    task,
+                    case.expected,
+                    response.content,
+                    judge_provider=judge_for_case,
+                    case_input=case.input,
+                    task_case=case,
+                )
+                score_elapsed = (time.perf_counter() - score_started) * 1000.0
+                trace.add(
+                    SPAN_SCORE,
+                    max(0.0, score_elapsed - judge_ms[0]),
+                    detail={
+                        "ok": score_result["ok"],
+                        "judge_ms": round(judge_ms[0], 3),
+                    },
+                )
+                records.append(
+                    PredictionRecord(
+                        case_id=case.id,
+                        scenario_family="custom",
+                        ok=score_result["ok"],
+                        category=None,
+                        requires_review=None,
+                        expected_category=Category.MATCHED,
+                        expected_requires_review=False,
+                        correct=score_result["ok"],
+                        raw_content=response.content,
+                        error_kind=None,
+                        error=None,
+                        latency_ms=response.latency_ms,
+                        input_tokens=response.input_tokens,
+                        output_tokens=response.output_tokens,
+                    )
+                )
         if on_progress:
             on_progress(index, total)
 
@@ -160,6 +211,7 @@ def run_task_experiment(
 
     predictions_text = "".join(r.model_dump_json() + "\n" for r in records)
     (run_dir / "predictions.jsonl").write_text(predictions_text, encoding="utf-8")
+    recorder.write(run_dir)
     (run_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     manifest = {
         "run_id": run_id,
@@ -168,6 +220,7 @@ def run_task_experiment(
         "split": split,
         "provider": {"name": provider, "model": provider_inst.model or provider},
         "n_cases": len(cases),
+        "trace": {"file": TRACE_FILENAME, "n_cases": total},
         "created_at_utc": created_at.isoformat(timespec="seconds"),
         "duration_seconds": round(time.perf_counter() - start, 3),
     }

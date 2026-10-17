@@ -120,11 +120,6 @@ def mock_config(selected_provider: str) -> ExperimentConfig:
         evaluation=EvaluationSection(metrics=["accuracy", "macro_f1", "schema_validity"]),
     )
 
-@pytest.fixture()
-def mock_provider() -> str:
-    """Override to use the provider selected for the test run."""
-    return "openrouter"
-
 
 def make_record(
     expected: Category,

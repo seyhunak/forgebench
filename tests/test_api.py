@@ -254,3 +254,40 @@ def test_setup_never_offers_the_mock_provider() -> None:
     from forgebench.api import list_env
 
     assert "mock" not in [p["provider"] for p in list_env()["providers"]]
+
+
+def test_trace_route_is_registered_before_the_run_catch_all() -> None:
+    """``/trace`` must win over ``/api/runs/{run_id:path}`` or it 404s.
+
+    Routes match in registration order, and ``{run_id:path}`` swallows
+    everything — so the check that matters is which route Starlette actually
+    selects for a GET.
+    """
+    paths = _paths()
+    assert "/api/runs/{run_id:path}/trace" in paths
+    assert _matched("/api/runs/some-run/trace", "GET") == "/api/runs/{run_id:path}/trace"
+
+
+def test_trace_of_an_unknown_run_is_a_404() -> None:
+    from forgebench.api import get_run_trace
+
+    with pytest.raises(HTTPException) as excinfo:
+        get_run_trace("definitely-not-a-run")
+    assert excinfo.value.status_code == 404
+
+
+def test_trace_of_a_run_without_a_trace_file_is_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Runs written before tracing existed degrade to an empty trace, not a 500."""
+    from forgebench import api
+    from forgebench.api import get_run_trace
+
+    run_dir = tmp_path / "legacy-run"
+    run_dir.mkdir()
+    monkeypatch.setattr(api, "_resolve_run_dir", lambda run_id: run_dir)
+
+    payload = get_run_trace("legacy-run")
+
+    assert payload["traces"] == []
+    assert payload["summary"] == {"n_cases": 0}

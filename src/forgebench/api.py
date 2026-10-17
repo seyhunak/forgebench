@@ -46,6 +46,7 @@ from .reporting import load_run, render_comparison, render_report
 from .runner import run_experiment
 from .task_runner import run_task_experiment
 from .tasks import list_tasks, load_task_with_cases, validate_task
+from .tracing import read_traces, summarise_traces
 
 _run_state: dict[str, dict[str, Any]] = {}
 
@@ -734,6 +735,21 @@ def get_run_predictions(run_id: str) -> list[dict[str, Any]]:
 
     records = read_predictions(run_dir)
     return [r.model_dump() for r in records]
+
+
+@app.get("/api/runs/{run_id:path}/trace")
+def get_run_trace(run_id: str) -> dict[str, Any]:
+    """Per-case span waterfall: how each case spent its wall-clock time.
+
+    Runs written before tracing existed have no ``trace.jsonl``; they return an
+    empty list rather than a 404 so the modal's Trace tab degrades gracefully.
+    """
+    run_dir = _resolve_run_dir(run_id)
+    if run_dir is None:
+        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+
+    traces = read_traces(run_dir)
+    return {"run_id": run_id, "summary": summarise_traces(traces), "traces": traces}
 
 
 @app.get("/api/runs/{run_id:path}")

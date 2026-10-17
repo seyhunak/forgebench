@@ -67,6 +67,7 @@ const els = {
   btnModalClose: document.getElementById("btn-modal-close"),
   btnModalReport: document.getElementById("btn-modal-report"),
   btnModalPredictions: document.getElementById("btn-modal-predictions"),
+  btnModalTrace: document.getElementById("btn-modal-trace"),
   btnModalDownloadReport: document.getElementById("btn-modal-download-report"),
   btnModalDownloadPredictions: document.getElementById("btn-modal-download-predictions"),
   modeSingle: document.getElementById("mode-single"),
@@ -925,6 +926,7 @@ function showModalReport() {
   els.runModalBody.innerHTML = (currentRun && currentRun.html) || (currentRun && currentRun.markdown) || "(no report)";
   els.btnModalReport.classList.add("is-active");
   els.btnModalPredictions.classList.remove("is-active");
+  els.btnModalTrace.classList.remove("is-active");
 }
 
 async function loadCurrentPredictions() {
@@ -940,11 +942,114 @@ async function showModalPredictions() {
   els.runModalBody.classList.add("modal-body--table");
   els.btnModalReport.classList.remove("is-active");
   els.btnModalPredictions.classList.add("is-active");
+  els.btnModalTrace.classList.remove("is-active");
   els.runModalBody.innerHTML = '<p class="modal-empty">Loading predictions…</p>';
   try {
     renderPredictionsTable(els.runModalBody, await loadCurrentPredictions());
   } catch (err) {
     els.runModalBody.innerHTML = `<p class="modal-empty">Failed to load predictions: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+// ---------- Trace waterfall ----------
+
+const SPAN_LABELS = {
+  provider_call: "Provider call",
+  score: "Parse & score",
+  judge: "Judge",
+  prompt_build: "Prompt build",
+};
+
+async function loadCurrentTrace() {
+  if (!currentRun) return null;
+  if (!currentRun.trace) {
+    currentRun.trace = await fetchJSON(`/api/runs/${currentRun.path}/trace`);
+  }
+  return currentRun.trace;
+}
+
+function fmtMs(value) {
+  const ms = Number(value) || 0;
+  return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms.toFixed(1)} ms`;
+}
+
+function spanLabel(name) {
+  return SPAN_LABELS[name] || name;
+}
+
+function renderTrace(container, data) {
+  const traces = (data && data.traces) || [];
+  const summary = (data && data.summary) || {};
+  if (!traces.length) {
+    container.innerHTML = '<p class="modal-empty">No trace recorded for this run (it predates tracing, or every case was skipped).</p>';
+    return;
+  }
+
+  const spanChips = Object.entries(summary.spans || {})
+    .map(([name, stat]) => `<span class="trace-chip"><b>${escapeHtml(spanLabel(name))}</b> ${fmtMs(stat.mean_ms)} avg · ${stat.count} calls</span>`)
+    .join("");
+
+  let html = `
+    <div class="trace-summary">
+      <span class="trace-chip"><b>${summary.n_cases}</b> cases</span>
+      <span class="trace-chip"><b>${fmtMs(summary.mean_ms)}</b> mean</span>
+      <span class="trace-chip"><b>${fmtMs(summary.p95_ms)}</b> p95</span>
+      <span class="trace-chip"><b>${fmtMs(summary.total_ms)}</b> total</span>
+      ${summary.errors ? `<span class="trace-chip trace-chip--error"><b>${summary.errors}</b> failed</span>` : ""}
+      ${spanChips}
+    </div>
+    <div class="trace-list">`;
+
+  // One global scale so a slow case is visibly wider than a fast one.
+  const scale = Math.max(1, ...traces.map(t => t.total_ms || 0));
+  for (const trace of traces) {
+    const segments = (trace.spans || []).map((span, index) => {
+      const width = Math.max(1.2, ((span.duration_ms || 0) / scale) * 100);
+      const title = `${spanLabel(span.name)} · ${fmtMs(span.duration_ms)}${span.status === "error" ? " · ERROR" : ""}`;
+      return `<span class="trace-seg trace-seg--${escapeAttr(span.name)}${span.status === "error" ? " is-error" : ""}" style="width:${width}%" title="${escapeAttr(title)}" data-span-index="${index}"></span>`;
+    }).join("");
+
+    const errors = (trace.spans || []).filter(sp => sp.status === "error");
+    html += `
+      <div class="trace-row${errors.length ? " trace-row--error" : ""}" tabindex="0" role="button" aria-expanded="false">
+        <span class="trace-case">${escapeHtml(trace.case_id)}</span>
+        <span class="trace-bars">${segments}</span>
+        <span class="trace-total">${fmtMs(trace.total_ms)}</span>
+      </div>
+      <div class="trace-detail" hidden>${errors.map(sp => `<p><b>${escapeHtml(spanLabel(sp.name))}</b> failed: <code>${escapeHtml((sp.detail && sp.detail.error) || "unknown error")}</code></p>`).join("")}
+        <ul>${(trace.spans || []).map(sp => `<li><b>${escapeHtml(spanLabel(sp.name))}</b> — ${fmtMs(sp.duration_ms)}${sp.detail && sp.detail.input_tokens != null ? ` · ${sp.detail.input_tokens} in / ${sp.detail.output_tokens ?? "?"} out` : ""}${sp.detail && sp.detail.error ? ` · <code>${escapeHtml(sp.detail.error)}</code>` : ""}</li>`).join("")}</ul>
+      </div>`;
+  }
+  html += "</div>";
+  container.innerHTML = html;
+
+  container.querySelectorAll(".trace-row").forEach(row => {
+    const toggle = () => {
+      const detail = row.nextElementSibling;
+      if (!detail) return;
+      const open = detail.hasAttribute("hidden");
+      detail.toggleAttribute("hidden", !open);
+      row.classList.toggle("is-open", open);
+      row.setAttribute("aria-expanded", String(open));
+    };
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(); }
+    });
+  });
+}
+
+async function showModalTrace() {
+  if (!currentRun) return;
+  els.runModalBody.classList.remove("modal-body--table");
+  els.btnModalReport.classList.remove("is-active");
+  els.btnModalPredictions.classList.remove("is-active");
+  els.btnModalTrace.classList.add("is-active");
+  els.runModalBody.innerHTML = '<p class="modal-empty">Loading trace…</p>';
+  try {
+    renderTrace(els.runModalBody, await loadCurrentTrace());
+  } catch (err) {
+    els.runModalBody.innerHTML = `<p class="modal-empty">Failed to load trace: ${escapeHtml(err.message)}</p>`;
   }
 }
 
@@ -960,6 +1065,7 @@ function downloadBlob(filename, content, type) {
 
 els.btnModalReport.addEventListener("click", showModalReport);
 els.btnModalPredictions.addEventListener("click", showModalPredictions);
+els.btnModalTrace.addEventListener("click", showModalTrace);
 
 els.btnModalDownloadReport.addEventListener("click", () => {
   if (!currentRun) return;

@@ -27,6 +27,7 @@ from .providers.base import ModelProvider, ProviderError
 from .registry import DatasetInfo, default_datasets_root, load_dataset, load_split
 from .reporting import ensure_dir, render_report, write_json, write_predictions
 from .schemas import BenchmarkCase, Category, PredictionRecord
+from .tracing import SPAN_PROVIDER_CALL, SPAN_SCORE, TRACE_FILENAME, TraceRecorder
 
 
 @dataclass
@@ -219,23 +220,52 @@ def run_experiment(
 
     provider = _make_provider(config, examples)
 
+    recorder = TraceRecorder()
     records: list[PredictionRecord] = []
     total = len(cases)
     for index, case in enumerate(cases, start=1):
-        try:
-            response = provider.predict(case)
-        except ProviderError as exc:
-            records.append(_provider_failure_record(case, exc))
-        else:
-            records.append(
-                score_case(
+        with recorder.case(case.id) as trace:
+            call_started = time.perf_counter()
+            try:
+                response = provider.predict(case)
+            except ProviderError as exc:
+                trace.add(
+                    SPAN_PROVIDER_CALL,
+                    (time.perf_counter() - call_started) * 1000.0,
+                    error=str(exc),
+                    detail={"provider": provider.name, "model": provider.model},
+                )
+                records.append(_provider_failure_record(case, exc))
+            else:
+                trace.add(
+                    SPAN_PROVIDER_CALL,
+                    (time.perf_counter() - call_started) * 1000.0,
+                    detail={
+                        "provider": provider.name,
+                        "model": provider.model,
+                        "reported_ms": round(response.latency_ms, 3),
+                        "input_tokens": response.input_tokens,
+                        "output_tokens": response.output_tokens,
+                    },
+                )
+                score_started = time.perf_counter()
+                record = score_case(
                     case,
                     response.content,
                     response.latency_ms,
                     response.input_tokens,
                     response.output_tokens,
                 )
-            )
+                trace.add(
+                    SPAN_SCORE,
+                    (time.perf_counter() - score_started) * 1000.0,
+                    detail={
+                        "ok": record.ok,
+                        "correct": record.correct,
+                        "error_kind": record.error_kind,
+                    },
+                )
+                records.append(record)
         if on_progress:
             on_progress(index, total)
 
@@ -268,12 +298,14 @@ def run_experiment(
             "git_sha": _git_sha(Path(__file__).resolve().parents[2]),
         },
         "few_shot_examples": len(examples),
+        "trace": {"file": TRACE_FILENAME, "n_cases": total},
         "command": " ".join(sys.argv) or None,
     }
 
     write_predictions(records, run_dir / "predictions.jsonl")
     write_json(metrics, run_dir / "metrics.json")
     write_json(manifest, run_dir / "manifest.json")
+    recorder.write(run_dir)
     (run_dir / "report.md").write_text(render_report(manifest, metrics, records), encoding="utf-8")
 
     return RunResult(
