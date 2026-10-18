@@ -1570,9 +1570,10 @@ els.btnRun.addEventListener("click", async () => {
   }
 });
 
-function populateRunModels(providerId) {
+async function populateRunModels(providerId) {
   let models = {};
   if (providerId === "ollama") {
+    await fetchOllamaStatus(true); // force refresh
     models = ollamaModelMap();
     if (!Object.keys(models).length) {
       safeInnerHTML(els.runModel, '<option value="">(start Ollama to list local models)</option>');
