@@ -44,6 +44,8 @@ const els = {
   setupValue: document.getElementById("setup-value"),
   btnSetupAdd: document.getElementById("btn-setup-add"),
   configSelect: document.getElementById("config-select"),
+  runProvider: document.getElementById("run-provider"),
+  runModel: document.getElementById("run-model"),
   runLimit: document.getElementById("run-limit"),
   runId: document.getElementById("run-id"),
   btnRun: document.getElementById("btn-run"),
@@ -1504,6 +1506,8 @@ let progressInterval = null;
 
 els.btnRun.addEventListener("click", async () => {
   const config = els.configSelect.value;
+  const provider = els.runProvider.value.trim() || undefined;
+  const model = els.runModel.value.trim() || undefined;
   const limit = parseInt(els.runLimit.value, 10) || undefined;
   const runId = els.runId.value.trim() || undefined;
 
@@ -1521,7 +1525,7 @@ els.btnRun.addEventListener("click", async () => {
 
     const data = await fetchJSON("/api/run", {
       method: "POST",
-      body: JSON.stringify({ config, limit, run_id: runId }),
+      body: JSON.stringify({ config, provider, model, limit, run_id: runId }),
     });
 
     const runIdRes = data.run_id;
@@ -2078,7 +2082,7 @@ async function init() {
     // Verify critical DOM elements exist
     const critical = ['key-provider', 'key-input', 'model-select', 'model-details',
       'btn-save-key', 'btn-verify-key', 'btn-remove-key', 'key-message',
-      'config-select', 'run-limit', 'run-id', 'btn-run', 'run-message',
+      'config-select', 'run-provider', 'run-model', 'run-limit', 'run-id', 'btn-run', 'run-message',
       'runs-grid', 'run-modal', 'run-modal-title', 'run-modal-meta', 'run-modal-body',
       'btn-modal-close', 'btn-modal-report', 'btn-modal-predictions',
       'btn-modal-download-report', 'btn-modal-download-predictions',

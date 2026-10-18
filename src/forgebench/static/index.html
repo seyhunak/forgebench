@@ -301,6 +301,25 @@
             <select id="config-select"></select>
           </div>
           <div class="form-field">
+            <label class="form-label">Provider (override)</label>
+            <select id="run-provider">
+              <option value="">(use config default)</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="mistral">Mistral</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="google">Google</option>
+              <option value="ollama">Ollama</option>
+              <option value="mock">Mock (offline)</option>
+            </select>
+            <span class="field-hint">Overrides the provider in the config.</span>
+          </div>
+          <div class="form-field">
+            <label class="form-label">Model (override)</label>
+            <input type="text" id="run-model" placeholder="e.g. openai/gpt-4o-mini">
+            <span class="field-hint">Overrides the model in the config.</span>
+          </div>
+          <div class="form-field">
             <label class="form-label">Case limit</label>
             <input type="number" id="run-limit" placeholder="0 = full split" min="0">
             <span class="field-hint">Leave 0 for the entire split.</span>
