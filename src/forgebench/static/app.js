@@ -333,6 +333,7 @@ async function loadProvidersAndModels() {
     // OpenRouter is the default provider — one key, every hosted model.
     selectOption(els.keyProvider, "openrouter");
     populateModels(els.keyProvider.value);
+    populateRunModels(els.runProvider.value);
   } catch (err) {
     setMessage(els.keyMessage, `Failed to load providers: ${err.message}`, "error");
   }
@@ -1569,17 +1570,28 @@ els.btnRun.addEventListener("click", async () => {
   }
 });
 
-function showRunResult(result) {
-  show(els.runResult);
-  els.resRunId.textContent = result.run_id;
-  const m = result.metrics || {};
-  els.resAccuracy.textContent = m.accuracy != null ? (m.accuracy * 100).toFixed(1) + "%" : "—";
-  els.resMacroF1.textContent = m.macro_f1 != null ? (m.macro_f1 * 100).toFixed(1) + "%" : "—";
-  els.resSchemaValidity.textContent = m.schema_validity != null ? (m.schema_validity * 100).toFixed(1) + "%" : "—";
-  els.btnOpenRun.onclick = () => {
-    viewRunReport(result.run_id);
-  };
+function populateRunModels(providerId) {
+  let models = {};
+  if (providerId === "ollama") {
+    models = ollamaModelMap();
+    if (!Object.keys(models).length) {
+      safeInnerHTML(els.runModel, '<option value="">(start Ollama to list local models)</option>');
+      els.runModel.value = "";
+      return;
+    }
+  } else if (modelsData && modelsData[providerId]) {
+    models = modelsData[providerId].models || {};
+  }
+  safeInnerHTML(els.runModel, '<option value="">(use config default)</option>' + Object.values(models)
+    .map(m => `<option value="${m.id}">${m.name || m.id}</option>`)
+    .join(""));
+  const preferred = preferredModel(providerId, models);
+  if (preferred) els.runModel.value = preferred;
 }
+
+els.runProvider.addEventListener("change", () => {
+  populateRunModels(els.runProvider.value);
+});
 
 // ---------- Mode toggle ----------
 

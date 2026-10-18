@@ -310,14 +310,15 @@
               <option value="anthropic">Anthropic</option>
               <option value="google">Google</option>
               <option value="ollama">Ollama</option>
-              <option value="mock">Mock (offline)</option>
             </select>
             <span class="field-hint">Overrides the provider in the config.</span>
           </div>
           <div class="form-field">
             <label class="form-label">Model (override)</label>
-            <input type="text" id="run-model" placeholder="e.g. openai/gpt-4o-mini">
-            <span class="field-hint">Overrides the model in the config.</span>
+            <select id="run-model">
+              <option value="">(use config default)</option>
+            </select>
+            <span class="field-hint">Overrides the model in the config. Options update when provider changes.</span>
           </div>
           <div class="form-field">
             <label class="form-label">Case limit</label>
