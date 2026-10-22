@@ -1,0 +1,24 @@
+{
+  "name": "forgebench-pitch-20s",
+  "private": true,
+  "description": "ForgeBench 20s pitch demo — video-shotcraft autonomous build",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts ForgeBench20s out/promo.mp4",
+    "render:nobgm": "remotion render src/index.ts ForgeBench20s out/promo-nobgm.mp4 --props=props-nobgm.json",
+    "still": "remotion still src/index.ts ForgeBench20s out/qa/frame.png"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.1.0",
+    "@fontsource/jetbrains-mono": "^5.1.0",
+    "@fontsource/space-grotesk": "^5.1.0",
+    "@remotion/cli": "4.0.245",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "4.0.245"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.6.0"
+  }
+}

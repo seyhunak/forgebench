@@ -485,7 +485,9 @@ def task_validate_cmd(
 
 @app.command("task-run")
 def task_run_cmd(
-    name: str = typer.Argument(..., help="Task name to run."),
+    name: str | None = typer.Argument(
+        None, help="Task name to run. Omit (or pass --all) to run every task."
+    ),
     split: str = typer.Option("test", "--split", help="Dataset split to evaluate."),
     provider: str = typer.Option(
         DEFAULT_PROVIDER,
@@ -500,6 +502,14 @@ def task_run_cmd(
             'Comma-separated model ids to compare, e.g. "model-a,model-b". '
             "Adds a comparison matrix run on top of each single run."
         ),
+    ),
+    tasks: str = typer.Option(
+        "",
+        "--tasks",
+        help='Comma-separated task names to run (e.g. "email_classification,ticket_triage").',
+    ),
+    all_tasks: bool = typer.Option(
+        False, "--all", "--all-tasks", help="Run every available task under --tasks-root."
     ),
     limit: int | None = typer.Option(
         None, "--limit", min=1, help="Evaluate only the first N cases."
@@ -534,6 +544,9 @@ def task_run_cmd(
         return str(getattr(value, "default", default) or default)
 
     models = _as_text(models, "")
+    tasks = _as_text(tasks, "")
+    if not isinstance(all_tasks, bool):
+        all_tasks = bool(getattr(all_tasks, "default", False))
     judge_provider = _as_text(judge_provider, "")
     judge_model = _as_text(judge_model, "")
     if tasks_root is not None and not isinstance(tasks_root, Path):
@@ -558,37 +571,87 @@ def task_run_cmd(
         if done % 25 == 0 or done == total:
             typer.echo(f"  {done}/{total} cases")
 
-    entries: list[dict[str, Any]] = []
-    for model_id in model_list:
-        try:
-            result = run_task_experiment(
-                name=name,
-                split=split,
-                provider=provider,
-                model=model_id,
-                judge_provider=judge_provider,
-                judge_model=judge_model,
-                limit=limit,
-                tasks_root=tasks_root,
-                output_root=output_root,
-                on_progress=_progress,
-            )
-        except FileNotFoundError as exc:
-            typer.echo(f"error: {exc}", err=True)
-            raise typer.Exit(code=1) from exc
-        entries.append(load_run(str(result.run_dir)))
-        typer.echo(f"\nRun: {result.run_id}")
-        typer.echo(f"Cases: {result.metrics['n_cases']} ({result.metrics['n_valid']} valid)")
-        typer.echo(f"Artifacts: {result.run_dir.resolve()}")
+    # Resolve which tasks to run.
+    from .tasks import list_tasks
 
-    if len(entries) >= 2:
-        comparison = render_comparison(entries)
-        comparison_path = entries[0]["manifest"].get("run_id")
-        out_dir = Path(output_root or Path("runs")) / str(comparison_path)
-        (out_dir / "comparison.md").write_text(comparison, encoding="utf-8")
-        typer.echo("")
-        typer.echo(comparison.rstrip())
-        typer.echo(f"comparison: {(out_dir / 'comparison.md').resolve()}")
+    selected_tasks: list[str] = []
+    if tasks.strip():
+        selected_tasks = [t.strip() for t in tasks.split(",") if t.strip()]
+    elif all_tasks or name is None:
+        selected_tasks = list_tasks(tasks_root)
+    elif name:
+        selected_tasks = [name]
+
+    if not selected_tasks:
+        typer.echo("error: no tasks to run (pass a task name, --tasks, or --all).", err=True)
+        raise typer.Exit(code=1)
+
+    suite_entries: list[dict[str, Any]] = []
+    for task_name in selected_tasks:
+        typer.echo(f"\n=== Task: {task_name} ===")
+        entries: list[dict[str, Any]] = []
+        for model_id in model_list:
+            try:
+                result = run_task_experiment(
+                    name=task_name,
+                    split=split,
+                    provider=provider,
+                    model=model_id,
+                    judge_provider=judge_provider,
+                    judge_model=judge_model,
+                    limit=limit,
+                    tasks_root=tasks_root,
+                    output_root=output_root,
+                    on_progress=_progress,
+                )
+            except FileNotFoundError as exc:
+                typer.echo(f"error: {exc}", err=True)
+                raise typer.Exit(code=1) from exc
+            entries.append(load_run(str(result.run_dir)))
+            suite_entries.append(entries[-1])
+            typer.echo(f"\nRun: {result.run_id}")
+            typer.echo(f"Cases: {result.metrics['n_cases']} ({result.metrics['n_valid']} valid)")
+            typer.echo(f"Artifacts: {result.run_dir.resolve()}")
+
+        if len(entries) >= 2:
+            comparison = render_comparison(entries)
+            comparison_path = entries[0]["manifest"].get("run_id")
+            out_dir = Path(output_root or Path("runs")) / str(comparison_path)
+            (out_dir / "comparison.md").write_text(comparison, encoding="utf-8")
+            typer.echo("")
+            typer.echo(comparison.rstrip())
+            typer.echo(f"comparison: {(out_dir / 'comparison.md').resolve()}")
+
+    # Write a small suite summary when more than one task ran.
+    if len(selected_tasks) > 1:
+        summary_path = Path(output_root or Path("runs")) / "suite_summary.md"
+        lines = ["# ForgeBench operations suite", ""]
+        lines.append("| Task | Run | Model | Cases | Valid | Score |")
+        lines.append("| --- | --- | --- | ---: | ---: | ---: |")
+        for e in suite_entries:
+            m = e["manifest"]
+            met = e["metrics"]
+            score = met.get("accuracy")
+            if score is None:
+                score = met.get("valid_rate")
+            lines.append(
+                f"| {m.get('task')} | `{m.get('run_id')}` | "
+                f"{(m.get('provider') or {}).get('model')} | {met.get('n_cases')} | "
+                f"{met.get('n_valid')} | {'-' if score is None else f'{score:.4f}'} |"
+            )
+        lines.append("")
+        try:
+            summary_path.write_text("\n".join(lines), encoding="utf-8")
+            typer.echo(f"\nsuite summary: {summary_path.resolve()}")
+        except OSError:
+            pass
+
+
+# Automation-friendly aliases for running the whole operations suite.
+app.command("run-suite")(task_run_cmd)
+app.command("run-all")(task_run_cmd)
+app.command("automate")(task_run_cmd)
+app.command("run-tasks")(task_run_cmd)
 
 
 @app.command("run")

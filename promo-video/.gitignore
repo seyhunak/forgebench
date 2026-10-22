@@ -1,0 +1,9 @@
+# Build / render artifacts
+out/
+node_modules/
+.remotion/
+*.mp4
+*.log
+
+# Local capture scratch
+.DS_Store
