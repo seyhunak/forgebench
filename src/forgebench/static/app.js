@@ -441,9 +441,10 @@ async function loadCredentialStatus(provider) {
   try {
     const query = provider ? `?provider=${encodeURIComponent(provider)}` : "";
     const data = await fetchJSON(`/api/credentials${query}`);
+    const providerId = provider || els.keyProvider.value;
     els.statusKey.textContent = data.key_masked || "(not set)";
     els.statusSource.textContent = data.source || "—";
-    els.statusModel.textContent = data.model || "(not set)";
+    els.statusModel.textContent = data.model || PROVIDER_DEFAULT_MODELS[providerId] || "(not set)";
     els.statusFile.textContent = data.env_file || "—";
 
     // With no explicit provider, switch to whichever provider has a key.
