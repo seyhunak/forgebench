@@ -10,11 +10,12 @@ and confidential. It is NOT open-source software, and no open-source
 license applies to it.
 
 1. Grant of use
-   Use of ForgeBench is permitted only under a signed license agreement
-   with the copyright holder, or under one of the published product
-   tiers (see README "Pricing") where no signed agreement exists:
-   evaluating the software internally for a free tier is permitted;
-   any use beyond that is prohibited.
+   A free Community license is granted for internal evaluation and
+   single-user use of unmodified copies. Team-scale deployment,
+   redistribution and any managed or competing service require a signed
+   commercial license agreement with the copyright holder. No commercial
+   licenses are currently on sale; contact the copyright holder for
+   licensing and early-access inquiries.
 
 2. Restrictions
    You may NOT, without a separate signed agreement:

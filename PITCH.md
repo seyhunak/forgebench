@@ -74,12 +74,14 @@ reaches production.
 | Cost per 1,000 cases | Reported directly in every run, comparison and history view from actual token usage with dated model pricing — so budget conversations have numbers attached. |
 | Infrastructure | Flat JSONL/JSON files under `runs/` — nothing to provision, back up or migrate. A run directory is the deployment unit. |
 
-**Commercial model (implemented):** the repo is closed-source under the ForgeBench Commercial License; the self-hosted Community tier stays free for internal evaluation —
+**Commercial model (announced, not yet on sale):** the repo is closed-source under the ForgeBench Commercial License; the self-hosted Community tier is free for internal evaluation — no billing exists today. The intended tiers:
 
 - **Community — free.** The complete self-hosted harness for one user: 9 datasets, 14 tasks, 6 providers, CLI + local dashboard.
 - **Team — $199/seat/month (min. 3).** Shared run storage, multi-user auth with roles, audit log, run annotations, priority support. Early-access buyers shape the shared-backend roadmap.
 - **Enterprise — custom, from $15k/yr.** SSO/OIDC, on-prem/air-gapped appliance packaging, SOC 2-style evidence pack, support SLA, private dataset-pack licensing.
-- **Hosted CI gate — private beta.** Managed baseline-vs-candidate regression gate on every PR; recurring revenue wedge, free for public repos once it launches.
+- **Hosted CI gate — private beta.** Managed baseline-vs-candidate regression gate on every PR; the recurring-revenue wedge, free for public repos once it launches.
+
+Pricing figures on the paid tiers are the intended offer, contingent on the shared-backend build — presented to prospects as roadmap, not as an active order form.
 
 This keeps the free self-hosted tier genuinely usable (adoption engine) while revenue lives where businesses need it: team scale, compliance, and CI automation.
 

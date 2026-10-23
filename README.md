@@ -46,18 +46,20 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 | **Compliance-ready evidence** | Deterministic synthetic ground truth (no customer PII in the test path), SHA-256 dataset manifests, prompt hashes, and sanitized self-contained HTML exports safe to attach to an audit file. |
 | **Team-readable output** | CLI for automation, local dashboard for humans, Markdown reports and JSON/CSV exports for whoever needs the numbers. |
 
-The tool itself is proprietary (see [LICENSE](LICENSE)): the **Community tier is free for internal evaluation** — you pay only the model provider you configure, exactly for the tokens used, and the zero-cost path (offline mock provider, local Ollama) keeps pipeline validation spend-free. Team and Enterprise tiers add multi-user access, audit and scale. Details in [Pricing](#%EF%B8%8F-pricing) below and the full business case in [PITCH.md](PITCH.md).
+The tool itself is proprietary (see [LICENSE](LICENSE)): the **Community tier is free for internal evaluation** — you pay only the model provider you configure, exactly for the tokens used, and the zero-cost path (offline mock provider, local Ollama) keeps pipeline validation spend-free. Paid tiers are announced below but **not yet on sale**.
 
-## 🏷️ Pricing
+## 🏷️ Pricing (planned — not yet on sale)
 
-| Tier | Price | What it includes |
-|------|-------|------------------|
-| **Community** | **Free** | The complete self-hosted harness: all 9 datasets, 14 tasks, 6 providers, CLI + local dashboard, BYOK, single-user. For internal evaluation use. |
-| **Team** | **$199 / seat / month** (min. 3 seats) | Everything in Community plus shared run storage, multi-user auth with roles, audit log, run annotations, and priority support. Ships when the shared backend lands — early-access buyers shape the roadmap. |
-| **Enterprise** | **Custom** (from $15k/yr) | Everything in Team plus SSO/OIDC, on-prem/air-gapped appliance packaging, SOC 2-style evidence pack, support SLA, and private dataset-pack licensing for your domain. |
-| **Hosted CI gate** | **Private beta** | GitHub App that runs baseline-vs-candidate evals on every PR and posts quality/cost deltas as review comments. Join the beta by opening an issue in this repository. |
+The commercial model below is the announced direction, not an active offering. Nothing is billed today; contact for early access and to shape what ships first.
 
-All tiers keep the same core promise: every number ships with the dataset hash, prompt digest and model identity that produced it. Contact: `seyhunak` (this repository) or [PITCH.md](PITCH.md) for the commercial model behind the tiers.
+| Tier | Price (intended) | What it will include | Status |
+|------|------------------|----------------------|--------|
+| **Community** | **Free** | The complete self-hosted harness: all 9 datasets, 14 tasks, 6 providers, CLI + local dashboard, BYOK, single-user. For internal evaluation use. | **Available now** |
+| **Team** | **$199 / seat / month** (min. 3 seats) | Everything in Community plus shared run storage, multi-user auth with roles, audit log, run annotations, and priority support. | Not yet available — needs the shared backend; early access shapes the roadmap. |
+| **Enterprise** | **Custom** (from $15k/yr) | Everything in Team plus SSO/OIDC, on-prem/air-gapped appliance packaging, SOC 2-style evidence pack, support SLA, and private dataset-pack licensing for your domain. | Not yet available — offered once the Team tier exists. |
+| **Hosted CI gate** | TBD | GitHub App that runs baseline-vs-candidate evals on every PR and posts quality/cost deltas as review comments. | Private beta, not announced publicly yet. |
+
+All tiers keep the same core promise: every number ships with the dataset hash, prompt digest and model identity that produced it. Contact: this repository (`seyhunak`) for licensing or early access — the full commercial model is in [PITCH.md](PITCH.md).
 
 ## 🚀 Quickstart
 
