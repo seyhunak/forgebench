@@ -34,6 +34,13 @@
       }
     });
 
+    /* Let app.js react to navigation (e.g. re-read the credit ledger). */
+    try {
+      document.dispatchEvent(new CustomEvent("fb:view", { detail: { view: id } }));
+    } catch (e) {
+      /* older browsers: the page simply keeps its initial data */
+    }
+
     try {
       localStorage.setItem(VIEW_KEY, id);
     } catch (e) {

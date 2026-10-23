@@ -2071,3 +2071,44 @@ body.modal-open {
     animation: none;
   }
 }
+
+/* ---------- 08 · Credits ---------- */
+
+.credits-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.credits-stats .metric-item {
+  padding: var(--space-sm) var(--space-xs);
+  border: var(--rule);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.credits-stats .metric-item span {
+  display: block;
+}
+
+.credits-stats .metric-item .metric-item--value {
+  margin-bottom: 0.2rem;
+}
+
+.credits-stats .env-chip {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.6rem;
+}
+
+@media (max-width: 900px) {
+  .credits-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Package descriptions sit under the label, not beside it. */
+#credits-packages-body td:first-child .field-hint {
+  display: block;
+  margin-top: 0.15rem;
+}

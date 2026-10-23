@@ -25,8 +25,14 @@ let dlog = () => {};
 const els = {
   keyProvider: document.getElementById("key-provider"),
   creditsBalance: document.getElementById("credits-balance"),
-  creditsMode: document.getElementById("credits-mode"),
-  creditsUnlimited: document.getElementById("credits-unlimited"),
+  creditsModeChip: document.getElementById("credits-mode-chip"),
+  creditsUnlimitedChip: document.getElementById("credits-unlimited-chip"),
+  creditsServiceChip: document.getElementById("credits-service-chip"),
+  creditsValue: document.getElementById("credits-value"),
+  creditsModeHint: document.getElementById("credits-mode-hint"),
+  creditsRedeemForm: document.getElementById("credits-redeem-form"),
+  creditsGrantsHint: document.getElementById("credits-grants-hint"),
+  creditsUsageHint: document.getElementById("credits-usage-hint"),
   creditsLedgerPath: document.getElementById("credits-ledger-path"),
   creditsCode: document.getElementById("credits-code"),
   btnCreditsRedeem: document.getElementById("btn-credits-redeem"),
@@ -2093,38 +2099,107 @@ els.taskJudgeProvider.addEventListener("change", async () => {
 
 // ---------- Credits view (08) ----------
 
+const PACKAGE_BUDGETS = {
+  starter_50: "≈ 50 runs",
+  growth_100: "≈ 100 runs",
+  scale_250: "≈ 250 runs",
+  max_500: "≈ 500 runs",
+  dataset_pack: "≈ 250 runs + dataset pack",
+  enterprise_unlimited: "unlimited runs",
+};
+const CREDIT_USD = 0.1;
+
+function chip(state, label) {
+  return `<span class="env-chip" data-state="${state}">${escapeHtml(label)}</span>`;
+}
+
+/** ISO timestamp → human local time; falls back to the raw string. */
+function creditTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return escapeHtml(iso);
+  return d.toLocaleString(undefined, {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
 function renderCredits(state) {
-  els.creditsBalance.textContent = state.unlimited ? "unlimited" : state.balance;
-  els.creditsMode.textContent = state.mode;
-  els.creditsUnlimited.textContent = state.unlimited ? "yes" : "no";
+  const balance = state.unlimited ? "∞" : state.balance;
+  els.creditsBalance.textContent = balance;
+  els.creditsValue.textContent = state.unlimited
+    ? "one payment, no meter"
+    : `≈ $${(state.balance * CREDIT_USD).toFixed(2)} of runs`;
+
+  const modes = {
+    off: chip("", "off"),
+    observe: chip("set", "observe"),
+    enforce: chip("set", "enforce"),
+  };
+  els.creditsModeChip.innerHTML = modes[state.mode] || modes.off;
+  els.creditsUnlimitedChip.innerHTML = state.unlimited ? chip("set", "yes") : chip("", "no");
+  els.creditsServiceChip.innerHTML = state.service_up
+    ? chip("set", "online")
+    : chip("", "offline");
+
   els.creditsLedgerPath.textContent =
     `ledger: ${state.ledger} · service: ${state.service}` +
-    (state.service_up ? " (up)" : " (unreachable — devctl: forgebench-stripe)");
+    (state.service_up ? "" : " — start it with devctl: forgebench-stripe");
+
+  els.creditsModeHint.textContent = "";
+  els.creditsModeHint.className = "message";
+  const note = state.unlimited
+    ? { text: "Unlimited plan active — runs never deduct credits.", type: "info" }
+    : {
+        off: {
+          text: "Ledger mode is off — completed runs don't count credits yet. " +
+            "Turn counting on with FORGEBENCH_CREDITS_MODE=observe (log only) or " +
+            "enforce (block runs at zero) in .env.",
+          type: "error",
+        },
+        observe: {
+          text: "Observe mode — every completed run deducts 1 credit. " +
+            "Switch to enforce to also block runs at zero.",
+          type: "info",
+        },
+        enforce: {
+          text: "Enforce mode — runs are blocked at zero. Top up below when you're out.",
+          type: "info",
+        },
+      }[state.mode] || { text: "", type: "info" };
+  if (note.text) setMessage(els.creditsModeHint, note.text, note.type);
 
   const links = state.payment_links || {};
   const rows = Object.entries(state.packages || {}).map(([name, pkg]) => {
     const link = links[name];
+    const budget = PACKAGE_BUDGETS[name] || "—";
     const buy = link
       ? `<a class="button button--primary" href="${escapeAttr(link)}" target="_blank" rel="noopener">Buy</a>`
       : `<span class="field-hint">link pending</span>`;
-    return `<tr><td>${escapeHtml(pkg.label)}</td><td>${escapeHtml(pkg.credits)}</td>` +
-      `<td>$${escapeHtml(pkg.usd)}</td><td>${buy}</td></tr>`;
+    return `<tr><td><strong>${escapeHtml(pkg.label)}</strong>` +
+      `<span class="field-hint">${escapeHtml(budget)}</span></td>` +
+      `<td>${escapeHtml(pkg.credits)}</td><td>$${escapeHtml(pkg.usd)}</td><td>${buy}</td></tr>`;
   });
   els.creditsPackagesBody.innerHTML = rows.join("") ||
-    `<tr><td colspan="4">Package catalog unavailable — credit service is off.</td></tr>`;
+    `<tr><td colspan="4">Package catalog unavailable — credit service is offline.</td></tr>`;
 
-  const grants = (state.grants || []).map((g) =>
+  const grants = [...(state.grants ?? [])].reverse();
+  els.creditsGrantsHint.textContent = grants.length
+    ? `${grants.length} voucher${grants.length === 1 ? "" : "s"} redeemed`
+    : "";
+  els.creditsGrantsBody.innerHTML = grants.map((g) =>
     `<tr><td>${escapeHtml(g.code)}</td><td>${escapeHtml(g.package)}</td>` +
-    `<td>${escapeHtml(g.unlimited ? "unlimited" : `${g.credits} credits`)}</td>` +
-    `<td>${escapeHtml(g.at)}</td></tr>`);
-  els.creditsGrantsBody.innerHTML = grants.join("") ||
-    `<tr><td colspan="4">No vouchers redeemed yet.</td></tr>`;
+    `<td>${escapeHtml(g.unlimited ? "unlimited" : `+${g.credits} credits`)}</td>` +
+    `<td>${creditTime(g.at)}</td></tr>`).join("") ||
+    `<tr><td colspan="4">No vouchers redeemed yet — the code arrives on your Stripe receipt.</td></tr>`;
 
-  const usage = [...(state.usage || [])].reverse().slice(0, 12).map((u) =>
-    `<tr><td>${escapeHtml(u.at)}</td><td>${escapeHtml(u.kind)}</td>` +
-    `<td>${escapeHtml(u.run)}</td><td>${escapeHtml(u.credits)}</td></tr>`);
-  els.creditsUsageBody.innerHTML = usage.join("") ||
-    `<tr><td colspan="4">No runs counted yet (ledger mode is off until FORGEBENCH_CREDITS_MODE is set).</td></tr>`;
+  const usage = [...(state.usage ?? [])].reverse().slice(0, 12);
+  const total = (state.usage ?? []).length;
+  els.creditsUsageHint.textContent =
+    total ? `${total} run${total === 1 ? "" : "s"} counted · −${total} credit${total === 1 ? "" : "s"}` : "";
+  els.creditsUsageBody.innerHTML = usage.map((u) =>
+    `<tr><td>${creditTime(u.at)}</td><td>${escapeHtml(u.kind)}</td>` +
+    `<td>${escapeHtml(u.run)}</td><td>−1</td></tr>`).join("") ||
+    `<tr><td colspan="4">No runs counted yet — counting starts when you set FORGEBENCH_CREDITS_MODE.</td></tr>`;
 }
 
 async function loadCredits() {
@@ -2135,7 +2210,8 @@ async function loadCredits() {
   }
 }
 
-async function redeemCredits() {
+async function redeemCredits(event) {
+  if (event) event.preventDefault();
   const code = els.creditsCode.value.trim();
   if (!code) {
     setMessage(els.creditsMessage, "Enter a voucher code first.", "error");
@@ -2203,9 +2279,11 @@ async function init() {
       'task-res-valid', 'task-btn-open-run', 'task-runs-grid',
       'setup-message', 'setup-file', 'setup-providers', 'setup-custom',
       'setup-name', 'setup-value', 'btn-setup-add',
-      'credits-balance', 'credits-mode', 'credits-unlimited', 'credits-ledger-path',
-      'credits-code', 'btn-credits-redeem', 'btn-credits-refresh', 'credits-message',
-      'credits-packages-body', 'credits-grants-body', 'credits-usage-body', 'credits-error'];
+      'credits-balance', 'credits-value', 'credits-mode-chip', 'credits-unlimited-chip',
+      'credits-service-chip', 'credits-mode-hint', 'credits-ledger-path',
+      'credits-code', 'credits-redeem-form', 'btn-credits-redeem', 'btn-credits-refresh',
+      'credits-message', 'credits-packages-body', 'credits-grants-body', 'credits-grants-hint',
+      'credits-usage-body', 'credits-usage-hint', 'credits-error'];
     const missing = critical.filter(id => !document.getElementById(id));
     if (missing.length > 0) {
       throw new Error('Missing DOM elements: ' + missing.join(', '));
@@ -2235,6 +2313,12 @@ async function init() {
     dlog('Credits loaded');
     els.btnCreditsRedeem.addEventListener("click", redeemCredits);
     els.btnCreditsRefresh.addEventListener("click", loadCredits);
+    els.creditsRedeemForm.addEventListener("submit", redeemCredits);
+    // Re-read the ledger whenever the visitor lands on the Credits page,
+    // so a balance after a benchmark run is accurate without a manual refresh.
+    document.addEventListener("fb:view", (ev) => {
+      if (ev.detail && ev.detail.view === "credits") loadCredits();
+    });
   } catch (err) {
     const errEl = document.createElement('div');
     errEl.style.cssText = 'position:fixed;top:1rem;left:1rem;right:1rem;background:#dc2626;color:#fff;padding:1rem;border-radius:6px;z-index:9999;font-family:monospace;font-size:0.875rem;';

@@ -530,44 +530,50 @@
             <h3 class="status-title">Balance</h3>
             <button class="button" id="btn-credits-refresh">Refresh</button>
           </div>
-          <div>
+          <div class="credits-stats" id="credits-stats">
             <div class="metric-item">
               <span class="metric-item--value" id="credits-balance">—</span>
               <span class="metric-item--label">Credits left</span>
+              <span class="field-hint" id="credits-value"></span>
             </div>
             <div class="metric-item">
-              <span class="metric-item--value" id="credits-mode">—</span>
+              <span id="credits-mode-chip"></span>
               <span class="metric-item--label">Ledger mode</span>
             </div>
             <div class="metric-item">
-              <span class="metric-item--value" id="credits-unlimited">—</span>
+              <span id="credits-unlimited-chip"></span>
               <span class="metric-item--label">Unlimited</span>
+            </div>
+            <div class="metric-item">
+              <span id="credits-service-chip"></span>
+              <span class="metric-item--label">Credit service</span>
             </div>
           </div>
           <p class="field-hint" id="credits-ledger-path"></p>
+          <div id="credits-mode-hint" class="message"></div>
 
-          <div class="form-grid">
+          <form class="form-grid" id="credits-redeem-form" autocomplete="off">
             <div class="form-field">
               <label class="form-label" for="credits-code">Voucher code</label>
-              <input type="text" id="credits-code" placeholder="FB-SCALE-250-AB12CD34">
+              <input type="text" id="credits-code" placeholder="FB-SCALE-250-AB12CD34" spellcheck="false">
               <span class="field-hint">One-time code from your Stripe receipt (or the credit service log). Redeems once.</span>
             </div>
             <div class="form-field compact">
               <span class="form-label">&nbsp;</span>
-              <button class="button button--primary" id="btn-credits-redeem">Redeem voucher</button>
+              <button class="button button--primary" id="btn-credits-redeem" type="submit">Redeem voucher</button>
             </div>
-          </div>
+          </form>
           <div id="credits-message" class="message"></div>
         </div>
 
         <div class="task-runs">
           <div class="task-runs-head">
             <h3 class="status-title">Top up</h3>
-            <span class="prompt-registry-hint">1 credit = $0.10 · Stripe sandbox (test mode, no real charges)</span>
+            <span class="prompt-registry-hint">1 credit = $0.10 · Sandbox (test mode — no real charges)</span>
           </div>
           <table class="data-table">
             <thead>
-              <tr><th>Package</th><th>Credits</th><th>Price</th><th></th></tr>
+              <tr><th>Package</th><th>Run budget</th><th>Price</th><th></th></tr>
             </thead>
             <tbody id="credits-packages-body"></tbody>
           </table>
@@ -576,6 +582,7 @@
         <div class="task-runs">
           <div class="task-runs-head">
             <h3 class="status-title">Grants</h3>
+            <span class="prompt-registry-hint" id="credits-grants-hint"></span>
           </div>
           <table class="data-table">
             <thead><tr><th>Code</th><th>Package</th><th>Amount</th><th>Redeemed at</th></tr></thead>
@@ -586,7 +593,7 @@
         <div class="task-runs">
           <div class="task-runs-head">
             <h3 class="status-title">Recent runs</h3>
-            <span class="prompt-registry-hint">each run deducts 1 credit (ledger mode off until FORGEBENCH_CREDITS_MODE is set)</span>
+            <span class="prompt-registry-hint" id="credits-usage-hint"></span>
           </div>
           <table class="data-table">
             <thead><tr><th>At</th><th>Kind</th><th>Run</th><th>Credits</th></tr></thead>
@@ -647,7 +654,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=19"></script>
-<script src="/static/shell.js?v=2"></script>
+<script src="/static/app.js?v=20"></script>
+<script src="/static/shell.js?v=3"></script>
 </body>
 </html>
