@@ -2123,12 +2123,39 @@ function creditTime(iso) {
   });
 }
 
+/** "scale_250" → "Scale 250" for display; a proper label when one exists. */
+function titleize(name) {
+  return String(name)
+    .split("_")
+    .map((word) => (word ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+    .join(" ");
+}
+
+/** Meter scale: one full meter == the Max pack. */
+const METER_MAX_CREDITS = 500;
+
+function renderCreditMeter(state) {
+  const fill = document.getElementById("credits-meter-fill");
+  const maxLabel = document.getElementById("credits-meter-max-label");
+  const pct = state.unlimited ? 100 : Math.min((state.balance / METER_MAX_CREDITS) * 100, 100);
+  fill.style.width = `${pct}%`;
+  fill.dataset.level = state.unlimited
+    ? "unlimited"
+    : state.balance === 0 ? "empty" : state.balance < METER_MAX_CREDITS * 0.2 ? "low" : "ok";
+  maxLabel.textContent = state.unlimited
+    ? "unlimited plan — the meter is pinned full"
+    : state.balance > METER_MAX_CREDITS
+      ? `500+ credits · beyond the Max pack scale`
+      : "500 credits · Max pack scale";
+}
+
 function renderCredits(state) {
   const balance = state.unlimited ? "∞" : state.balance;
   els.creditsBalance.textContent = balance;
   els.creditsValue.textContent = state.unlimited
-    ? "one payment, no meter"
-    : `≈ $${(state.balance * CREDIT_USD).toFixed(2)} of runs`;
+    ? "one payment, never metered"
+    : `credits left ≈ $${(state.balance * CREDIT_USD).toFixed(2)} of runs`;
+  renderCreditMeter(state);
 
   const modes = {
     off: chip("", "off"),
@@ -2186,11 +2213,15 @@ function renderCredits(state) {
   els.creditsGrantsHint.textContent = grants.length
     ? `${grants.length} voucher${grants.length === 1 ? "" : "s"} redeemed`
     : "";
-  els.creditsGrantsBody.innerHTML = grants.map((g) =>
-    `<tr><td>${escapeHtml(g.code)}</td><td>${escapeHtml(g.package)}</td>` +
-    `<td>${escapeHtml(g.unlimited ? "unlimited" : `+${g.credits} credits`)}</td>` +
-    `<td>${creditTime(g.at)}</td></tr>`).join("") ||
-    `<tr><td colspan="4">No vouchers redeemed yet — the code arrives on your Stripe receipt.</td></tr>`;
+  els.creditsGrantsBody.innerHTML = grants.map((g) => {
+    const name = g.label
+      ? titleize(g.label)
+      : `${titleize(g.package)}`;
+    const amount = g.unlimited ? "unlimited runs" : `+${g.credits} credits`;
+    return `<tr><td><strong>${escapeHtml(name)}</strong></td>` +
+      `<td>${escapeHtml(amount)}</td><td>${creditTime(g.at)}</td></tr>`;
+  }).join("") ||
+    `<tr><td colspan="3">No vouchers redeemed yet — the code arrives on your Stripe receipt.</td></tr>`;
 
   const usage = [...(state.usage ?? [])].reverse().slice(0, 12);
   const total = (state.usage ?? []).length;
@@ -2315,7 +2346,8 @@ async function init() {
       'task-res-valid', 'task-btn-open-run', 'task-runs-grid',
       'setup-message', 'setup-file', 'setup-providers', 'setup-custom',
       'setup-name', 'setup-value', 'btn-setup-add',
-      'credits-balance', 'credits-value', 'credits-mode-chip', 'credits-unlimited-chip',
+      'credits-balance', 'credits-value', 'credits-meter-fill', 'credits-meter-max-label',
+      'credits-mode-chip', 'credits-unlimited-chip',
       'credits-service-chip', 'credits-mode-hint', 'credits-ledger-path',
       'credits-code', 'credits-redeem-form', 'btn-credits-redeem', 'btn-credits-refresh',
       'credits-message', 'credits-packages-body', 'credits-grants-body', 'credits-grants-hint',

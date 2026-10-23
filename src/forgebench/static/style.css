@@ -2074,36 +2074,125 @@ body.modal-open {
 
 /* ---------- 08 · Credits ---------- */
 
-.credits-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+.credits-meter-card {
+  border: var(--rule);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.credits-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: var(--space-md);
   margin-bottom: var(--space-sm);
 }
 
-.credits-stats .metric-item {
+.credits-meter-head .metric-item--value {
+  font-size: var(--step-2);
+}
+
+.credits-meter-aside {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  text-align: right;
+}
+
+/* Fuel-gauge meter: fill + ten segment ticks, scaled to the Max pack. */
+.credit-meter {
+  position: relative;
+  height: 16px;
+  border: var(--rule);
+  border-radius: var(--pill);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.credit-meter--fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--success) 55%, var(--surface)), var(--success));
+  transition: width 0.5s ease;
+}
+
+.credit-meter--fill[data-level="empty"] {
+  background: var(--danger);
+  opacity: 0.35;
+}
+
+.credit-meter--fill[data-level="low"] {
+  background: var(--danger);
+}
+
+.credit-meter--fill[data-level="unlimited"] {
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+}
+
+.credit-meter--ticks {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(10% - 1px),
+    color-mix(in oklab, var(--fg) 16%, transparent) calc(10% - 1px),
+    color-mix(in oklab, var(--fg) 16%, transparent) 10%
+  );
+}
+
+.credit-meter--scale {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.credits-chip-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+.credits-chip-row .metric-item {
   padding: var(--space-sm) var(--space-xs);
   border: var(--rule);
   border-radius: var(--radius);
   text-align: center;
 }
 
-.credits-stats .metric-item span {
+.credits-chip-row .metric-item span {
   display: block;
 }
 
-.credits-stats .metric-item .metric-item--value {
+.credits-chip-row .metric-item .metric-item--value {
   margin-bottom: 0.2rem;
 }
 
-.credits-stats .env-chip {
+.credits-chip-row .env-chip {
   font-size: 0.75rem;
   padding: 0.15rem 0.6rem;
 }
 
 @media (max-width: 900px) {
-  .credits-stats {
-    grid-template-columns: repeat(2, 1fr);
+  .credits-chip-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .credits-chip-row {
+    grid-template-columns: 1fr;
   }
 }
 

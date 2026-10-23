@@ -530,12 +530,21 @@
             <h3 class="status-title">Balance</h3>
             <button class="button" id="btn-credits-refresh">Refresh</button>
           </div>
-          <div class="credits-stats" id="credits-stats">
-            <div class="metric-item">
+          <div class="credits-meter-card">
+            <div class="credits-meter-head">
               <span class="metric-item--value" id="credits-balance">—</span>
-              <span class="metric-item--label">Credits left</span>
-              <span class="field-hint" id="credits-value"></span>
+              <span class="credits-meter-aside" id="credits-value"></span>
             </div>
+            <div class="credit-meter" aria-label="Credits remaining, scaled to the Max pack">
+              <div class="credit-meter--fill" id="credits-meter-fill"></div>
+              <div class="credit-meter--ticks" aria-hidden="true"></div>
+            </div>
+            <div class="credit-meter--scale" aria-hidden="true">
+              <span>0</span>
+              <span id="credits-meter-max-label">500 credits · Max pack scale</span>
+            </div>
+          </div>
+          <div class="credits-chip-row">
             <div class="metric-item">
               <span id="credits-mode-chip"></span>
               <span class="metric-item--label">Ledger mode</span>
@@ -585,7 +594,7 @@
             <span class="prompt-registry-hint" id="credits-grants-hint"></span>
           </div>
           <table class="data-table">
-            <thead><tr><th>Code</th><th>Package</th><th>Amount</th><th>Redeemed at</th></tr></thead>
+            <thead><tr><th>Package</th><th>Amount</th><th>Redeemed at</th></tr></thead>
             <tbody id="credits-grants-body"></tbody>
           </table>
         </div>
@@ -654,7 +663,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=21"></script>
+<script src="/static/app.js?v=22"></script>
 <script src="/static/shell.js?v=3"></script>
 </body>
 </html>
