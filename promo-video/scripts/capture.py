@@ -6,10 +6,10 @@ Three-piece output (same contract as the shotcraft capture template):
   2. layout.json                            element bboxes in page CSS px (shared coord system)
 No secrets: the dashboard runs locally with mock/synthetic runs only.
 """
+
 import json
 import pathlib
 import sys
-import time
 
 from playwright.sync_api import sync_playwright
 
@@ -42,15 +42,25 @@ def boxes(page, selector, *, all_=True, max_=None):
     for i in range(n):
         bb = els.nth(i).bounding_box()
         if bb:
-            out.append({k: round(v, 1) for k, v in
-                        {"x": bb["x"], "y": bb["y"], "w": bb["width"], "h": bb["height"]}.items()})
+            out.append(
+                {
+                    k: round(v, 1)
+                    for k, v in {
+                        "x": bb["x"],
+                        "y": bb["y"],
+                        "w": bb["width"],
+                        "h": bb["height"],
+                    }.items()
+                }
+            )
     return out if all_ else (out[0] if out else None)
 
 
 with sync_playwright() as p:
     browser = p.chromium.launch()
-    page = browser.new_page(viewport={"width": VIEWPORT["width"], "height": VIEWPORT["height"]},
-                            device_scale_factor=2)
+    page = browser.new_page(
+        viewport={"width": VIEWPORT["width"], "height": VIEWPORT["height"]}, device_scale_factor=2
+    )
     page.goto(BASE, wait_until="networkidle")
     settle(page)
 
@@ -67,8 +77,11 @@ with sync_playwright() as p:
         "rail": boxes(page, "aside nav, .rail", all_=False),
     }
     layout["results"] = e
-    print("results-full", e["pageH"], {k: len(v) if isinstance(v, list) else v
-                                        for k, v in e["boxes"].items()})
+    print(
+        "results-full",
+        e["pageH"],
+        {k: len(v) if isinstance(v, list) else v for k, v in e["boxes"].items()},
+    )
 
     # ---- 2. compare view: ci-baseline (first = baseline) vs ci-prompt ----
     page.click("#mode-compare")
@@ -112,7 +125,10 @@ with sync_playwright() as p:
         print("   row", i, r)
 
     # ---- 3. run-detail modal (report of ci-prompt) ----
-    ok = page.evaluate("() => { if (window.viewRunReport) { viewRunReport('runs/ci-prompt'); return true; } return false; }")
+    ok = page.evaluate(
+        "() => { if (window.viewRunReport) { viewRunReport('runs/ci-prompt');"
+        " return true; } return false; }"
+    )
     if not ok:
         sys.exit("viewRunReport not exposed")
     page.wait_for_selector("#btn-modal-close", timeout=15000)
