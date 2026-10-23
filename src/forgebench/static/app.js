@@ -265,7 +265,7 @@ const PROVIDER_DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
   anthropic: "claude-sonnet-4-5",
   google: "gemini-flash-latest",
-  ollama: "llama3.1:8b",
+  ollama: "beam:cloud",
 };
 
 function preferredModel(providerId, models) {
@@ -367,6 +367,11 @@ function populateModels(providerId) {
   if (providerId === "ollama") {
     // No models.dev catalog — the daemon is the source of truth.
     models = ollamaModelMap();
+    // beam:cloud is the default cloud model until the user picks another;
+    // keep it selectable even when the daemon hasn't listed it yet.
+    if (!models["beam:cloud"]) {
+      models["beam:cloud"] = { id: "beam:cloud", name: "beam:cloud" };
+    }
     if (!Object.keys(models).length) {
       safeInnerHTML(els.modelSelect, '<option value="">(start Ollama to list local models)</option>');
       els.modelSelect.value = "";
@@ -1645,6 +1650,9 @@ async function populateRunModels(providerId) {
   if (providerId === "ollama") {
     await fetchOllamaStatus(true); // force refresh
     models = ollamaModelMap();
+    if (!models["beam:cloud"]) {
+      models["beam:cloud"] = { id: "beam:cloud", name: "beam:cloud" };
+    }
     if (!Object.keys(models).length) {
       safeInnerHTML(els.runModel, '<option value="">(start Ollama to list local models)</option>');
       els.runModel.value = "";
@@ -1909,7 +1917,11 @@ window.downloadComparison = async (runDirs) => {
 async function taskModelMap(providerId) {
   if (providerId === "ollama") {
     if (!ollamaCache) await fetchOllamaStatus();
-    return ollamaModelMap();
+    const models = ollamaModelMap();
+    if (!models["beam:cloud"]) {
+      models["beam:cloud"] = { id: "beam:cloud", name: "beam:cloud" };
+    }
+    return models;
   }
   const provider = modelsData && modelsData[providerId];
   return (provider && provider.models) || {};
@@ -1919,6 +1931,7 @@ async function taskModelMap(providerId) {
 // chat; prefer a local completion model, then a known general-purpose family.
 function preferredOllamaModel(models) {
   const names = models.map(m => m.id);
+  if (names.includes("beam:cloud")) return "beam:cloud";
   const caps = (ollamaCache && ollamaCache.capabilities) || {};
   const completions = names.filter(n => (caps[n] || []).includes("completion"));
   const local = completions.filter(n => !/:cloud$/.test(n));
