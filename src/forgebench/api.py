@@ -111,6 +111,7 @@ class CredentialSave(BaseModel):
 class RunRequest(BaseModel):
     config: str
     provider: str = ""
+    model: str = ""
     limit: int | None = None
     run_id: str | None = None
     output_root: str = "runs"
@@ -918,7 +919,7 @@ def start_run(payload: RunRequest) -> dict[str, str]:
     # Keep the provider and its configured default model in sync. A switch of
     # provider (or a missing/unusable model left over from a mock config) would
     # otherwise send an invalid model id such as ``rule-mock-v1`` to the API.
-    model = experiment.provider.model
+    model = (payload.model or "").strip() or experiment.provider.model
     if experiment.provider.name != "mock":
         if not model or model == "rule-mock-v1":
             model = _configured_model(experiment.provider.name)
