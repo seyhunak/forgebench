@@ -1,0 +1,72 @@
+{
+  "run_id": "legal-baseline-ollama-20261018T122052Z",
+  "experiment_name": "legal-baseline",
+  "created_at_utc": "2026-10-18T12:20:52+00:00",
+  "duration_seconds": 0.076,
+  "provider": {
+    "name": "ollama",
+    "model": "openai/gpt-4o-mini"
+  },
+  "dataset": {
+    "name": "legal_v1",
+    "version": "1.0.0",
+    "split": "test",
+    "split_sha256": "8442441055bf35e3fbabf3e763204f92f826a512e6272c2d52b6b468e3204c06",
+    "n_cases": 42
+  },
+  "config": {
+    "experiment": {
+      "name": "legal-baseline",
+      "dataset": "legal_v1",
+      "dataset_version": "1.0.0",
+      "split": "test",
+      "seed": 42
+    },
+    "provider": {
+      "name": "ollama",
+      "model": "openai/gpt-4o-mini",
+      "options": {}
+    },
+    "inference": {
+      "temperature": 0.0,
+      "max_retries": 2,
+      "timeout_seconds": 30.0,
+      "max_tokens": 1024
+    },
+    "prompt": {
+      "system": null,
+      "name": null,
+      "version": null,
+      "few_shot_count": 0
+    },
+    "evaluation": {
+      "metrics": [
+        "accuracy",
+        "macro_f1",
+        "critical_false_match_rate",
+        "escalation_recall",
+        "schema_validity",
+        "latency",
+        "estimated_cost"
+      ]
+    }
+  },
+  "environment": {
+    "forgebench_version": "0.1.0",
+    "python_version": "3.15.0",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "git_sha": "5e1869eb8ff40c87884e711aa8e9994d92982679"
+  },
+  "few_shot_examples": 0,
+  "prompt": {
+    "source": "provider_default",
+    "chars": 995,
+    "effective_sha256": "617fcd8930a2b0a931c8ca91a08f026e01bfd0b166ca014d96991265a2ff3cb9"
+  },
+  "prompt_build_ms": 0.056,
+  "trace": {
+    "file": "trace.jsonl",
+    "n_cases": 42
+  },
+  "command": "/Users/seyhunakyurek/Projects/forgebench/.venv/bin/forgebench dashboard"
+}
