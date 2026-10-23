@@ -17,6 +17,8 @@ ForgeBench is a reproducible, provider-agnostic benchmark harness for answering 
 
 The first benchmark domain is **financial and transaction operations**: synthetic banking, accounting, claims, and e-commerce scenarios (transaction exception classification and reconciliation triage). No private data, no GPU, no API key required to run the pipeline.
 
+**Who it's for:** teams shipping AI in finance, healthcare, legal, insurance, payments, procurement and support operations — anyone who needs "we think the new prompt is better" replaced with a pinned, auditable, cost-measured comparison on a fixed test set. See [PITCH.md](PITCH.md) for the full business case: value proposition, problems solved, commercial model.
+
 ![ForgeBench dashboard — API key view with Mistral selected and its default model](docs/screenshots/dashboard.png)
 
 ## ✨ Key Features
@@ -36,6 +38,19 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 | **Local dashboard** | FastAPI-served, Hallmark-designed UI with a dark-first Cobalt theme, side-rail navigation, and a ⌘K jump palette — environment setup with per-provider key entry, key management, dataset browsing, run launching, and results browsing where every run opens a detail modal (report, predictions, downloadable artifacts) plus cross-run comparison. |
 | **Deterministic dataset generator** | Same seed, byte-identical files. Regenerate `finance_v1` or add new datasets with `scripts/generate_dataset.py`. |
 | **User-defined tasks** | Define any evaluation task in YAML — input fields, output schema, weighted scoring rules — and run it with `forgebench task-run`. No code required. |
+
+## 💼 Why ForgeBench for business
+
+| Business benefit | How it lands |
+|------------------|--------------|
+| **Lower model cost** | Cost per 1,000 cases is a headline metric in every run and comparison, computed from actual token usage with dated pricing — pick the cheapest model that clears the risk metrics instead of debating vendor decks. |
+| **Fewer production incidents** | Regression gating on PR: if a prompt or model change degrades a pinned baseline past tolerance, CI fails the change — not your customers. The financially dangerous error (a false "matched") is a first-class metric. |
+| **Faster model decisions** | Swap providers with `--provider` on the same config; decide between models in an afternoon, not a week of ad-hoc evaluation. |
+| **No ML infrastructure** | No GPU, no database, no paid platform. Python 3.11, flat files, bring-your-own-key — or fully local inference via Ollama with zero egress. |
+| **Compliance-ready evidence** | Deterministic synthetic ground truth (no customer PII in the test path), SHA-256 dataset manifests, prompt hashes, and sanitized self-contained HTML exports safe to attach to an audit file. |
+| **Team-readable output** | CLI for automation, local dashboard for humans, Markdown reports and JSON/CSV exports for whoever needs the numbers. |
+
+The tool itself is free (Apache-2.0): you pay the model provider you configure, exactly for the tokens used — and the zero-cost path (offline mock provider, local Ollama) keeps pipeline validation spend-free. The full business case — value proposition, problems solved, cost model and commercial roadmap — lives in [PITCH.md](PITCH.md).
 
 ## 🚀 Quickstart
 
@@ -67,7 +82,7 @@ forgebench compare runs/baseline runs/prompt-v1
 
 Each run writes `predictions.jsonl`, `metrics.json`, `manifest.json`, `trace.jsonl`, and `report.md` under `runs/<run-id>/`.
 
-Without a key, use a local model instead: `forgebench run --config configs/baseline.yaml --provider ollama --model <your-pulled-model>`.
+Without a key, use a local model instead: `forgebench run --config configs/baseline.yaml --provider ollama --model <your-pulled-model>` — or omit `--model` entirely: Ollama picks up `OLLAMA_MODEL` from your `.env`, falling back to `beam:cloud`.
 
 ### Running against real models (bring your own key)
 
@@ -186,7 +201,7 @@ All providers implement the same `predict(case) -> ProviderResponse` contract:
 | **Anthropic** | `providers/anthropic.py` | Claude 4 Opus, Claude 4 Sonnet, Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku | `ANTHROPIC_API_KEY` |
 | **Google** | `providers/google.py` | Gemini 2.5 Pro, Gemini 2.5 Flash, Gemini 2.0 Flash, Gemini 1.5 Pro, Gemini 1.5 Flash | `GOOGLE_API_KEY` |
 | **OpenRouter** | `providers/openrouter.py` | Every model OpenRouter hosts (hundreds), addressed as `vendor/model` — e.g. `anthropic/claude-3.5-sonnet`, `openai/gpt-4o`, `meta-llama/llama-3.1-70b-instruct`, `google/gemini-2.5-pro` | `OPENROUTER_API_KEY` |
-| **Ollama** | `providers/ollama.py` (`OllamaProvider`) — local daemon | Whatever you have pulled — listed live from the daemon, not from a catalog | `OLLAMA_API_KEY` (optional for local Ollama) / `OLLAMA_HOST` |
+| **Ollama** | `providers/ollama.py` (`OllamaProvider`) — local daemon (also cloud-served `:cloud` models) | Whatever you have pulled. Default: `OLLAMA_MODEL` env, else `beam:cloud` | `OLLAMA_API_KEY` (optional for local Ollama) / `OLLAMA_HOST` |
 
 The OpenRouter adapter speaks the REST API directly with the standard library, so it works on a bare install (no extra SDK). Its catalog is available from `forgebench models --provider openrouter` (the pinned snapshot) or `--live` (straight from `openrouter.ai/api/v1/models`).
 
@@ -198,7 +213,7 @@ Model lists are synchronized from [models.dev](https://models.dev) and include p
 
 ```bash
 # Same config, different provider
-forgebench run --config configs/baseline.yaml --provider ollama --model llama3.1:8b --run-id ollama-run
+forgebench run --config configs/baseline.yaml --provider ollama --model beam:cloud --run-id ollama-run
 forgebench run --config configs/baseline.yaml --provider mistral --run-id mistral-run
 forgebench run --config configs/baseline.yaml --provider openai --model gpt-4o --run-id openai-run
 forgebench run --config configs/baseline.yaml --provider anthropic --model claude-3-5-sonnet --run-id anthropic-run
@@ -460,7 +475,7 @@ forgebench/
 │   ├── dashboard.py             # Legacy Streamlit entry point (kept for compat)
 │   └── static/                  # Dashboard frontend (index.html, style.css, app.js, shell.js, models.json)
 ├── tests/                       # Unit + end-to-end tests (no API key needed)
-└── runs/                        # Local run artifacts (git-ignored by default)
+└── runs/                        # Local run artifacts (demo/evidence runs may be committed)
 ```
 
 ## 🧪 Testing
@@ -560,7 +575,7 @@ forgebench task-validate sentiment_analysis
 forgebench task-run sentiment_analysis --split test --provider openrouter --judge-provider openai --judge-model gpt-4o-mini
 ```
 
-Nine tasks ship with the repo under `tasks/`:
+Fourteen tasks ship with the repo under `tasks/`:
 
 | Task | What it evaluates | Scoring methods |
 |------|-------------------|-----------------|
@@ -574,6 +589,10 @@ Nine tasks ship with the repo under `tasks/`:
 | `topic_classification` | Article topic with confidence | exact_match, contains |
 | `question_type` | Question type and whether external context is needed | exact_match, boolean |
 | `safety_redteam` | Red-team probes: prompt injection, jailbreak, PII, bias, toxicity | boolean, exact_match |
+| `expense_reimbursement` | Expense claim review: approve/reject/flag, reimbursable amount | exact_match, contains |
+| `invoice_matching` | Invoice vs. purchase order: match status and review flag | exact_match, boolean, contains |
+| `purchase_order_approval` | Purchase order decision and approver routing | exact_match, contains |
+| `ticket_triage` | Support ticket priority, owning team and response SLA | exact_match, contains |
 
 ### Safety / red-team scan
 A red-team workflow is available via `forgebench safety-scan` (prompt injection, jailbreaking, PII leakage, bias, toxicity); `--provider mock` runs it fully offline for pipeline validation.
