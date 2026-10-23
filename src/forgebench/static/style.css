@@ -400,6 +400,36 @@ kbd {
   background: var(--surface);
 }
 
+/* Live credit balance summarized beside the 08 · Credits entry. */
+.rail-badge {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.05em;
+  padding: 0.05rem 0.45rem;
+  border: var(--rule);
+  border-radius: var(--pill);
+  background: var(--surface);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.rail-badge[data-level="ok"] {
+  color: var(--success);
+  border-color: color-mix(in oklab, var(--success) 45%, transparent);
+}
+
+.rail-badge[data-level="low"],
+.rail-badge[data-level="empty"] {
+  color: var(--danger);
+  border-color: color-mix(in oklab, var(--danger) 45%, transparent);
+}
+
+.rail-badge[data-level="unlimited"] {
+  color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
 .rail-link.is-active {
   color: var(--ink);
   border-bottom-color: var(--accent);

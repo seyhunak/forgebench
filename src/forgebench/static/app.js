@@ -28,6 +28,7 @@ const els = {
   creditsModeChip: document.getElementById("credits-mode-chip"),
   creditsUnlimitedChip: document.getElementById("credits-unlimited-chip"),
   creditsServiceChip: document.getElementById("credits-service-chip"),
+  railCreditsBadge: document.getElementById("rail-credits-badge"),
   creditsValue: document.getElementById("credits-value"),
   creditsModeHint: document.getElementById("credits-mode-hint"),
   creditsRedeemForm: document.getElementById("credits-redeem-form"),
@@ -2150,6 +2151,14 @@ function renderCreditMeter(state) {
 }
 
 function renderCredits(state) {
+  // Sidebar summary: same level thresholds as the meter (low < 20% of Max).
+  if (els.railCreditsBadge) {
+    els.railCreditsBadge.hidden = false;
+    els.railCreditsBadge.textContent = state.unlimited ? "∞" : `${state.balance} cr`;
+    els.railCreditsBadge.dataset.level = state.unlimited
+      ? "unlimited"
+      : state.balance === 0 ? "empty" : state.balance < METER_MAX_CREDITS * 0.2 ? "low" : "ok";
+  }
   const balance = state.unlimited ? "∞" : state.balance;
   els.creditsBalance.textContent = balance;
   els.creditsValue.textContent = state.unlimited
