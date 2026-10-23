@@ -1,0 +1,31 @@
+name: expense_reimbursement
+version: "1.0.0"
+description: "Review an employee expense claim for reimbursement."
+input_fields:
+  - employee
+  - amount
+  - category
+  - receipt_attached
+output_schema:
+  - name: status
+    type: enum
+    enum_values: ["approved", "rejected", "needs_review"]
+  - name: reimbursement_amount
+    type: number
+  - name: reason
+    type: string
+scoring_rules:
+  - field: status
+    method: exact_match
+    weight: 2.0
+  - field: reimbursement_amount
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+  - field: reason
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+system_prompt: |
+  You are an expense reviewer. Approve, reject, or flag claims; compute
+  reimbursable amount; explain. Output valid JSON.

@@ -1,0 +1,3 @@
+{"id": "PO-0006", "input": {"requestor": "Frank", "amount": "15000", "category": "marketing", "justification": "Ad campaign"}, "expected": {"decision": "needs_review", "approver_role": "director", "reason": "policy"}}
+{"id": "PO-0007", "input": {"requestor": "Grace", "amount": "300", "category": "supplies", "justification": "Printer toner"}, "expected": {"decision": "approved", "approver_role": "manager", "reason": "policy"}}
+{"id": "PO-0008", "input": {"requestor": "Heidi", "amount": "100000", "category": "equipment", "justification": "Fleet vehicles"}, "expected": {"decision": "rejected", "approver_role": "finance", "reason": "policy"}}

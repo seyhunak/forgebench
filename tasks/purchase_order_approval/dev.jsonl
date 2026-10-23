@@ -1,0 +1,2 @@
+{"id": "PO-0004", "input": {"requestor": "Dave", "amount": "50", "category": "meals", "justification": "Team lunch"}, "expected": {"decision": "rejected", "approver_role": "manager", "reason": "policy"}}
+{"id": "PO-0005", "input": {"requestor": "Eve", "amount": "1200", "category": "training", "justification": "Conference ticket"}, "expected": {"decision": "approved", "approver_role": "manager", "reason": "policy"}}

@@ -1,0 +1,35 @@
+name: ticket_triage
+version: "1.0.0"
+description: "Triage a support ticket into priority, owning team, and response SLA."
+input_fields:
+  - subject
+  - body
+output_schema:
+  - name: priority
+    type: enum
+    enum_values: ["low", "medium", "high", "critical"]
+  - name: team
+    type: enum
+    enum_values: ["billing", "support", "engineering"]
+  - name: response_sla_hours
+    type: number
+  - name: reason
+    type: string
+scoring_rules:
+  - field: priority
+    method: exact_match
+    weight: 2.0
+  - field: team
+    method: exact_match
+    weight: 2.0
+  - field: response_sla_hours
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+  - field: reason
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+system_prompt: |
+  You are a support triage agent. Classify the ticket priority and owning team,
+  estimate response SLA in hours, and justify. Output valid JSON.

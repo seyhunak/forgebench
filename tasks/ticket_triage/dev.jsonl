@@ -1,0 +1,2 @@
+{"id": "TX-0004", "input": {"subject": "Bug in export", "body": "CSV export fails for large files"}, "expected": {"priority": "medium", "team": "engineering", "response_sla_hours": 24, "reason": "triage"}}
+{"id": "TX-0005", "input": {"subject": "Password reset", "body": "Forgot password, no rush"}, "expected": {"priority": "low", "team": "support", "response_sla_hours": 24, "reason": "triage"}}

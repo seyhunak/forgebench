@@ -1,0 +1,3 @@
+{"id": "PO-0001", "input": {"requestor": "Alice", "amount": "500", "category": "office_supplies", "justification": "Need new monitors"}, "expected": {"decision": "approved", "approver_role": "manager", "reason": "policy"}}
+{"id": "PO-0002", "input": {"requestor": "Bob", "amount": "8000", "category": "software", "justification": "Annual SaaS license renewal"}, "expected": {"decision": "needs_review", "approver_role": "director", "reason": "policy"}}
+{"id": "PO-0003", "input": {"requestor": "Carol", "amount": "25000", "category": "hardware", "justification": "New server rack"}, "expected": {"decision": "needs_review", "approver_role": "finance", "reason": "policy"}}

@@ -1,0 +1,3 @@
+{"id": "TX-0001", "input": {"subject": "Cannot log in", "body": "I am locked out, urgent client demo in 1 hour"}, "expected": {"priority": "critical", "team": "engineering", "response_sla_hours": 1, "reason": "triage"}}
+{"id": "TX-0002", "input": {"subject": "Invoice wrong", "body": "Charged twice for March, need refund"}, "expected": {"priority": "high", "team": "billing", "response_sla_hours": 4, "reason": "triage"}}
+{"id": "TX-0003", "input": {"subject": "Feature request", "body": "Would love dark mode"}, "expected": {"priority": "low", "team": "engineering", "response_sla_hours": 72, "reason": "triage"}}

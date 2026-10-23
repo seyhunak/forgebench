@@ -1,0 +1,35 @@
+name: invoice_matching
+version: "1.0.0"
+description: "Match an incoming invoice against its purchase order and flag discrepancies."
+input_fields:
+  - po_number
+  - vendor
+  - invoice_amount
+  - po_amount
+  - due_date
+  - status
+output_schema:
+  - name: match_status
+    type: enum
+    enum_values: ["matched", "amount_mismatch", "missing_po"]
+    description: "Whether the invoice matches its PO."
+  - name: requires_review
+    type: boolean
+    description: "Whether a human must review."
+  - name: reason
+    type: string
+    description: "Short justification."
+scoring_rules:
+  - field: match_status
+    method: exact_match
+    weight: 2.0
+  - field: requires_review
+    method: boolean
+    weight: 1.0
+  - field: reason
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+system_prompt: |
+  You are an accounts-payable reviewer. Compare the invoice to its purchase order.
+  Return match_status, requires_review, and a short reason. Output valid JSON.

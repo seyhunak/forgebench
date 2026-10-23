@@ -1,0 +1,2 @@
+{"id": "IM-0007", "input": {"po_number": "", "vendor": "Initech", "invoice_amount": "500.00", "po_amount": "", "due_date": "2026-11-01", "status": "open"}, "expected": {"match_status": "missing_po", "requires_review": true, "reason": "no PO"}}
+{"id": "IM-0008", "input": {"po_number": "", "vendor": "Initech", "invoice_amount": "500.00", "po_amount": "", "due_date": "2026-11-01", "status": "open"}, "expected": {"match_status": "missing_po", "requires_review": true, "reason": "no PO"}}

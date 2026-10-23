@@ -1,0 +1,2 @@
+{"id": "IM-0005", "input": {"po_number": "PO-2005", "vendor": "Globex", "invoice_amount": "1200.00", "po_amount": "1000.00", "due_date": "2026-11-01", "status": "open"}, "expected": {"match_status": "amount_mismatch", "requires_review": true, "reason": "invoice higher"}}
+{"id": "IM-0006", "input": {"po_number": "PO-2006", "vendor": "Globex", "invoice_amount": "1200.00", "po_amount": "1000.00", "due_date": "2026-11-01", "status": "open"}, "expected": {"match_status": "amount_mismatch", "requires_review": true, "reason": "invoice higher"}}

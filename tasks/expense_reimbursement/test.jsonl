@@ -1,0 +1,3 @@
+{"id": "EX-0006", "input": {"employee": "Frank", "amount": "60.00", "category": "travel", "receipt_attached": "true"}, "expected": {"status": "approved", "reimbursement_amount": 60.0, "reason": "policy"}}
+{"id": "EX-0007", "input": {"employee": "Grace", "amount": "300.00", "category": "equipment", "receipt_attached": "false"}, "expected": {"status": "needs_review", "reimbursement_amount": 0.0, "reason": "policy"}}
+{"id": "EX-0008", "input": {"employee": "Heidi", "amount": "20.00", "category": "office", "receipt_attached": "true"}, "expected": {"status": "approved", "reimbursement_amount": 20.0, "reason": "policy"}}

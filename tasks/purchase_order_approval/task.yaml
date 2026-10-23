@@ -1,0 +1,31 @@
+name: purchase_order_approval
+version: "1.0.0"
+description: "Approve, route, or reject a purchase order request."
+input_fields:
+  - requestor
+  - amount
+  - category
+  - justification
+output_schema:
+  - name: decision
+    type: enum
+    enum_values: ["approved", "needs_review", "rejected"]
+  - name: approver_role
+    type: enum
+    enum_values: ["manager", "director", "finance"]
+  - name: reason
+    type: string
+scoring_rules:
+  - field: decision
+    method: exact_match
+    weight: 2.0
+  - field: approver_role
+    method: exact_match
+    weight: 1.0
+  - field: reason
+    method: contains
+    weight: 1.0
+    threshold: 0.0
+system_prompt: |
+  You are a procurement approver. Decide whether to approve a purchase order,
+  route to an approver role, and explain. Output valid JSON.

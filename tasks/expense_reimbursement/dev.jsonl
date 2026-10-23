@@ -1,0 +1,2 @@
+{"id": "EX-0004", "input": {"employee": "Dave", "amount": "15.00", "category": "office", "receipt_attached": "true"}, "expected": {"status": "approved", "reimbursement_amount": 15.0, "reason": "policy"}}
+{"id": "EX-0005", "input": {"employee": "Eve", "amount": "250.00", "category": "meals", "receipt_attached": "true"}, "expected": {"status": "rejected", "reimbursement_amount": 0.0, "reason": "policy"}}
