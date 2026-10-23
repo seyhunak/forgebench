@@ -64,22 +64,24 @@ reaches production.
 
 ## 4. How it costs
 
-**Cost to run the open-source tool (Apache-2.0, self-hosted):**
+**Cost to run the self-hosted Community tier:**
 
 | Cost item | What it looks like |
 |---|---|
-| ForgeBench itself | $0 — no license, no paid tiers in the core, no telemetry service |
+| ForgeBench itself | Community tier is free for internal evaluation; the product is proprietary (ForgeBench Commercial License) — Team/Enterprise tiers add multi-user, audit and scale. |
 | Model spend | Bring-your-own-key; you pay the provider you configured, for exactly the tokens used. Cloud model defaults (e.g. Ollama `beam:cloud`) run on cloud-served hardware with no local GPU. Sub-dollar runs are normal with `--limit N` sampling during iteration. |
 | Fully local path | $0 marginal spend — the Ollama adapter runs the whole harness on internal hardware with zero egress to third parties. |
 | Cost per 1,000 cases | Reported directly in every run, comparison and history view from actual token usage with dated model pricing — so budget conversations have numbers attached. |
 | Infrastructure | Flat JSONL/JSON files under `runs/` — nothing to provision, back up or migrate. A run directory is the deployment unit. |
 
-**Proposed commercial model (open-core, roadmap):** the core stays free; paid tiers sell what teams ask for at scale —
+**Commercial model (implemented):** the repo is closed-source under the ForgeBench Commercial License; the self-hosted Community tier stays free for internal evaluation —
 
-- **Team** — multi-user access with real auth, shared run storage, audit log, run annotations.
-- **Enterprise** — everything in Team plus SSO/OIDC, on-prem/air-gapped appliance packaging, SOC 2-style evidence pack, support SLA.
+- **Community — free.** The complete self-hosted harness for one user: 9 datasets, 14 tasks, 6 providers, CLI + local dashboard.
+- **Team — $199/seat/month (min. 3).** Shared run storage, multi-user auth with roles, audit log, run annotations, priority support. Early-access buyers shape the shared-backend roadmap.
+- **Enterprise — custom, from $15k/yr.** SSO/OIDC, on-prem/air-gapped appliance packaging, SOC 2-style evidence pack, support SLA, private dataset-pack licensing.
+- **Hosted CI gate — private beta.** Managed baseline-vs-candidate regression gate on every PR; recurring revenue wedge, free for public repos once it launches.
 
-This keeps the free core credible (adoption engine) while the paid tiers are the features businesses need at org scale. Pricing figures for these tiers are TBD — they depend on the shared-backend build.
+This keeps the free self-hosted tier genuinely usable (adoption engine) while revenue lives where businesses need it: team scale, compliance, and CI automation.
 
 ---
 
@@ -91,7 +93,7 @@ This keeps the free core credible (adoption engine) while the paid tiers are the
 | Vendor "AI model eval" platforms | Per-seat SaaS with customer data on their cloud — a hard no for regulated domains, and the eval logic is a black box. |
 | Generic academic benchmarks (MMLU, HumanEval) | Free but irrelevant: they don't measure the business task, the expensive errors, or the cost. |
 
-ForgeBench's position: **free and local by design, auditable by construction, priced only when an organization needs team-scale access.**
+ForgeBench's position: **Community tier free and local by design, auditable by construction, priced only when an organization needs team-scale access.**
 
 ---
 

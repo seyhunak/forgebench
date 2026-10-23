@@ -65,7 +65,7 @@ function stat(s, n, label, x, y, w = 2.15, dark = true) {
   s.addText("FORGEBENCH", { x: 0.7, y: 1.5, w: 9, h: 1.6, fontSize: 96, fontFace: "Space Grotesk", color: WHITE, bold: true, margin: 0, charSpacing: -4 });
   s.addText("Measure domain adaptation, not just model intelligence.", { x: 0.7, y: 3.0, w: 9, h: 0.8, fontSize: 26, fontFace: "Space Grotesk", color: ACCENT_T, margin: 0, charSpacing: -0.5 });
   s.addText("A reproducible, provider-agnostic benchmark harness that answers one question:\ndid customizing a model — a better prompt, few-shot examples, structured output,\na fine-tune — actually improve performance on a domain task, or did it just make\nthe pipeline more complicated?", { x: 0.7, y: 3.9, w: 8.6, h: 1.0, fontSize: 14, fontFace: "Inter", color: INK2, margin: 0, valign: "top" });
-  s.addText("Seyhun Akyürek  ·  github.com/seyhunak/forgebench  ·  Apache-2.0", { x: 0.7, y: 5.05, w: 8.6, h: 0.3, fontSize: 11, fontFace: "Inter", color: MUTED, margin: 0 });
+  s.addText("Seyhun Akyürek  ·  github.com/seyhunak/forgebench  ·  Proprietary license", { x: 0.7, y: 5.05, w: 8.6, h: 0.3, fontSize: 11, fontFace: "Inter", color: MUTED, margin: 0 });
   footer(s, 1, true);
 }
 
@@ -270,7 +270,7 @@ function stat(s, n, label, x, y, w = 2.15, dark = true) {
   const s = darkSlide();
   title(s, "Open by default. Honest by rule.", 0.7, 0.4, 8.6, INK, 28);
   const pairs = [
-    ["License", "Apache-2.0 — fork it, ship it."],
+    ["License", "Proprietary — commercial license."],
     ["Telemetry", "None. No events sent, no analytics."],
     ["Data", "No backend. Keys stay on device (chmod 600)."],
     ["Actions", "Real-world handoff only. Errors are data."],
@@ -295,7 +295,7 @@ function stat(s, n, label, x, y, w = 2.15, dark = true) {
   s.addShape(pres.shapes.OVAL, { x: 6.5, y: -1, w: 5, h: 5, fill: { color: ACCENT, transparency: 92 }, line: { width: 0 } });
   s.addText("Thank you.", { x: 0.7, y: 1.7, w: 9, h: 1.4, fontSize: 72, fontFace: "Space Grotesk", color: WHITE, bold: true, margin: 0, charSpacing: -3 });
   s.addText("ForgeBench — Measure domain adaptation, not just model intelligence.", { x: 0.7, y: 3.2, w: 9, h: 0.7, fontSize: 22, fontFace: "Space Grotesk", color: ACCENT_T, margin: 0, charSpacing: -0.5 });
-  s.addText("Seyhun Akyürek  ·  github.com/seyhunak/forgebench  ·  Apache-2.0", { x: 0.7, y: 4.1, w: 8.6, h: 0.3, fontSize: 12, fontFace: "Inter", color: MUTED, margin: 0 });
+  s.addText("Seyhun Akyürek  ·  github.com/seyhunak/forgebench  ·  Proprietary license", { x: 0.7, y: 4.1, w: 8.6, h: 0.3, fontSize: 12, fontFace: "Inter", color: MUTED, margin: 0 });
   footer(s, 14, true);
 }
 

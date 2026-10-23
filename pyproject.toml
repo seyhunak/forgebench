@@ -8,13 +8,13 @@ version = "0.2.0"
 description = "A small, reproducible benchmark for measuring whether model customization improves domain-specific AI performance."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
-authors = [{ name = "ForgeBench contributors" }]
+license = { text = "LicenseRef-Proprietary" }
+authors = [{ name = "Seyhun Akürek" }]
 keywords = ["llm", "evaluation", "benchmark", "mistral", "reproducibility"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: Apache Software License",
+  "License :: Other/Proprietary",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
