@@ -12,7 +12,7 @@ license = { text = "LicenseRef-Proprietary" }
 authors = [{ name = "Seyhun Akürek" }]
 keywords = ["llm", "evaluation", "benchmark", "mistral", "reproducibility"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
   "License :: Other/Proprietary",
   "Programming Language :: Python :: 3",
