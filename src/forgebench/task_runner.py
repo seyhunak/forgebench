@@ -230,7 +230,8 @@ def run_task_experiment(
             _log(f"[{index}/{total}] ✓ {case.id} · {case_ms:.0f} ms")
         else:
             _log(
-                f"[{index}/{total}] ✗ {case.id} · error {record.error_kind if record else '?'} · {case_ms:.0f} ms"
+                f"[{index}/{total}] ✗ {case.id} · error "
+                f"{record.error_kind if record else '?'} · {case_ms:.0f} ms"
             )
 
     metrics = {

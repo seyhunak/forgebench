@@ -348,7 +348,8 @@ def run_experiment(
                 judge_section.provider, model=judge_section.model, options=judge_section.options
             )
             _log(
-                f"judge {judge_section.provider} · model {judge_instance.model or judge_section.model}"
+                f"judge {judge_section.provider} · model "
+                f"{judge_instance.model or judge_section.model}"
             )
         except Exception as exc:  # noqa: BLE001 - judge is optional
             judge_warning = str(exc)
