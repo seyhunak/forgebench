@@ -1,0 +1,27 @@
+{
+  "n_cases": 3,
+  "n_valid": 0,
+  "accuracy": 0.0,
+  "per_rule": {
+    "priority": {
+      "n_cases": 3,
+      "n_pass": 3,
+      "pass_rate": 1.0
+    },
+    "reason": {
+      "n_cases": 3,
+      "n_pass": 0,
+      "pass_rate": 0.0
+    },
+    "response_sla_hours": {
+      "n_cases": 3,
+      "n_pass": 2,
+      "pass_rate": 0.6667
+    },
+    "team": {
+      "n_cases": 3,
+      "n_pass": 2,
+      "pass_rate": 0.6667
+    }
+  }
+}

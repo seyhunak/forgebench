@@ -1,0 +1,21 @@
+{
+  "run_id": "ticket_triage-ollama-beam-cloud-20261023T084310Z",
+  "task": "ticket_triage",
+  "task_version": "1.0.0",
+  "split": "test",
+  "provider": {
+    "name": "ollama",
+    "model": "beam:cloud"
+  },
+  "judge": {
+    "name": "ollama",
+    "model": "beam:cloud"
+  },
+  "n_cases": 3,
+  "trace": {
+    "file": "trace.jsonl",
+    "n_cases": 3
+  },
+  "created_at_utc": "2026-10-23T08:43:10+00:00",
+  "duration_seconds": 10.511
+}
