@@ -55,9 +55,12 @@ def run_task_experiment(
     tasks_root: Path | None = None,
     output_root: Path | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_log: Callable[[str], None] | None = None,
 ) -> TaskRunResult:
     """Execute one custom-task evaluation end-to-end."""
     from .credits import TASK_CREDITS_PER_CASE, consume_run, run_credit_id
+
+    _log = on_log or (lambda _msg: None)
 
     if not provider:
         from .credentials import get_value
@@ -89,6 +92,11 @@ def run_task_experiment(
     # a task that fails to load or has no cases costs nothing.
     if cases:
         consume_run("task", run_credit_id(name), amount=len(cases) * TASK_CREDITS_PER_CASE)
+        _log(
+            f"task {name} · {len(cases)} cases · provider {provider}"
+            + (f"/{model}" if model else "")
+            + f" · charged {len(cases) * TASK_CREDITS_PER_CASE} credits"
+        )
 
     provider_inst = build_provider(
         provider,
@@ -122,6 +130,7 @@ def run_task_experiment(
     total = len(cases)
 
     for index, case in enumerate(cases, start=1):
+        case_started = time.perf_counter()
         prompt = _build_task_prompt(task, case)
         with recorder.case(case.id) as trace:
             call_started = time.perf_counter()
@@ -215,6 +224,14 @@ def run_task_experiment(
                 )
         if on_progress:
             on_progress(index, total)
+        case_ms = (time.perf_counter() - case_started) * 1000.0
+        record = records[-1] if records else None
+        if record is not None and record.ok:
+            _log(f"[{index}/{total}] ✓ {case.id} · {case_ms:.0f} ms")
+        else:
+            _log(
+                f"[{index}/{total}] ✗ {case.id} · error {record.error_kind if record else '?'} · {case_ms:.0f} ms"
+            )
 
     metrics = {
         "n_cases": len(cases),
@@ -222,6 +239,10 @@ def run_task_experiment(
         "accuracy": round((sum(1 for r in records if r.ok) / len(cases)) if cases else 0.0, 4),
         "per_rule": summarize_rule_scores(rule_scores_by_case),
     }
+    _log(
+        f"metrics: {metrics['n_valid']}/{metrics['n_cases']} valid "
+        f"· accuracy {metrics['accuracy']:.4f}"
+    )
     created_at = datetime.now(UTC)
     model_slug = (
         re.sub(r"[^a-z0-9]+", "-", (provider_inst.model or provider).lower()).strip("-") or "model"

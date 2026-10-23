@@ -291,9 +291,16 @@ def run_experiment(
     limit: int | None = None,
     run_id: str | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_log: Callable[[str], None] | None = None,
 ) -> RunResult:
-    """Execute one experiment end to end and persist all artifacts."""
+    """Execute one experiment end to end and persist all artifacts.
+
+    ``on_log`` receives human-readable milestone lines (config loaded,
+    provider ready, per-case results, metrics) so callers such as the
+    dashboard can stream an execution log while the run is in flight.
+    """
     started = time.perf_counter()
+    _log = on_log or (lambda _msg: None)
     from .credits import BENCHMARK_RUN_CREDITS, consume_run, run_credit_id
 
     # Metering: one benchmark run = one flat price (30 credits = $3.00),
@@ -310,6 +317,11 @@ def run_experiment(
     if limit is not None:
         cases = cases[:limit]
 
+    _log(
+        f"config {config.experiment.name} · dataset {info.name}@{info.version} "
+        f"({config.experiment.split}) · {len(cases)} cases"
+    )
+
     examples: list[dict[str, Any]] = []
     build_started = time.perf_counter()
     if config.prompt.few_shot_count:
@@ -322,6 +334,7 @@ def run_experiment(
     provider = _make_provider(config, examples, system_text)
     prompt_build_ms = (time.perf_counter() - build_started) * 1000.0
     prompt_meta = _effective_prompt_meta(provider, prompt_meta)
+    _log(f"provider {provider.name} · model {provider.model}")
 
     # Optional LLM-as-judge on top of the rule-based metrics. Built once; a
     # judge that cannot be constructed disables judging with a loud warning
@@ -334,8 +347,12 @@ def run_experiment(
             judge_instance = build_provider(
                 judge_section.provider, model=judge_section.model, options=judge_section.options
             )
+            _log(
+                f"judge {judge_section.provider} · model {judge_instance.model or judge_section.model}"
+            )
         except Exception as exc:  # noqa: BLE001 - judge is optional
             judge_warning = str(exc)
+            _log(f"judge unavailable ({exc}) — judging is advisory")
 
     recorder = TraceRecorder()
     records: list[PredictionRecord] = []
@@ -343,8 +360,10 @@ def run_experiment(
     judge_failures = 0
     total = len(cases)
     for index, case in enumerate(cases, start=1):
+        case_started = time.perf_counter()
         with recorder.case(case.id) as trace:
             call_started = time.perf_counter()
+            record = None
             try:
                 response = provider.predict(case)
             except ProviderError as exc:
@@ -354,7 +373,8 @@ def run_experiment(
                     error=str(exc),
                     detail={"provider": provider.name, "model": provider.model},
                 )
-                records.append(_provider_failure_record(case, exc))
+                record = _provider_failure_record(case, exc)
+                records.append(record)
             else:
                 trace.add(
                     SPAN_PROVIDER_CALL,
@@ -411,8 +431,24 @@ def run_experiment(
                 records.append(record)
         if on_progress:
             on_progress(index, total)
+        case_ms = (time.perf_counter() - case_started) * 1000.0
+        if record is not None and record.ok:
+            _log(f"[{index}/{total}] ✓ {case.id} · correct={record.correct} · {case_ms:.0f} ms")
+        elif record is not None:
+            _log(
+                f"[{index}/{total}] ✗ {case.id} · error {record.error_kind or 'invalid'} · "
+                f"{case_ms:.0f} ms"
+            )
 
     metrics = compute_metrics(records, config.evaluation.metrics, model=provider.model)
+    _log(
+        "metrics computed: "
+        + " · ".join(
+            f"{key} {metrics[key]:.4f}"
+            for key in ("accuracy", "macro_f1", "schema_validity")
+            if key in metrics
+        )
+    )
     if judge_instance is not None:
         metrics["judge"] = {
             "provider": judge_section.provider,

@@ -342,12 +342,17 @@
 
         <div class="run-progress" id="run-progress" style="display:none;">
           <div class="progress-label">
-            <span id="progress-text">Starting…</span>
+            <span class="progress-title">
+              <span class="run-live-icon" id="run-live-icon" data-state="busy" aria-hidden="true"></span>
+              <span id="progress-text">Starting…</span>
+            </span>
+            <span id="progress-elapsed" class="progress-elapsed">0s</span>
             <span id="progress-counter" class="progress-counter">0 / 0</span>
           </div>
           <div class="progress-bar">
             <div class="progress-fill" id="progress-fill"></div>
           </div>
+          <div class="run-log" id="run-log" aria-label="Execution log" aria-live="polite"></div>
         </div>
 
         <div id="run-result" class="run-result" style="display:none;">
@@ -665,7 +670,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=24"></script>
+<script src="/static/app.js?v=25"></script>
 <script src="/static/shell.js?v=3"></script>
 </body>
 </html>

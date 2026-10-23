@@ -3,6 +3,8 @@
 [![CI](https://github.com/seyhunak/forgebench/actions/workflows/tests.yml/badge.svg)](https://github.com/seyhunak/forgebench/actions/workflows/tests.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Stripe: sandbox](https://img.shields.io/badge/stripe-sandbox-635bff.svg)](services/stripe_webhook/README.md)
 [![Status: MVP](https://img.shields.io/badge/status-MVP-informational.svg)](LICENSE)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Tests: pytest](https://img.shields.io/badge/tests-pytest-0A0A0A.svg)](https://docs.pytest.org/)
@@ -53,7 +55,7 @@ The tool itself is proprietary (see [LICENSE](LICENSE)): the **Community tier is
 
 ## 🏷️ Pricing: credit packs (Stripe)
 
-Credits are the unit of purchase: **$0.10 per credit, and every benchmark or task run consumes 1 credit** — runs are counted, not seats. A **dataset pack** can be bought from the same wallet. The Stripe fulfillment loop is wired end-to-end in this repository: checkout → webhook (`services/stripe_webhook`) → single-use voucher code → `forgebench redeem FB-…` → local credit ledger (`.forgebench/credits.json`, git-ignored).
+Credits are the unit of purchase: **$0.10 per credit.** Metering: a benchmark run costs **30 credits ($3.00) flat** — one price whatever the case limit — and a custom-task run costs **1 credit ($0.10) per case** (each case is one model call). Runs are counted, not seats. A **dataset pack** can be bought from the same wallet. The Stripe fulfillment loop is wired end-to-end in this repository: checkout → webhook (`services/stripe_webhook`) → single-use voucher code → `forgebench redeem FB-…` → local credit ledger (`.forgebench/credits.json`, git-ignored).
 
 | Package | Credits | Price |
 |---------|--------:|------:|

@@ -1222,6 +1222,20 @@ select[multiple] {
   margin-bottom: var(--space-xs);
 }
 
+.progress-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.progress-elapsed {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-3);
+}
+
 .progress-counter {
   font-family: var(--mono);
   font-size: 0.75rem;
@@ -1241,6 +1255,118 @@ select[multiple] {
   background: var(--accent);
   border-radius: var(--pill);
   transition: width 240ms var(--ease);
+}
+
+/* Indeterminate sweep while the dataset/provider are still loading. */
+.progress-fill--indeterminate {
+  width: 100%;
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 45%, var(--accent) 55%, transparent 100%);
+  background-size: 200% 100%;
+  animation: progress-sweep 1.1s linear infinite;
+}
+
+@keyframes progress-sweep {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Live status icon beside the progress text. */
+.run-live-icon {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--pill);
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  animation: run-live-spin 0.8s linear infinite;
+  flex: none;
+  position: relative;
+}
+
+.run-live-icon::after {
+  position: absolute;
+  top: -4px;
+  left: -2px;
+  font-size: 0.875rem;
+  line-height: 1;
+  font-weight: 700;
+  display: none;
+}
+
+.run-live-icon[data-state="busy"] {
+  /* spinner stays */
+}
+
+.run-live-icon[data-state="done"] {
+  animation: none;
+  border: none;
+  width: 0;
+  height: 0;
+  padding: 0;
+  position: static;
+}
+
+.run-live-icon[data-state="done"]::after {
+  display: block;
+  content: "✓";
+  color: var(--success);
+  position: static;
+}
+
+.run-live-icon[data-state="error"] {
+  animation: none;
+  border: none;
+  width: 0;
+  height: 0;
+  padding: 0;
+  position: static;
+}
+
+.run-live-icon[data-state="error"]::after {
+  display: block;
+  content: "✗";
+  color: var(--danger);
+  position: static;
+}
+
+@keyframes run-live-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Execution log streamed from the worker thread. */
+.run-log {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface);
+  border: var(--rule);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  line-height: 1.7;
+  max-height: 240px;
+  overflow-y: auto;
+  color: var(--ink-2);
+}
+
+.run-log:empty {
+  display: none;
+}
+
+.run-log--line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.run-log--ok {
+  color: var(--ink-2);
+}
+
+.run-log--error {
+  color: var(--danger);
+}
+
+.run-log--info {
+  color: var(--ink-3);
 }
 
 /* ---------- Run cards ---------- */

@@ -535,7 +535,16 @@ def test_start_task_run_n_models(monkeypatch: pytest.MonkeyPatch) -> None:
     from forgebench.task_runner import TaskRunResult
 
     def fake(
-        name, split, provider, model, judge_provider, judge_model, limit, output_root, on_progress
+        name,
+        split,
+        provider,
+        model,
+        judge_provider,
+        judge_model,
+        limit,
+        output_root,
+        on_progress,
+        on_log=None,
     ):
         on_progress(2, 2)
         return TaskRunResult(
@@ -566,7 +575,16 @@ def test_n_model_endpoint_runs_three_models(monkeypatch: pytest.MonkeyPatch) -> 
     calls: list[str] = []
 
     def fake(
-        name, split, provider, model, judge_provider, judge_model, limit, output_root, on_progress
+        name,
+        split,
+        provider,
+        model,
+        judge_provider,
+        judge_model,
+        limit,
+        output_root,
+        on_progress,
+        on_log=None,
     ):
         calls.append(model)
         on_progress(2, 2)

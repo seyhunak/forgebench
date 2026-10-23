@@ -119,7 +119,16 @@ def test_start_task_run_executes_both_models_when_model_2_is_set(monkeypatch) ->
     calls: list[str] = []
 
     def fake(
-        name, split, provider, model, judge_provider, judge_model, limit, output_root, on_progress
+        name,
+        split,
+        provider,
+        model,
+        judge_provider,
+        judge_model,
+        limit,
+        output_root,
+        on_progress,
+        on_log=None,
     ):
         calls.append(model)
         for i in (1, 2):
@@ -179,7 +188,16 @@ def test_start_task_run_single_model_unchanged(monkeypatch) -> None:
     from forgebench.task_runner import TaskRunResult
 
     def fake(
-        name, split, provider, model, judge_provider, judge_model, limit, output_root, on_progress
+        name,
+        split,
+        provider,
+        model,
+        judge_provider,
+        judge_model,
+        limit,
+        output_root,
+        on_progress,
+        on_log=None,
     ):
         on_progress(2, 2)
         return TaskRunResult(

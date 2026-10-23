@@ -73,6 +73,9 @@ const els = {
   progressText: document.getElementById("progress-text"),
   progressCounter: document.getElementById("progress-counter"),
   progressFill: document.getElementById("progress-fill"),
+  progressElapsed: document.getElementById("progress-elapsed"),
+  runLiveIcon: document.getElementById("run-live-icon"),
+  runLog: document.getElementById("run-log"),
   runResult: document.getElementById("run-result"),
   resRunId: document.getElementById("res-run-id"),
   resAccuracy: document.getElementById("res-accuracy"),
@@ -1523,6 +1526,38 @@ function renderPredictionsTable(container, records) {
 // ---------- Run ----------
 
 let progressInterval = null;
+let runLogRendered = 0;
+let localRunStart = 0;
+
+/** Live run status icon: spinner while working, ✓ done, ✗ failed. */
+function setRunIcon(state) {
+  els.runLiveIcon.dataset.state = state;
+}
+
+/** Human elapsed "1m 42s" since the run started (server or local clock). */
+function runElapsedText(startedAt) {
+  const base = startedAt ? Date.parse(startedAt) : NaN;
+  const start = Number.isFinite(base) ? base : localRunStart;
+  const secs = Math.max(0, Math.floor((Date.now() - start) / 1000));
+  return secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`;
+}
+
+/** Append new log entries from the poll payload (icon by kind). */
+function renderRunLog(entries) {
+  if (!entries || entries.length <= runLogRendered) return;
+  const fresh = entries.slice(runLogRendered);
+  runLogRendered = entries.length;
+  const frag = document.createDocumentFragment();
+  for (const entry of fresh) {
+    const line = document.createElement("div");
+    line.className = `run-log--line run-log--${entry.kind || "info"}`;
+    const icon = entry.kind === "ok" ? "✓" : entry.kind === "error" ? "✗" : "›";
+    line.textContent = `${icon} ${entry.text}`;
+    frag.appendChild(line);
+  }
+  els.runLog.appendChild(frag);
+  els.runLog.scrollTop = els.runLog.scrollHeight;
+}
 
 els.btnRun.addEventListener("click", async () => {
   const config = els.configSelect.value;
@@ -1550,21 +1585,35 @@ els.btnRun.addEventListener("click", async () => {
 
     const runIdRes = data.run_id;
     show(els.runProgress);
+    runLogRendered = 0;
+    localRunStart = Date.now();
+    els.runLog.innerHTML = "";
+    setRunIcon("busy");
     els.progressText.textContent = "Starting…";
     els.progressCounter.textContent = "0 / 0";
+    els.progressElapsed.textContent = "0s";
     els.progressFill.style.width = "0%";
 
     progressInterval = setInterval(async () => {
       try {
         const state = await fetchJSON(`/api/run/${runIdRes}/progress`);
-        els.progressText.textContent = state.status === "running" ? "Running…" : "Processing…";
+        els.progressElapsed.textContent = runElapsedText(state.started_at);
         const p = state.progress;
         if (p && p.total > 0) {
+          els.progressText.textContent = state.status === "running" ? "Running cases" : "Processing…";
           els.progressCounter.textContent = `${p.done} / ${p.total}`;
           els.progressFill.style.width = `${(p.done / p.total) * 100}%`;
+        } else if (state.status === "running") {
+          // Still loading the dataset/provider — indeterminate progress.
+          els.progressText.textContent = "Loading dataset & provider…";
+          els.progressFill.classList.add("progress-fill--indeterminate");
         }
+        renderRunLog(state.log);
         if (state.status === "done") {
           clearInterval(progressInterval);
+          els.progressFill.classList.remove("progress-fill--indeterminate");
+          setRunIcon("done");
+          renderRunLog([{ text: `run complete — ${runElapsedText(state.started_at)}`, kind: "ok" }]);
           hide(els.runProgress);
           showRunResult(state.result);
           els.btnRun.disabled = false;
@@ -1573,7 +1622,9 @@ els.btnRun.addEventListener("click", async () => {
     dlog('Runs loaded');
         } else if (state.status === "error") {
           clearInterval(progressInterval);
-          hide(els.runProgress);
+          els.progressFill.classList.remove("progress-fill--indeterminate");
+          setRunIcon("error");
+          renderRunLog([{ text: `run failed: ${state.error}`, kind: "error" }]);
           setMessage(els.runMessage, `Run failed: ${state.error}`, "error");
           els.btnRun.disabled = false;
           els.btnRun.textContent = "Run benchmark";

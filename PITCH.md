@@ -76,7 +76,7 @@ reaches production.
 
 **Commercial model (built in-repo, live when the Stripe account is configured):** the repo is closed-source; the Community tier is free for internal evaluation and **monetization is credits, not seats —
 
-- **1 credit = $0.10; every benchmark or task run = 1 credit.** Runs are counted by the local ledger (`.forgebench/credits.json`).
+- **1 credit = $0.10.** Benchmark runs cost **30 credits ($3.00) flat** per run (one price whatever the case limit); custom-task runs cost **1 credit ($0.10) per case** (each case is one model call). Runs are counted by the local ledger (`.forgebench/credits.json`).
 - **Packs — Starter 50/$5, Growth 100/$10, Scale 250/$25, Max 500/$50.** Stripe checkout → webhook voucher → `forgebench redeem` → local balance.
 - **Domain dataset pack — 250 credits / $25**, from the same wallet.
 - **Enterprise Unlimited — $5,000 one-time.** Unlimited runs, SSO/on-prem priorities, shapes the shared-backend roadmap.

@@ -14,6 +14,7 @@ import re
 import shutil
 import threading
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,19 @@ class _ProgressReporter:
 
     def __call__(self, done: int, total: int) -> None:
         _run_state[self.run_id]["progress"] = {"done": done, "total": total}
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def _log_entry(line: str) -> dict[str, Any]:
+    """Classify a runner log line so the UI can pick an icon for it."""
+    if line.startswith("["):  # per-case line: "[3/20] ✓ case-id …"
+        kind = "ok" if " ✓ " in line else "error"
+    else:
+        kind = "info"
+    return {"at": _now_iso(), "kind": kind, "text": line}
 
 
 class CredentialSave(BaseModel):
@@ -918,10 +932,20 @@ def start_run(payload: RunRequest) -> dict[str, str]:
         "progress": {"done": 0, "total": 0},
         "result": None,
         "error": None,
+        "started_at": _now_iso(),
+        "log": [_log_entry("run queued · one benchmark run = flat 30 credits ($3.00)")],
     }
+
+    MAX_LOG_LINES = 400
 
     def _worker() -> None:
         try:
+
+            def _on_log(line: str) -> None:
+                entry = _run_state[run_id]["log"]
+                entry.append(_log_entry(line))
+                del entry[:-MAX_LOG_LINES]
+
             reporter = _ProgressReporter(run_id)
             result = run_experiment(
                 experiment,
@@ -929,6 +953,7 @@ def start_run(payload: RunRequest) -> dict[str, str]:
                 limit=payload.limit,
                 run_id=payload.run_id,
                 on_progress=reporter,
+                on_log=_on_log,
             )
             _run_state[run_id]["status"] = "done"
             _run_state[run_id]["result"] = {
@@ -1181,10 +1206,20 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, Any]:
         "result": None,
         "error": None,
         "type": "task",
+        "started_at": _now_iso(),
+        "log": [],
     }
 
     def _worker() -> None:
         try:
+
+            def _on_log(line: str) -> None:
+                state = _run_state.get(run_id)
+                if state is not None:
+                    log = state["log"]
+                    log.append(_log_entry(line))
+                    del log[:-400]
+
             _, cases = load_task_with_cases(name, payload.split)
             n_cases = len(cases)
             ordered: list[str] = [model]
@@ -1195,6 +1230,7 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, Any]:
                         ordered.append(candidate)
             models = ordered
             total = n_cases * len(models)
+            _run_state[run_id]["log"] = []
             results: list[dict[str, Any]] = []
             for index, mdl in enumerate(models):
                 base = index * n_cases
@@ -1215,6 +1251,7 @@ def start_task_run(name: str, payload: TaskRunRequest) -> dict[str, Any]:
                         limit=payload.limit,
                         output_root=Path(payload.output_root),
                         on_progress=reporter,
+                        on_log=_on_log,
                     )
                 except Exception:  # noqa: BLE001 - surface in run state, not worker death
                     import traceback
