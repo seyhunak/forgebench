@@ -13,6 +13,9 @@ service ``forgebench_stripe``):
 - ``GET /packages`` / ``GET /health`` — catalog with payment links, and
   liveness.
 
+Run via devctl as service ``forgebench-stripe`` (webhook process) plus
+``forgebench-stripe-listen`` (the Stripe CLI sandbox forwarder).
+
 Configuration (environment):
 - ``STRIPE_WEBHOOK_SECRET`` — required for webhook verification; the
   service boots without it (health/packages still work) and the webhook
@@ -276,6 +279,13 @@ async def health() -> JSONResponse:
 
 def main() -> None:
     import uvicorn
+
+    try:  # the launchd/devctl process must see STRIPE_* from the repo .env
+        from dotenv import load_dotenv
+
+        load_dotenv(Path.cwd() / ".env")
+    except ImportError:
+        pass
 
     uvicorn.run(
         app,
