@@ -22,3 +22,6 @@ venv/
 
 # OS
 .DS_Store
+
+# Generated run artifacts (created by `forgebench run` / `task-run`)
+runs/

@@ -16,6 +16,8 @@ inference:
   max_tokens: 1024
 prompt:
   system: null
+  name: null
+  version: null
   few_shot_count: 0
 evaluation:
   metrics:
@@ -26,4 +28,5 @@ evaluation:
   - schema_validity
   - latency
   - estimated_cost
+  judge: null
 
