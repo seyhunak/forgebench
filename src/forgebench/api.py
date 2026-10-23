@@ -513,6 +513,69 @@ def delete_env(name: str) -> dict[str, str | None]:
     return {"name": name, "removed_from": str(removed) if removed else None}
 
 
+# ------------------------------------------------------------------ credits --
+
+class CreditRedeem(BaseModel):
+    code: str
+    service: str = ""
+
+
+def _credits_service_url() -> str:
+    return (os.environ.get("FORGEBENCH_CREDITS_SERVICE") or "http://127.0.0.1:8583").rstrip("/")
+
+
+def _stripe_packages() -> dict[str, Any]:
+    """The service's catalog; empty dict when it is off or unreachable."""
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(  # noqa: S310 — localhost service
+            f"{_credits_service_url()}/packages", timeout=2
+        ) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+        return {}
+
+
+@app.get("/api/credits")
+def credits_status() -> dict[str, Any]:
+    """Local credit ledger status plus the live package catalog."""
+    from .credits import status
+
+    state = status()
+    catalog = _stripe_packages()
+    state["packages"] = catalog.get("packages", {})
+    state["payment_links"] = catalog.get("payment_links", {})
+    state["service"] = _credits_service_url()
+    state["service_up"] = bool(catalog)
+    return state
+
+
+@app.post("/api/credits/redeem")
+def redeem_credits(payload: CreditRedeem) -> dict[str, Any]:
+    """Redeem one voucher code into the local credit ledger."""
+    import urllib.error
+
+    from .credits import redeem
+
+    if not payload.code.strip():
+        raise HTTPException(status_code=400, detail="Voucher code is required.")
+    try:
+        state = redeem(payload.code, service_url=payload.service.strip() or None)
+    except urllib.error.HTTPError as exc:
+        raise HTTPException(
+            status_code=exc.code or 400, detail=f"Voucher rejected: {exc.reason}"
+        ) from exc
+    except (urllib.error.URLError, TimeoutError) as exc:  # noqa: UP041 — tuple form
+        raise HTTPException(
+            status_code=503,
+            detail=f"Credit service unreachable at {_credits_service_url()} — "
+            "start it with devctl (forgebench-stripe) and retry.",
+        ) from exc
+    return state
+
+
 @app.get("/api/models")
 def list_models() -> dict[str, Any]:
     """All providers and models from https://models.dev/api.json."""

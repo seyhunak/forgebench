@@ -24,6 +24,18 @@ let dlog = () => {};
 // DOM elements
 const els = {
   keyProvider: document.getElementById("key-provider"),
+  creditsBalance: document.getElementById("credits-balance"),
+  creditsMode: document.getElementById("credits-mode"),
+  creditsUnlimited: document.getElementById("credits-unlimited"),
+  creditsLedgerPath: document.getElementById("credits-ledger-path"),
+  creditsCode: document.getElementById("credits-code"),
+  btnCreditsRedeem: document.getElementById("btn-credits-redeem"),
+  btnCreditsRefresh: document.getElementById("btn-credits-refresh"),
+  creditsMessage: document.getElementById("credits-message"),
+  creditsError: document.getElementById("credits-error"),
+  creditsPackagesBody: document.getElementById("credits-packages-body"),
+  creditsGrantsBody: document.getElementById("credits-grants-body"),
+  creditsUsageBody: document.getElementById("credits-usage-body"),
   keyInput: document.getElementById("key-input"),
   modelSelect: document.getElementById("model-select"),
   modelDetails: document.getElementById("model-details"),
@@ -2079,6 +2091,77 @@ els.taskJudgeProvider.addEventListener("change", async () => {
 
 // ---------- Init ----------
 
+// ---------- Credits view (08) ----------
+
+function renderCredits(state) {
+  els.creditsBalance.textContent = state.unlimited ? "unlimited" : state.balance;
+  els.creditsMode.textContent = state.mode;
+  els.creditsUnlimited.textContent = state.unlimited ? "yes" : "no";
+  els.creditsLedgerPath.textContent =
+    `ledger: ${state.ledger} · service: ${state.service}` +
+    (state.service_up ? " (up)" : " (unreachable — devctl: forgebench-stripe)");
+
+  const links = state.payment_links || {};
+  const rows = Object.entries(state.packages || {}).map(([name, pkg]) => {
+    const link = links[name];
+    const buy = link
+      ? `<a class="button button--primary" href="${escapeAttr(link)}" target="_blank" rel="noopener">Buy</a>`
+      : `<span class="field-hint">link pending</span>`;
+    return `<tr><td>${escapeHtml(pkg.label)}</td><td>${escapeHtml(pkg.credits)}</td>` +
+      `<td>$${escapeHtml(pkg.usd)}</td><td>${buy}</td></tr>`;
+  });
+  els.creditsPackagesBody.innerHTML = rows.join("") ||
+    `<tr><td colspan="4">Package catalog unavailable — credit service is off.</td></tr>`;
+
+  const grants = (state.grants || []).map((g) =>
+    `<tr><td>${escapeHtml(g.code)}</td><td>${escapeHtml(g.package)}</td>` +
+    `<td>${escapeHtml(g.unlimited ? "unlimited" : `${g.credits} credits`)}</td>` +
+    `<td>${escapeHtml(g.at)}</td></tr>`);
+  els.creditsGrantsBody.innerHTML = grants.join("") ||
+    `<tr><td colspan="4">No vouchers redeemed yet.</td></tr>`;
+
+  const usage = [...(state.usage || [])].reverse().slice(0, 12).map((u) =>
+    `<tr><td>${escapeHtml(u.at)}</td><td>${escapeHtml(u.kind)}</td>` +
+    `<td>${escapeHtml(u.run)}</td><td>${escapeHtml(u.credits)}</td></tr>`);
+  els.creditsUsageBody.innerHTML = usage.join("") ||
+    `<tr><td colspan="4">No runs counted yet (ledger mode is off until FORGEBENCH_CREDITS_MODE is set).</td></tr>`;
+}
+
+async function loadCredits() {
+  try {
+    renderCredits(await fetchJSON("/api/credits"));
+  } catch (err) {
+    setMessage(els.creditsError, `Credit status unavailable: ${err.message}`, "error");
+  }
+}
+
+async function redeemCredits() {
+  const code = els.creditsCode.value.trim();
+  if (!code) {
+    setMessage(els.creditsMessage, "Enter a voucher code first.", "error");
+    return;
+  }
+  els.btnCreditsRedeem.disabled = true;
+  try {
+    const state = await fetchJSON("/api/credits/redeem", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+    const balance = state.unlimited ? "unlimited" : `${state.balance} credits`;
+    setMessage(
+      els.creditsMessage,
+      `Redeemed ${code} (${state.package}). New balance: ${balance}.`,
+      "success"
+    );
+    els.creditsCode.value = "";
+    await loadCredits();
+  } catch (err) {
+    setMessage(els.creditsMessage, `Redeem failed: ${err.message}`, "error");
+  } finally {
+    els.btnCreditsRedeem.disabled = false;
+  }
+}
+
 async function init() {
   try {
     // Debug overlay — opt-in via ?debug so it never intrudes on the UI.
@@ -2119,7 +2202,10 @@ async function init() {
       'task-progress-fill', 'task-result', 'task-res-run-id', 'task-res-cases',
       'task-res-valid', 'task-btn-open-run', 'task-runs-grid',
       'setup-message', 'setup-file', 'setup-providers', 'setup-custom',
-      'setup-name', 'setup-value', 'btn-setup-add'];
+      'setup-name', 'setup-value', 'btn-setup-add',
+      'credits-balance', 'credits-mode', 'credits-unlimited', 'credits-ledger-path',
+      'credits-code', 'btn-credits-redeem', 'btn-credits-refresh', 'credits-message',
+      'credits-packages-body', 'credits-grants-body', 'credits-usage-body', 'credits-error'];
     const missing = critical.filter(id => !document.getElementById(id));
     if (missing.length > 0) {
       throw new Error('Missing DOM elements: ' + missing.join(', '));
@@ -2145,6 +2231,10 @@ async function init() {
     dlog('Runs loaded');
     await loadTasks();
     dlog('Tasks loaded');
+    await loadCredits();
+    dlog('Credits loaded');
+    els.btnCreditsRedeem.addEventListener("click", redeemCredits);
+    els.btnCreditsRefresh.addEventListener("click", loadCredits);
   } catch (err) {
     const errEl = document.createElement('div');
     errEl.style.cssText = 'position:fixed;top:1rem;left:1rem;right:1rem;background:#dc2626;color:#fff;padding:1rem;border-radius:6px;z-index:9999;font-family:monospace;font-size:0.875rem;';

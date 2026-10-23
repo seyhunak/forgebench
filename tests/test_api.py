@@ -478,3 +478,47 @@ def test_prompt_endpoints_report_missing_things_honestly(
     with pytest.raises(HTTPException) as missing_version:
         get_prompt_endpoint("classify", version=5)
     assert missing_version.value.status_code == 404
+
+
+# ------------------------------------------------------------------ credits --
+
+
+def test_credits_routes_are_registered() -> None:
+    assert "/api/credits" in _paths()
+    assert _matched("/api/credits/redeem", method="POST") == "/api/credits/redeem"
+
+
+def test_credits_status_shape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("FORGEBENCH_CREDITS_PATH", str(tmp_path / "credits.json"))
+    monkeypatch.setenv("FORGEBENCH_CREDITS_MODE", "observe")
+    # Pin the service to a dead port: status must not fail when it is down.
+    monkeypatch.setenv("FORGEBENCH_CREDITS_SERVICE", "http://127.0.0.1:1")
+
+    from forgebench.api import credits_status
+
+    state = credits_status()
+    assert state["balance"] == 0
+    assert state["unlimited"] is False
+    assert state["mode"] == "observe"
+    assert state["packages"] == {}
+    assert state["service_up"] is False
+
+
+def test_redeem_unreachable_service_is_503(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("FORGEBENCH_CREDITS_PATH", str(tmp_path / "credits.json"))
+    monkeypatch.setenv("FORGEBENCH_CREDITS_SERVICE", "http://127.0.0.1:1")
+
+    from forgebench.api import CreditRedeem, redeem_credits
+
+    with pytest.raises(HTTPException) as boom:
+        redeem_credits(CreditRedeem(code="FB-STARTER_50-WILLFAIL"))
+    assert boom.value.status_code == 503
+    assert "unreachable" in boom.value.detail
+
+
+def test_redeem_rejects_blank_code() -> None:
+    from forgebench.api import CreditRedeem, redeem_credits
+
+    with pytest.raises(HTTPException) as boom:
+        redeem_credits(CreditRedeem(code="   "))
+    assert boom.value.status_code == 400

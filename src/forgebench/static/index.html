@@ -59,6 +59,7 @@
       <li><button type="button" class="rail-link" data-view="run" data-label="Run"><span class="rail-num">05</span>Run</button></li>
       <li><button type="button" class="rail-link" data-view="results" data-label="Results"><span class="rail-num">06</span>Results</button></li>
       <li><button type="button" class="rail-link" data-view="tasks" data-label="Custom tasks"><span class="rail-num">07</span>Tasks</button></li>
+      <li><button type="button" class="rail-link" data-view="credits" data-label="Credits"><span class="rail-num">08</span>Credits</button></li>
     </ul>
     <div class="rail-foot">
       <div class="rail-chip"><span class="rail-dot" id="rail-dot" data-state="none"></span><span class="rail-foot__key" id="rail-dot-label">key not set</span></div>
@@ -514,6 +515,89 @@
       </div>
     </section>
 
+    <section class="view" id="view-credits" data-view="credits" aria-label="Credits">
+      <header class="view-head">
+        <div>
+          <p class="view-kicker">08 · Credits</p>
+          <h2 class="view-title">Credits</h2>
+        </div>
+        <p class="view-lede">Every run consumes 1 credit ($0.10). Buy a pack with Stripe, redeem the voucher code, and the balance lives here on this machine.</p>
+      </header>
+
+      <div class="view-body">
+        <div class="task-runs" style="border-top:none;padding-top:0;">
+          <div class="task-runs-head">
+            <h3 class="status-title">Balance</h3>
+            <button class="button" id="btn-credits-refresh">Refresh</button>
+          </div>
+          <div>
+            <div class="metric-item">
+              <span class="metric-item--value" id="credits-balance">—</span>
+              <span class="metric-item--label">Credits left</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-item--value" id="credits-mode">—</span>
+              <span class="metric-item--label">Ledger mode</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-item--value" id="credits-unlimited">—</span>
+              <span class="metric-item--label">Unlimited</span>
+            </div>
+          </div>
+          <p class="field-hint" id="credits-ledger-path"></p>
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label" for="credits-code">Voucher code</label>
+              <input type="text" id="credits-code" placeholder="FB-SCALE-250-AB12CD34">
+              <span class="field-hint">One-time code from your Stripe receipt (or the credit service log). Redeems once.</span>
+            </div>
+            <div class="form-field compact">
+              <span class="form-label">&nbsp;</span>
+              <button class="button button--primary" id="btn-credits-redeem">Redeem voucher</button>
+            </div>
+          </div>
+          <div id="credits-message" class="message"></div>
+        </div>
+
+        <div class="task-runs">
+          <div class="task-runs-head">
+            <h3 class="status-title">Credit packages</h3>
+            <span class="prompt-registry-hint">1 credit = $0.10 · dataset pack = 250 credits · Enterprise = unlimited</span>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr><th>Package</th><th>Credits</th><th>Price</th><th></th></tr>
+            </thead>
+            <tbody id="credits-packages-body"></tbody>
+          </table>
+        </div>
+
+        <div class="task-runs">
+          <div class="task-runs-head">
+            <h3 class="status-title">Grants</h3>
+          </div>
+          <table class="data-table">
+            <thead><tr><th>Code</th><th>Package</th><th>Amount</th><th>Redeemed at</th></tr></thead>
+            <tbody id="credits-grants-body"></tbody>
+          </table>
+        </div>
+
+        <div class="task-runs">
+          <div class="task-runs-head">
+            <h3 class="status-title">Recent runs</h3>
+            <span class="prompt-registry-hint">each run deducts 1 credit (ledger mode off until FORGEBENCH_CREDITS_MODE is set)</span>
+          </div>
+          <table class="data-table">
+            <thead><tr><th>At</th><th>Kind</th><th>Run</th><th>Credits</th></tr></thead>
+            <tbody id="credits-usage-body"></tbody>
+          </table>
+        </div>
+
+        <div id="credits-error" class="message"></div>
+      </div>
+    </section>
+
     <footer class="foot-line">
       <span>ForgeBench · domain adaptation benchmark harness · MVP (v0.2.0)</span>
       <a href="/docs" target="_blank" rel="noopener">API docs</a>
@@ -563,7 +647,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=18"></script>
+<script src="/static/app.js?v=19"></script>
 <script src="/static/shell.js?v=2"></script>
 </body>
 </html>
