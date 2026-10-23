@@ -155,3 +155,25 @@ class TestHealthAndCatalog:
 
     def test_grant_lookup_rejects_unknown(self) -> None:
         assert grant_for_package("mystery") is None
+
+
+class TestVoucherBySession:
+    def test_resolves_the_open_voucher_for_a_session(self, client: TestClient) -> None:
+        minted = _post_webhook(client, _event("scale_250")).json()
+        ledger = app_module._load_ledger()["vouchers"]
+        code = next(iter(ledger))
+        assert minted["voucher"] == code
+
+        response = client.get("/voucher/by-session/cs_test_123")
+        assert response.status_code == 200
+        assert response.json()["voucher"] == code
+        assert response.json()["package"] == "scale_250"
+
+    def test_unknown_session_is_404(self, client: TestClient) -> None:
+        assert client.get("/voucher/by-session/cs_nope").status_code == 404
+
+    def test_redeemed_vouchers_are_not_returned(self, client: TestClient) -> None:
+        _post_webhook(client, _event("scale_250"))
+        code = next(iter(app_module._load_ledger()["vouchers"]))
+        assert client.post("/redeem", json={"code": code}).status_code == 200
+        assert client.get("/voucher/by-session/cs_test_123").status_code == 404

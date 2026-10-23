@@ -522,3 +522,23 @@ def test_redeem_rejects_blank_code() -> None:
     with pytest.raises(HTTPException) as boom:
         redeem_credits(CreditRedeem(code="   "))
     assert boom.value.status_code == 400
+
+
+def test_complete_session_rejects_blank_id() -> None:
+    from forgebench.api import CreditSession, complete_credits
+
+    with pytest.raises(HTTPException) as boom:
+        complete_credits(CreditSession(session_id="   "))
+    assert boom.value.status_code == 400
+
+
+def test_complete_session_unreachable_service_is_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FORGEBENCH_CREDITS_SERVICE", "http://127.0.0.1:1")
+
+    from forgebench.api import CreditSession, complete_credits
+
+    with pytest.raises(HTTPException) as boom:
+        complete_credits(CreditSession(session_id="cs_test_dead"))
+    assert boom.value.status_code == 503

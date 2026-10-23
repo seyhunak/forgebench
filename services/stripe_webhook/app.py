@@ -234,6 +234,33 @@ async def stripe_webhook(request: Request) -> JSONResponse:
     return JSONResponse({"handled": True, "voucher": voucher})
 
 
+@app.get("/voucher/by-session/{session_id}")
+async def voucher_by_session(session_id: str) -> JSONResponse:
+    """Resolve a completed checkout session to its open voucher code.
+
+    Used by the dashboard redirect-after-payment flow: the payment link
+    sends the customer back with ``?topup={CHECKOUT_SESSION_ID}`` and the
+    dashboard exchanges that id for the voucher this service minted when
+    the webhook fired. Only open (unredeemed) vouchers are returned, and
+    the session id is unguessable, so this stays a tight surface.
+    """
+    ledger = _load_ledger()
+    for code, entry in ledger["vouchers"].items():
+        if entry.get("session_id") == session_id and not entry.get("redeemed"):
+            return JSONResponse(
+                {
+                    "voucher": code,
+                    "package": entry.get("package"),
+                    "grant": entry.get("grant"),
+                }
+            )
+    raise HTTPException(
+        status_code=404,
+        detail="No voucher minted for this session yet "
+        "(the checkout webhook may still be arriving).",
+    )
+
+
 @app.post("/redeem")
 async def redeem_voucher(request: Request) -> JSONResponse:
     try:

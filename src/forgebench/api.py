@@ -521,6 +521,10 @@ class CreditRedeem(BaseModel):
     service: str = ""
 
 
+class CreditSession(BaseModel):
+    session_id: str
+
+
 def _credits_service_url() -> str:
     return (os.environ.get("FORGEBENCH_CREDITS_SERVICE") or "http://127.0.0.1:8583").rstrip("/")
 
@@ -551,6 +555,47 @@ def credits_status() -> dict[str, Any]:
     state["service"] = _credits_service_url()
     state["service_up"] = bool(catalog)
     return state
+
+
+@app.post("/api/credits/complete")
+def complete_credits(payload: CreditSession) -> dict[str, Any]:
+    """Finish a top-up started at Stripe: session id → voucher → ledger.
+
+    The payment-link redirect sends the customer back with
+    ``?topup={CHECKOUT_SESSION_ID}``; the dashboard exchanges that id here.
+    Returns 404 ("still confirming") until the mint webhook has landed, so
+    the caller can retry.
+    """
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    from .credits import redeem
+
+    session_id = payload.session_id.strip()
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required.")
+    url = f"{_credits_service_url()}/voucher/by-session/" + urllib.parse.quote(session_id, safe="")
+    try:
+        with urllib.request.urlopen(  # noqa: S310 — localhost service
+            url, timeout=5
+        ) as response:
+            found = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise HTTPException(status_code=404, detail="still confirming — retry shortly") from exc
+        raise HTTPException(status_code=exc.code or 400, detail=exc.reason) from exc
+    except (urllib.error.URLError, TimeoutError) as exc:  # noqa: UP041 — tuple form
+        raise HTTPException(
+            status_code=503,
+            detail=f"Credit service unreachable at {_credits_service_url()}.",
+        ) from exc
+
+    return {
+        "voucher": found["voucher"],
+        "package": found["package"],
+        "state": redeem(found["voucher"]),
+    }
 
 
 @app.post("/api/credits/redeem")

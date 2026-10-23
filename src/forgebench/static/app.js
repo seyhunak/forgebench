@@ -2210,6 +2210,42 @@ async function loadCredits() {
   }
 }
 
+/** Finish a Stripe-topup redirect: ?topup={CHECKOUT_SESSION_ID} on the URL.
+    The webhook may land a beat after the browser is back, so poll a few
+    times before giving up. */
+async function completeTopup(sessionId) {
+  setMessage(els.creditsMessage, "Verifying your payment with Stripe…", "info");
+  const attempts = 6;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const done = await fetchJSON("/api/credits/complete", {
+        method: "POST",
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      const balance = done.state.unlimited
+        ? "unlimited"
+        : `${done.state.balance} credits`;
+      setMessage(
+        els.creditsMessage,
+        `Top-up complete — ${done.package} via voucher ${done.voucher}. New balance: ${balance}.`,
+        "success"
+      );
+      await loadCredits();
+      return;
+    } catch (err) {
+      if (i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+  }
+  setMessage(
+    els.creditsMessage,
+    "Top-up not confirmed yet — the checkout webhook hasn't minted a voucher for this payment. " +
+      "Refresh in a minute or redeem the code from your Stripe receipt manually.",
+    "error"
+  );
+}
+
 async function redeemCredits(event) {
   if (event) event.preventDefault();
   const code = els.creditsCode.value.trim();
@@ -2319,6 +2355,12 @@ async function init() {
     document.addEventListener("fb:view", (ev) => {
       if (ev.detail && ev.detail.view === "credits") loadCredits();
     });
+    // Returning from Stripe: ?topup={CHECKOUT_SESSION_ID} → finish locally.
+    const topup = new URLSearchParams(location.search).get("topup");
+    if (topup) {
+      history.replaceState(null, "", location.pathname + location.hash);
+      await completeTopup(topup);
+    }
   } catch (err) {
     const errEl = document.createElement('div');
     errEl.style.cssText = 'position:fixed;top:1rem;left:1rem;right:1rem;background:#dc2626;color:#fff;padding:1rem;border-radius:6px;z-index:9999;font-family:monospace;font-size:0.875rem;';

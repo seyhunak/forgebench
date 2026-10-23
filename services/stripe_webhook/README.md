@@ -51,6 +51,13 @@ Test-mode account `acct_1Q5YYN2mqUSt5owq` via the Stripe CLI:
    voucher.
    `stripe trigger` fixtures carry no metadata, which is exactly why
    `STRIPE_PRICE_MAP` exists as the safety net.
+4. Redirect-after-payment: every payment link is set to
+   `after_completion: redirect` →
+   `http://127.0.0.1:8501/?topup={CHECKOUT_SESSION_ID}#credits`. The
+   dashboard exchanges the session id for the open voucher via
+   `GET /voucher/by-session/{sid}` on this service and finishes the
+   redeem through `POST /api/credits/complete` (it polls while the mint
+   webhook is still in flight), then shows the new balance.
 
 ## Production
 
