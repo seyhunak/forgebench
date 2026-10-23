@@ -189,6 +189,7 @@ function safeText(el, text) {
 }
 
 function show(el, cls = "") {
+  if (!el) return;
   el.style.display = "";
   el.className = el.className.replace(/\bmessage--\w+\b/g, "").trim();
   if (cls) el.classList.add(cls);
@@ -196,6 +197,8 @@ function show(el, cls = "") {
 }
 
 function hide(el) {
+  if (!el) return;
+  el.style.display = "none";
   el.classList.add("hidden");
 }
 
@@ -1583,6 +1586,18 @@ els.btnRun.addEventListener("click", async () => {
     hide(els.runMessage);
     els.btnRun.disabled = true;
     els.btnRun.textContent = "Running…";
+    // Show the progress card immediately so the run never looks stuck,
+    // even before the first server response lands.
+    show(els.runProgress);
+    runLogRendered = 0;
+    localRunStart = Date.now();
+    els.runLog.innerHTML = "";
+    setRunIcon("busy");
+    els.progressText.textContent = "Queuing run…";
+    els.progressCounter.textContent = "0 / 0";
+    els.progressElapsed.textContent = "0s";
+    els.progressFill.style.width = "0%";
+    els.progressFill.classList.add("progress-fill--indeterminate");
 
     const data = await fetchJSON("/api/run", {
       method: "POST",
@@ -1590,15 +1605,14 @@ els.btnRun.addEventListener("click", async () => {
     });
 
     const runIdRes = data.run_id;
-    show(els.runProgress);
     runLogRendered = 0;
-    localRunStart = Date.now();
     els.runLog.innerHTML = "";
     setRunIcon("busy");
     els.progressText.textContent = "Starting…";
     els.progressCounter.textContent = "0 / 0";
     els.progressElapsed.textContent = "0s";
     els.progressFill.style.width = "0%";
+    els.progressFill.classList.add("progress-fill--indeterminate");
 
     progressInterval = setInterval(async () => {
       try {

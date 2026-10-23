@@ -245,14 +245,19 @@
   function mirror() {
     var keyText = statusKey ? statusKey.textContent.trim() : "";
     var set = keyText && keyText !== "—" && keyText.indexOf("(not set)") === -1;
+    var provSelect = document.getElementById("key-provider");
+    var prov = (provSelect && provSelect.value) || "ollama";
+    var modelText = statusModel ? statusModel.textContent.trim() : "";
+    if (!modelText || modelText === "(not set)") modelText = "beam:cloud";
+    var providerModel = prov + " · " + modelText;
 
     if (chipKey) {
       chipKey.textContent = keyText || "—";
       chipKey.hidden = !set;
     }
     if (chipModel) {
-      chipModel.textContent = statusModel ? statusModel.textContent.trim() : "—";
-      chipModel.hidden = !statusModel;
+      chipModel.textContent = set ? providerModel : "ollama · beam:cloud";
+      chipModel.hidden = false;
     }
     if (dot) dot.dataset.state = set ? "set" : "none";
     if (dotLabel) dotLabel.textContent = set ? "key set" : "key not set";
