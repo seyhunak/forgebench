@@ -79,7 +79,7 @@ _DEFAULT_MODELS_FOR_PROVIDER = {
     "openai": "gpt-4o-mini",
     "anthropic": "claude-sonnet-4-5",
     "google": "gemini-flash-latest",
-    "ollama": "llama3.1:8b",
+    "ollama": "beam:cloud",
 }
 
 

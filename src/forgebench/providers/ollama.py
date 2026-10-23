@@ -104,10 +104,10 @@ class OllamaProvider:
             (model or "").strip()
             or os.environ.get("OLLAMA_MODEL", "").strip()
             or get_value("OLLAMA_MODEL")
-            or "llama3.1:8b"
+            or "beam:cloud"
         )
         if not resolved:
-            raise ProviderError("Ollama needs a model id, e.g. --model llama3.1:8b.")
+            raise ProviderError("Ollama needs a model id, e.g. --model beam:cloud.")
         self.model = resolved
         self.base_url = ollama_host().rstrip("/")
         self.temperature = temperature
