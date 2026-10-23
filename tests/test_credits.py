@@ -65,6 +65,40 @@ class TestConsumeRun:
         with pytest.raises(credits.CreditsError):
             credits.consume_run("benchmark", "run-2")
 
+    def test_benchmark_run_costs_thirty_credits(
+        self, ledger_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _set_mode(monkeypatch, "observe")
+        credits.apply_grant(
+            {"voucher": "F1", "package": "", "label": "", "credits": 100, "unlimited": False}
+        )
+        result = credits.consume_run("benchmark", "run-1", amount=credits.BENCHMARK_RUN_CREDITS)
+        assert result["balance"] == 70
+        data = json.loads(ledger_path.read_text())
+        assert data["usage"][-1]["credits"] == 30
+
+    def test_enforce_refuses_benchmark_without_full_price(
+        self, ledger_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _set_mode(monkeypatch, "enforce")
+        credits.apply_grant(
+            {"voucher": "F1", "package": "", "label": "", "credits": 29, "unlimited": False}
+        )
+        with pytest.raises(credits.CreditsError, match="needs 30"):
+            credits.consume_run("benchmark", "run-1", amount=credits.BENCHMARK_RUN_CREDITS)
+
+    def test_task_run_costs_one_credit_per_case(
+        self, ledger_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _set_mode(monkeypatch, "observe")
+        credits.apply_grant(
+            {"voucher": "F1", "package": "", "label": "", "credits": 50, "unlimited": False}
+        )
+        result = credits.consume_run("task", "triage-run", amount=3 * credits.TASK_CREDITS_PER_CASE)
+        assert result["balance"] == 47
+        data = json.loads(ledger_path.read_text())
+        assert data["usage"][-1]["credits"] == 3
+
     def test_unlimited_never_decrements(
         self, ledger_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

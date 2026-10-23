@@ -336,6 +336,7 @@
         <div class="button-group">
           <button class="button button--primary" id="btn-run">Run benchmark</button>
         </div>
+        <p class="field-hint">Metered: each benchmark run costs <strong>30 credits ($3.00)</strong> flat — one price whatever the case limit.</p>
 
         <div id="run-message" class="message"></div>
 
@@ -482,6 +483,7 @@
           <button class="button" id="btn-validate-task">Validate task</button>
           <button class="button button--primary" id="btn-run-task">Run task</button>
         </div>
+        <p class="field-hint">Metered per call: <strong>1 credit ($0.10) per case</strong> — each case is one model call, billed before inference.</p>
 
         <div id="task-message" class="message"></div>
 
@@ -521,7 +523,7 @@
           <p class="view-kicker">08 · Credits</p>
           <h2 class="view-title">Credits</h2>
         </div>
-        <p class="view-lede">Every run consumes 1 credit ($0.10). Buy a pack with Stripe, redeem the voucher code, and the balance lives here on this machine.</p>
+        <p class="view-lede">Benchmark runs cost 30 credits ($3.00) flat; custom-task runs cost 1 credit ($0.10) per case. Buy a pack with Stripe, redeem the voucher code, and the balance lives here on this machine.</p>
       </header>
 
       <div class="view-body">
@@ -663,7 +665,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=23"></script>
+<script src="/static/app.js?v=24"></script>
 <script src="/static/shell.js?v=3"></script>
 </body>
 </html>

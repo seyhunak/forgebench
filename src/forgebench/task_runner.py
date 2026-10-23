@@ -57,9 +57,8 @@ def run_task_experiment(
     on_progress: Callable[[int, int], None] | None = None,
 ) -> TaskRunResult:
     """Execute one custom-task evaluation end-to-end."""
-    from .credits import consume_run, run_credit_id
+    from .credits import TASK_CREDITS_PER_CASE, consume_run, run_credit_id
 
-    consume_run("task", run_credit_id(name))
     if not provider:
         from .credentials import get_value
         from .providers import PROVIDER_ENV_VARS
@@ -84,6 +83,12 @@ def run_task_experiment(
 
     if limit is not None:
         cases = cases[:limit]
+
+    # Metering is per model call: one case = one call = 1 credit ($0.10).
+    # Billed after the case list is known, before any inference happens —
+    # a task that fails to load or has no cases costs nothing.
+    if cases:
+        consume_run("task", run_credit_id(name), amount=len(cases) * TASK_CREDITS_PER_CASE)
 
     provider_inst = build_provider(
         provider,

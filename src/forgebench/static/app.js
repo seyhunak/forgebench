@@ -2193,7 +2193,7 @@ function renderCredits(state) {
           type: "error",
         },
         observe: {
-          text: "Observe mode — every completed run deducts 1 credit. " +
+          text: "Observe mode — runs are billed (benchmarks 30 credits flat; tasks 1 credit per case). " +
             "Switch to enforce to also block runs at zero.",
           type: "info",
         },

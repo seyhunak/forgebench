@@ -1,6 +1,9 @@
 """Local credit ledger for the Stripe package model.
 
-Business model: 1 credit = $0.10, one benchmark or task run = 1 credit.
+Business model: 1 credit = $0.10. A benchmark run costs a flat
+``BENCHMARK_RUN_CREDITS`` (30 credits = $3.00), whatever the ``--limit``;
+a custom-task run costs ``TASK_CREDITS_PER_CASE`` (1 credit = $0.10) per
+case — each case is one model call.
 Credits arrive as voucher codes issued by the Stripe webhook service
 (``services/stripe_webhook``) and are redeemed once (
 ``forgebench redeem FB-...``); the redeemed balance lives locally so the
@@ -28,6 +31,14 @@ from typing import Any
 
 DEFAULT_LEDGER = Path(".forgebench/credits.json")
 MAX_USAGE_ROWS = 500  # tail of usage history kept on disk
+
+#: Flat price of one benchmark run (05 · Execute): 30 credits = $3.00,
+#: whatever the case limit — one run, one price.
+BENCHMARK_RUN_CREDITS = 30
+
+#: Price per model call in a custom-task run (07 · Custom tasks):
+#: 1 credit = $0.10 per case.
+TASK_CREDITS_PER_CASE = 1
 
 
 class CreditsError(Exception):
@@ -102,12 +113,12 @@ def consume_run(
     amount: int = 1,
     path: Path | None = None,
 ) -> dict[str, Any] | None:
-    """Record one run against the ledger; refuse it when enforcing without funds.
+    """Record a run (or case calls) against the ledger; refuse it when enforcing.
 
-    Called at the top of ``run_experiment`` / ``run_task_experiment``. In
-    ``off`` mode this is a no-op so community use is untouched. Note the
-    MVP semantics: credits are counted per *run*, offline/community runs
-    obviously still work while ``off``.
+    Called from ``run_experiment`` (``amount=BENCHMARK_RUN_CREDITS``, flat)
+    and ``run_task_experiment`` (``amount=len(cases) * TASK_CREDITS_PER_CASE``,
+    billed after the case list is known and before any inference). In
+    ``off`` mode this is a no-op so community use is untouched.
     """
     current = mode()
     if current == "off":

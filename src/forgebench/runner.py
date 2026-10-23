@@ -294,9 +294,11 @@ def run_experiment(
 ) -> RunResult:
     """Execute one experiment end to end and persist all artifacts."""
     started = time.perf_counter()
-    from .credits import consume_run, run_credit_id
+    from .credits import BENCHMARK_RUN_CREDITS, consume_run, run_credit_id
 
-    consume_run("benchmark", run_credit_id(config.experiment.name))
+    # Metering: one benchmark run = one flat price (30 credits = $3.00),
+    # charged before any dataset load or inference.
+    consume_run("benchmark", run_credit_id(config.experiment.name), amount=BENCHMARK_RUN_CREDITS)
     root = datasets_root or default_datasets_root()
 
     cases, info = load_dataset(config.experiment.dataset, config.experiment.split, root)

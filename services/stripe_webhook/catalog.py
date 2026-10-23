@@ -1,8 +1,9 @@
 """Stripe credit catalog: the product grid of theForgeBench credit model.
 
-1 credit = $0.10. One benchmark or task run = 1 credit; runs are counted
-by the local ledger (``src/forgebench/credits.py``). The dataset pack is
-also priced in credits so it can be bought with the same wallet.
+1 credit = $0.10. A benchmark run costs a flat 30 credits ($3.00); a
+custom-task run costs 1 credit ($0.10) per case — metering lives in the
+local ledger (``src/forgebench/credits.py``). The dataset pack is also
+priced in credits so it can be bought with the same wallet.
 
 Prices and the pack sizes are set here in one place; payment-link URLs
 and Stripe price IDs come from the environment, never from this file.

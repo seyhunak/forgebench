@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,12 @@ from forgebench.config import (
     ProviderSection,
 )
 from forgebench.schemas import BenchmarkCase, Category, PredictionRecord
+
+# The CLI loads the nearest .env at import time (dotenv; processes env wins).
+# Pin the metering off so the operator's live .env/ledger can't leak into the
+# test run — metering tests set their own mode and ledger via monkeypatch.
+os.environ["FORGEBENCH_CREDITS_MODE"] = "off"
+os.environ.pop("FORGEBENCH_CREDITS_PATH", None)
 
 CATEGORIES = list(Category)
 

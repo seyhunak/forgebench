@@ -1158,7 +1158,10 @@ def credits_cmd() -> None:
     state = status()
     balance = "unlimited" if state["unlimited"] else str(state["balance"])
     typer.echo(f"mode:     {state['mode']}")
-    typer.echo(f"balance:  {balance} credits  (1 credit = $0.10, 1 run = 1 credit)")
+    typer.echo(
+        f"balance:  {balance} credits  "
+        "(1 credit = $0.10 · benchmark run 30 credits flat · task run 1 credit per case)"
+    )
     typer.echo(f"ledger:   {state['ledger']}")
     for grant in state["grants"]:
         amount = "unlimited" if grant["unlimited"] else f"{grant['credits']} credits"
