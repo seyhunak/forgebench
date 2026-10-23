@@ -70,6 +70,8 @@ const els = {
   btnRun: document.getElementById("btn-run"),
   runMessage: document.getElementById("run-message"),
   runProgress: document.getElementById("run-progress"),
+  runCaseCount: document.getElementById("run-case-count"),
+  runLimitPresets: document.getElementById("run-limit-presets"),
   progressText: document.getElementById("progress-text"),
   progressCounter: document.getElementById("progress-counter"),
   progressFill: document.getElementById("progress-fill"),
@@ -874,6 +876,7 @@ els.btnSaveConfig.addEventListener("click", async () => {
     setMessage(els.configMessage, "Config saved successfully.", "ok");
     await loadConfigs();
     dlog('Configs loaded');
+    await refreshRunCaseCount();
   } catch (err) {
     setMessage(els.configMessage, `Save failed: ${err.message}`, "error");
   }
@@ -1538,6 +1541,33 @@ let progressInterval = null;
 let runLogRendered = 0;
 let localRunStart = 0;
 
+/** Refresh the "N cases in this split" hint + quick-select chips. */
+async function refreshRunCaseCount() {
+  const cfgPath = els.configSelect && els.configSelect.value;
+  if (!cfgPath || !els.runCaseCount) return;
+  try {
+    const cfg = await fetchJSON(`/api/configs/${cfgPath}`);
+    const name = cfg.experiment && cfg.experiment.dataset;
+    const split = (cfg.experiment && cfg.experiment.split) || "test";
+    if (!name) { els.runCaseCount.textContent = "Leave 0 for the entire split."; return; }
+    const splitData = await fetchJSON(`/api/datasets/${name}/splits/${split}`);
+    const total = splitData.n_cases;
+    els.runCaseCount.textContent = `${total} cases available in this split (0 = all).`;
+    if (els.runLimitPresets) {
+      const presets = [5, 10, 25, total].filter((v, i, a) => v > 0 && a.indexOf(v) === i);
+      els.runLimitPresets.innerHTML = presets.map(v =>
+        `<button type="button" class="run-preset" data-n="${v}">${v === total ? "All" : v}</button>`
+      ).join("");
+      els.runLimitPresets.querySelectorAll(".run-preset").forEach(btn => {
+        btn.addEventListener("click", () => { els.runLimit.value = btn.dataset.n === String(total) ? "0" : btn.dataset.n; });
+      });
+    }
+  } catch (err) {
+    els.runCaseCount.textContent = "Leave 0 for the entire split.";
+    if (els.runLimitPresets) els.runLimitPresets.innerHTML = "";
+  }
+}
+
 /** Live run status icon: spinner while working, ✓ done, ✗ failed. */
 function setRunIcon(state) {
   els.runLiveIcon.dataset.state = state;
@@ -1751,7 +1781,8 @@ async function loadHistory() {
         </tr>`;
     }).join("");
     container.innerHTML = `
-      <table class="data-table">
+      <div class="table-scroll">
+        <table class="data-table">
         <thead>
           <tr>
             <th>Group</th><th>Run</th><th>Date (UTC)</th><th>Model</th>
@@ -1759,7 +1790,8 @@ async function loadHistory() {
           </tr>
         </thead>
         <tbody>${rows}</tbody>
-      </table>`;
+        </table>
+      </div>`;
     if (message) setMessage(message, "", "info"), hide(message);
   } catch (err) {
     if (message) setMessage(message, `Failed to load history: ${err.message}`, "error");
@@ -2455,6 +2487,8 @@ async function init() {
     dlog('Environment loaded');
     await loadConfigs();
     dlog('Configs loaded');
+    await refreshRunCaseCount();
+    els.configSelect.addEventListener("change", refreshRunCaseCount);
     await loadPromptRegistry();
     dlog('Prompt registry loaded');
     await loadBaselines();

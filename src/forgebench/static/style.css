@@ -1369,6 +1369,40 @@ select[multiple] {
   color: var(--ink-3);
 }
 
+.run-limit-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.run-preset {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border: var(--rule);
+  border-radius: var(--pill);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.run-preset:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+/* ---------- Tables ---------- */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius);
+}
+
+.table-scroll .data-table {
+  min-width: 720px;
+}
+
 /* ---------- Run cards ---------- */
 .runs-grid {
   display: grid;
