@@ -16,6 +16,9 @@ venv/
 .env
 *.key
 
+# Credit/voucher state (local ledgers, never committed)
+.forgebench/
+
 
 # OS
 .DS_Store

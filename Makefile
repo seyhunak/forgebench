@@ -29,3 +29,7 @@ dashboard:
 
 clean:
 	rm -rf build dist *.egg-info .pytest_cache .ruff_cache
+
+# Stripe credit service (same process devctl manages on :8583)
+stripe:
+	.venv/bin/python -m services.stripe_webhook

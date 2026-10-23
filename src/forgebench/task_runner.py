@@ -57,6 +57,9 @@ def run_task_experiment(
     on_progress: Callable[[int, int], None] | None = None,
 ) -> TaskRunResult:
     """Execute one custom-task evaluation end-to-end."""
+    from .credits import consume_run, run_credit_id
+
+    consume_run("task", run_credit_id(name))
     if not provider:
         from .credentials import get_value
         from .providers import PROVIDER_ENV_VARS

@@ -1150,5 +1150,43 @@ class _JudgeShim:
         return self._provider.predict_text(prompt)
 
 
+@app.command("credits")
+def credits_cmd() -> None:
+    """Show the local credit balance, mode and recent grants."""
+    from .credits import status
+
+    state = status()
+    balance = "unlimited" if state["unlimited"] else str(state["balance"])
+    typer.echo(f"mode:     {state['mode']}")
+    typer.echo(f"balance:  {balance} credits  (1 credit = $0.10, 1 run = 1 credit)")
+    typer.echo(f"ledger:   {state['ledger']}")
+    for grant in state["grants"]:
+        amount = "unlimited" if grant["unlimited"] else f"{grant['credits']} credits"
+        typer.echo(f"granted:  {grant['code']}  {grant['package']}  {amount}  {grant['at']}")
+
+
+@app.command("redeem")
+def redeem_cmd(
+    code: str = typer.Argument(..., help="Voucher code, e.g. FB-STARTER-50-AB12CD34."),
+    service: str = typer.Option(
+        "",
+        "--service",
+        help="Credit service URL (default FORGEBENCH_CREDITS_SERVICE or 127.0.0.1:8583).",
+    ),
+) -> None:
+    """Redeem a voucher code from the Stripe credit fulfillment service."""
+    from .credits import redeem
+
+    try:
+        state = redeem(code, service_url=service or None)
+    except Exception as exc:  # noqa: BLE001 — network/service errors surface here
+        typer.echo(f"redeem failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    balance = "unlimited" if state["unlimited"] else str(state["balance"])
+    typer.echo(f"redeemed: {code}")
+    typer.echo(f"package:  {state.get('package', '')}")
+    typer.echo(f"balance:  {balance} credits")
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()

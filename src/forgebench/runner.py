@@ -294,6 +294,9 @@ def run_experiment(
 ) -> RunResult:
     """Execute one experiment end to end and persist all artifacts."""
     started = time.perf_counter()
+    from .credits import consume_run, run_credit_id
+
+    consume_run("benchmark", run_credit_id(config.experiment.name))
     root = datasets_root or default_datasets_root()
 
     cases, info = load_dataset(config.experiment.dataset, config.experiment.split, root)

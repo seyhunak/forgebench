@@ -16,7 +16,7 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 
 **Who it's for:** teams shipping AI in finance, healthcare, legal, insurance, payments, procurement and support operations — anyone who needs "we think the new prompt is better" replaced with a pinned, auditable, cost-measured comparison on a fixed test set. See [PITCH.md](PITCH.md) for the full business case: value proposition, problems solved, commercial model.
 
-**Status: MVP (v0.2.0).** Actively developed; expect breaking changes between versions. There are no licenses on sale and no commercial use terms yet — everything paid is a planned tier ([Pricing](#%EF%B8%8F-pricing-planned--not-yet-on-sale)).
+**Status: MVP (v0.2.0).** Actively developed; expect breaking changes between versions. Monetization is credit-based ($0.10/credit, runs counted) with the Stripe loop wired in this repository — nothing billed until the Stripe account is configured ([Pricing](#%EF%B8%8F-pricing-credit-packs-stripe)).
 
 ![ForgeBench dashboard — API key view with Mistral selected and its default model](docs/screenshots/dashboard.png)
 
@@ -49,20 +49,28 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 | **Compliance-ready evidence** | Deterministic synthetic ground truth (no customer PII in the test path), SHA-256 dataset manifests, prompt hashes, and sanitized self-contained HTML exports safe to attach to an audit file. |
 | **Team-readable output** | CLI for automation, local dashboard for humans, Markdown reports and JSON/CSV exports for whoever needs the numbers. |
 
-The tool itself is proprietary (see [LICENSE](LICENSE)): the **Community tier is free for internal evaluation** — you pay only the model provider you configure, exactly for the tokens used, and the zero-cost path (offline mock provider, local Ollama) keeps pipeline validation spend-free. Paid tiers are announced below but **not yet on sale**.
+The tool itself is proprietary (see [LICENSE](LICENSE)): the **Community tier is free for internal evaluation** — you pay only the model provider you configure, exactly for the tokens used, and the zero-cost path (offline mock provider, local Ollama) keeps pipeline validation spend-free.
 
-## 🏷️ Pricing (planned — not yet on sale)
+## 🏷️ Pricing: credit packs (Stripe)
 
-The commercial model below is the announced direction, not an active offering. Nothing is billed today; contact for early access and to shape what ships first.
+Credits are the unit of purchase: **$0.10 per credit, and every benchmark or task run consumes 1 credit** — runs are counted, not seats. A **dataset pack** can be bought from the same wallet. The Stripe fulfillment loop is wired end-to-end in this repository: checkout → webhook (`services/stripe_webhook`) → single-use voucher code → `forgebench redeem FB-…` → local credit ledger (`.forgebench/credits.json`, git-ignored).
 
-| Tier | Price (intended) | What it will include | Status |
-|------|------------------|----------------------|--------|
-| **Community** | **Free** | The complete self-hosted harness: all 9 datasets, 14 tasks, 6 providers, CLI + local dashboard, BYOK, single-user. For internal evaluation use. | **Available now** |
-| **Team** | **$199 / seat / month** (min. 3 seats) | Everything in Community plus shared run storage, multi-user auth with roles, audit log, run annotations, and priority support. | Not yet available — needs the shared backend; early access shapes the roadmap. |
-| **Enterprise** | **Custom** (from $15k/yr) | Everything in Team plus SSO/OIDC, on-prem/air-gapped appliance packaging, SOC 2-style evidence pack, support SLA, and private dataset-pack licensing for your domain. | Not yet available — offered once the Team tier exists. |
-| **Hosted CI gate** | TBD | GitHub App that runs baseline-vs-candidate evals on every PR and posts quality/cost deltas as review comments. | Private beta, not announced publicly yet. |
+| Package | Credits | Price |
+|---------|--------:|------:|
+| **Starter** | 50 | **$5** |
+| **Growth** | 100 | **$10** |
+| **Scale** | 250 | **$25** |
+| **Max** | 500 | **$50** |
+| **Domain dataset pack** | 250 | **$25** |
+| **Enterprise Unlimited** | unlimited | **$5,000** one-time |
 
-All tiers keep the same core promise: every number ships with the dataset hash, prompt digest and model identity that produced it. Contact: this repository (`seyhunak`) for licensing or early access — the full commercial model is in [PITCH.md](PITCH.md).
+```bash
+forgebench credits            # balance, mode, grants
+forgebench redeem FB-SCALE-250-AB12CD34   # one-time redemption → local balance
+```
+
+Status: the catalog, webhook listener, voucher store and redeem flow are **implemented and tested** in this repository; checkout goes live as soon as the Stripe account is configured (payment links + `STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_MAP` — see `services/stripe_webhook/README.md`). Until then nothing is billed. Enterprise
+also covers SSO/on-prem priorities and shapes the shared-backend roadmap; the fuller business case is in [PITCH.md](PITCH.md).
 
 ## 🚀 Quickstart
 
@@ -455,6 +463,8 @@ forgebench/
 │   ├── named_entity_extraction/ # Typed entity extraction from free text
 │   └── contract_clause_detection/ # Clause type, risk level, counsel flag
 ├── docs/                        # Architecture, protocol, integration notes, dashboard screenshots
+├── services/                    # Business services (not part of the harness)
+│   └── stripe_webhook/          # Stripe checkout → voucher → credit fulfillment (devctl-managed)
 ├── scripts/                     # Deterministic dataset generators
 │   ├── generate_dataset.py      # Regenerate finance_v1
 │   └── generate_multi_dataset.py # Generate the six 105-case datasets
