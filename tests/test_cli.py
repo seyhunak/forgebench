@@ -70,7 +70,7 @@ def test_run_compare_report_cycle(tmp_path: Path, deterministic_provider: dict) 
 
     comparison = runner.invoke(app, ["compare", str(run_dir), str(tmp_path / "cli-prompt")])
     assert comparison.exit_code == 0
-    assert "Δ vs baseline" in comparison.output
+    assert "Delta vs Baseline" in comparison.output
 
     report = runner.invoke(app, ["report", str(run_dir)])
     assert report.exit_code == 0

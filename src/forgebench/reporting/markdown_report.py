@@ -32,6 +32,61 @@ def _fmt(value: Any) -> str:
     return str(value)
 
 
+def _fmt_pct(value: float | None) -> str:
+    """Format as percentage."""
+    if value is None:
+        return "—"
+    return f"{value * 100:.1f}%"
+
+
+def _fmt_usd(value: float | None) -> str:
+    """Format as USD."""
+    if value is None:
+        return "—"
+    if value == 0:
+        return "$0.00"
+    if value < 0.01:
+        return f"${value:.6f}"
+    return f"${value:.4f}"
+
+
+def _fmt_ms(value: float | None) -> str:
+    """Format as milliseconds."""
+    if value is None:
+        return "—"
+    return f"{value:.1f} ms"
+
+
+def _winner_badge(baseline_val: float | None, current_val: float | None, higher_is_better: bool = True) -> str:
+    """Return a badge indicating winner/loser."""
+    if baseline_val is None or current_val is None:
+        return ""
+    if higher_is_better:
+        if current_val > baseline_val:
+            return " 🏆"
+        elif current_val < baseline_val:
+            return " 📉"
+    else:
+        if current_val < baseline_val:
+            return " 🏆"
+        elif current_val > baseline_val:
+            return " 📉"
+    return " ➖"
+
+
+def _delta_str(baseline_val: float | None, current_val: float | None, higher_is_better: bool = True) -> str:
+    """Return formatted delta with direction indicator."""
+    if baseline_val is None or current_val is None:
+        return "—"
+    delta = current_val - baseline_val
+    if higher_is_better:
+        sign = "+" if delta > 0 else ""
+    else:
+        sign = "+" if delta < 0 else ""
+        delta = -delta
+    return f"{sign}{delta:.4f}"
+
+
 def render_report(
     manifest: dict[str, Any],
     metrics: dict[str, Any],
@@ -270,7 +325,7 @@ def resolve_metric(entry: dict[str, Any], key: str) -> float | None:
 
 
 def render_comparison(entries: list[dict[str, Any]]) -> str:
-    """Compare N runs — benchmark runs and custom-task runs, side by side.
+    """Compare N runs -- benchmark runs and custom-task runs, side by side.
 
     The first run is the baseline other runs are measured against. Works even
     when the runs measured different things: rows with missing values render
@@ -278,43 +333,362 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
     """
     if not entries:
         return "No runs to compare.\n"
-    lines = ["# ForgeBench comparison", ""]
-    names = [e["run_id"] for e in entries]
-    lines.append("| Run | Model | Scope | Cases | Valid |")
-    lines.append("| --- | --- | --- | ---: | ---: |")
-    for entry in entries:
-        m, manifest = entry["metrics"], entry["manifest"]
+
+    baseline = entries[0]
+    baseline_metrics = baseline["metrics"]
+    baseline_manifest = baseline["manifest"]
+    baseline_name = entries[0]["run_id"]
+
+    lines = ["# ForgeBench Comparison Report", ""]
+
+    lines.append("## Test Dataset")
+    lines.append("")
+
+    dataset = baseline_manifest.get("dataset", {})
+    task = baseline_manifest.get("task") or baseline_manifest.get("experiment_name", "unknown")
+
+    lines.append("- **Task / Experiment:** " + task)
+    if dataset.get("name"):
+        sha = str(dataset.get("split_sha256", ""))[:12]
         lines.append(
-            f"| {entry['run_id']} | `{manifest.get('provider', {}).get('model')}` | "
-            f"{_scope_of(manifest)} | "
-            f"{m.get('n_cases')} | {m.get('n_valid')} |"
+            "- **Dataset:** " + dataset.get("name") + " v" + dataset.get("version") + " "
+            "(split: " + dataset.get("split") + ", SHA256: `" + sha + "...`)"
+        )
+    lines.append("- **Total Cases:** " + str(baseline_metrics.get("n_cases", "N/A")))
+    lines.append("- **Baseline Run:** `" + baseline_name + "`")
+    lines.append("- **Comparison Runs:** " + str(len(entries) - 1))
+    lines.append("")
+
+    lines.append("## Models Compared")
+    lines.append("")
+
+    header_cols = ["Run ID", "Provider", "Model", "Cases", "Valid", "Schema Validity"]
+    lines.append("| " + " | ".join(header_cols) + " |")
+    lines.append("| " + " | ".join(["---"] * len(header_cols)) + " |")
+
+    for entry in entries:
+        manifest = entry["manifest"]
+        metrics = entry["metrics"]
+        provider = manifest.get("provider", {})
+        provider_name = provider.get("name", "unknown").title()
+        model = provider.get("model", "unknown")
+        schema_valid = metrics.get("schema_validity", 0)
+        schema_str = _fmt_pct(schema_valid) if schema_valid else "--"
+
+        lines.append(
+            "| " + entry["run_id"] + " | " + provider_name + " | `" + model + "` | "
+            + str(metrics.get("n_cases", "N/A")) + " | " + str(metrics.get("n_valid", "N/A")) + " | " + schema_str + " |"
         )
     lines.append("")
-
-    scalar_keys = collect_metric_keys(entries)
-
-    # Build metric rows with deltas vs baseline (first run). Runs that lack a
-    # metric render "—" instead of silently dropping the row.
-    header = "| Metric | " + " | ".join(names) + " | Δ vs baseline |"
-    lines.append(header)
-    lines.append("| --- | " + " | ".join("---:" for _ in names) + " | ---: |")
-    for key in scalar_keys:
-        values = [resolve_metric(entry, key) for entry in entries]
-        if all(v is None for v in values):
-            continue
-        cells = " | ".join("-" if v is None else _fmt(v) for v in values)
-        present = [v for v in values if v is not None]
-        delta = f"{present[-1] - present[0]:+.4f}" if len(present) > 1 else "0"
-        lines.append(f"| {key} | {cells} | {delta} |")
+    lines.append("## Accuracy Metrics")
     lines.append("")
-    lines.append(
-        "_Deltas compare the last run against the baseline (first run). "
-        "With small test sets, treat differences within a few points as noise; "
-        "inspect per-rule and error examples before concluding anything._"
-    )
+
+    acc_metrics = [
+        ("accuracy", "Accuracy", True),
+        ("macro_f1", "Macro F1", True),
+        ("critical_false_match_rate", "Critical False Match Rate", False),
+        ("escalation_recall", "Escalation Recall", True),
+        ("schema_validity", "Schema Validity", True),
+    ]
+
+    lines.append("| Metric | " + " | ".join([e["run_id"] for e in entries]) + " | Delta vs Baseline | Winner |")
+    lines.append("| --- | " + " | ".join(["---:"] * len(entries)) + " | ---: | --- |")
+
+    for key, label, higher_better in acc_metrics:
+        baseline_val = baseline_metrics.get(key)
+        row_cells = []
+        winner = ""
+        for i, entry in enumerate(entries):
+            val = entry["metrics"].get(key)
+            if val is not None:
+                cell = _fmt(val)
+                if i > 0:
+                    badge = _winner_badge(baseline_val, val, higher_better)
+                    cell += badge
+                row_cells.append(cell)
+            else:
+                row_cells.append("--")
+
+        delta = ""
+        if len(entries) > 1:
+            current_val = entries[-1]["metrics"].get(key)
+            delta = _delta_str(baseline_val, current_val, higher_better)
+
+        if len(entries) > 1:
+            valid_entries = [(i, e["metrics"].get(key)) for i, e in enumerate(entries) if e["metrics"].get(key) is not None]
+            if len(valid_entries) > 1:
+                if higher_better:
+                    best_idx = max(valid_entries, key=lambda x: x[1])[0]
+                else:
+                    best_idx = min(valid_entries, key=lambda x: x[1])[0]
+                winner = "Run " + str(best_idx + 1)
+
+        lines.append("| **" + label + "** | " + " | ".join(row_cells) + " | " + delta + " | " + winner + " |")
+
     lines.append("")
+    lines.append("*Winner badge: 🏆 = beats baseline | 📉 = worse than baseline | ➖ = tied*")
+    lines.append("")
+
+    lines.append("## LLM Performance")
+    lines.append("")
+
+    perf_metrics = [
+        ("latency.p50_ms", "Latency P50", False),
+        ("latency.p95_ms", "Latency P95", False),
+        ("latency.mean_ms", "Latency Mean", False),
+        ("provider_error_rate", "Provider Error Rate", False),
+    ]
+
+    lines.append("| Metric | " + " | ".join([e["run_id"] for e in entries]) + " | Delta vs Baseline | Winner |")
+    lines.append("| --- | " + " | ".join(["---:"] * len(entries)) + " | ---: | --- |")
+
+    for key, label, higher_better in perf_metrics:
+        baseline_val = resolve_metric(baseline, key)
+        row_cells = []
+        for i, entry in enumerate(entries):
+            val = resolve_metric(entry, key)
+            if val is not None:
+                cell = _fmt_ms(val) if "latency" in key else (_fmt_pct(val) if key == "provider_error_rate" else (f"{val:.4f}" if isinstance(val, float) else str(val)))
+                if i > 0:
+                    badge = _winner_badge(baseline_val, val, higher_better)
+                    cell += badge
+                row_cells.append(cell)
+            else:
+                row_cells.append("--")
+
+        delta = ""
+        if len(entries) > 1:
+            current_val = resolve_metric(entries[-1], key)
+            delta = _delta_str(baseline_val, current_val, higher_better)
+
+        winner = ""
+        if len(entries) > 1:
+            valid_entries = [(i, resolve_metric(e, key)) for i, e in enumerate(entries) if resolve_metric(e, key) is not None]
+            if len(valid_entries) > 1:
+                if higher_better:
+                    best_idx = max(valid_entries, key=lambda x: x[1])[0]
+                else:
+                    best_idx = min(valid_entries, key=lambda x: x[1])[0]
+                winner = "Run " + str(best_idx + 1)
+
+        lines.append("| **" + label + "** | " + " | ".join(row_cells) + " | " + delta + " | " + winner + " |")
+
+    lines.append("")
+    lines.append("## Token Cost Analysis")
+    lines.append("")
+
+    cost_metrics = [
+        ("estimated_cost.total_input_tokens", "Total Input Tokens", False),
+        ("estimated_cost.total_output_tokens", "Total Output Tokens", False),
+        ("estimated_cost.usd_total", "Total Cost (USD)", False),
+        ("estimated_cost.usd_per_case", "Cost per Case (USD)", False),
+        ("estimated_cost.usd_per_1000_cases", "Cost per 1K Cases (USD)", False),
+    ]
+
+    lines.append("| Metric | " + " | ".join([e["run_id"] for e in entries]) + " | Delta vs Baseline | Winner |")
+    lines.append("| --- | " + " | ".join(["---:"] * len(entries)) + " | ---: | --- |")
+
+    for key, label, higher_better in cost_metrics:
+        baseline_val = resolve_metric(baseline, key)
+        row_cells = []
+        for i, entry in enumerate(entries):
+            val = resolve_metric(entry, key)
+            if val is not None:
+                if "usd" in key.lower() or key.endswith("_usd"):
+                    cell = _fmt_usd(val)
+                else:
+                    cell = f"{int(val):,}" if isinstance(val, float) and val == int(val) else str(val)
+                if i > 0:
+                    badge = _winner_badge(baseline_val, val, higher_better)
+                    cell += badge
+                row_cells.append(cell)
+            else:
+                row_cells.append("--")
+
+        delta = ""
+        if len(entries) > 1:
+            current_val = resolve_metric(entries[-1], key)
+            delta = _delta_str(baseline_val, current_val, higher_better)
+
+        winner = ""
+        if len(entries) > 1:
+            valid_entries = [(i, resolve_metric(e, key)) for i, e in enumerate(entries) if resolve_metric(e, key) is not None]
+            if len(valid_entries) > 1:
+                if higher_better:
+                    best_idx = max(valid_entries, key=lambda x: x[1])[0]
+                else:
+                    best_idx = min(valid_entries, key=lambda x: x[1])[0]
+                winner = "Run " + str(best_idx + 1)
+
+        lines.append("| **" + label + "** | " + " | ".join(row_cells) + " | " + delta + " | " + winner + " |")
+
+    cost_info = baseline_metrics.get("estimated_cost", {})
+    if cost_info.get("price_basis"):
+        lines.append("")
+        lines.append("*Price basis: " + cost_info["price_basis"] + "*")
+        if cost_info.get("price_note"):
+            lines.append("*Note: " + cost_info["price_note"] + "*")
+        if cost_info.get("tokens_estimated_when_missing"):
+            lines.append("*Token usage was estimated (provider did not report usage)*")
+
+    lines.append("")
+    baseline_per_class = baseline_metrics.get("per_class", {})
+    if baseline_per_class and len(entries) > 1:
+        lines.append("## Per-Class Comparison")
+        lines.append("")
+
+        all_classes = set()
+        for entry in entries:
+            all_classes.update(entry["metrics"].get("per_class", {}).keys())
+
+        if all_classes:
+            lines.append("### Precision")
+            lines.append("")
+            header = "| Class | " + " | ".join([e["run_id"] for e in entries]) + " |"
+            lines.append(header)
+            lines.append("| " + " | ".join(["---"] + ["---:"] * len(entries)) + " |")
+
+            for cls in sorted(all_classes):
+                baseline_val = baseline_per_class.get(cls, {}).get("precision")
+                row_cells = []
+                for i, entry in enumerate(entries):
+                    val = entry["metrics"].get("per_class", {}).get(cls, {}).get("precision")
+                    if val is not None:
+                        cell = _fmt(val)
+                        if i > 0:
+                            badge = _winner_badge(baseline_val, val, True)
+                            cell += badge
+                        row_cells.append(cell)
+                    else:
+                        row_cells.append("--")
+                lines.append("| " + cls + " | " + " | ".join(row_cells) + " |")
+
+            lines.append("")
+
+            lines.append("### Recall")
+            lines.append("")
+            header = "| Class | " + " | ".join([e["run_id"] for e in entries]) + " |"
+            lines.append(header)
+            lines.append("| " + " | ".join(["---"] + ["---:"] * len(entries)) + " |")
+
+            for cls in sorted(all_classes):
+                baseline_val = baseline_per_class.get(cls, {}).get("recall")
+                row_cells = []
+                for i, entry in enumerate(entries):
+                    val = entry["metrics"].get("per_class", {}).get(cls, {}).get("recall")
+                    if val is not None:
+                        cell = _fmt(val)
+                        if i > 0:
+                            badge = _winner_badge(baseline_val, val, True)
+                            cell += badge
+                        row_cells.append(cell)
+                    else:
+                        row_cells.append("--")
+                lines.append("| " + cls + " | " + " | ".join(row_cells) + " |")
+
+            lines.append("")
+
+            lines.append("### F1 Score")
+            lines.append("")
+            header = "| Class | " + " | ".join([e["run_id"] for e in entries]) + " |"
+            lines.append(header)
+            lines.append("| " + " | ".join(["---"] + ["---:"] * len(entries)) + " |")
+
+            for cls in sorted(all_classes):
+                baseline_val = baseline_per_class.get(cls, {}).get("f1")
+                row_cells = []
+                for i, entry in enumerate(entries):
+                    val = entry["metrics"].get("per_class", {}).get(cls, {}).get("f1")
+                    if val is not None:
+                        cell = _fmt(val)
+                        if i > 0:
+                            badge = _winner_badge(baseline_val, val, True)
+                            cell += badge
+                        row_cells.append(cell)
+                    else:
+                        row_cells.append("--")
+                lines.append("| " + cls + " | " + " | ".join(row_cells) + " |")
+
+            lines.append("")
+    has_errors = any(entry["metrics"].get("error_breakdown") for entry in entries)
+
+    if has_errors:
+        lines.append("## Error Analysis")
+        lines.append("")
+
+        all_error_types = set()
+        for entry in entries:
+            all_error_types.update(entry["metrics"].get("error_breakdown", {}).keys())
+
+        if all_error_types:
+            lines.append("| Error Type | " + " | ".join([e["run_id"] for e in entries]) + " |")
+            lines.append("| --- | " + " | ".join(["---:"] * len(entries)) + " |")
+
+            for err_type in sorted(all_error_types):
+                row_cells = []
+                for entry in entries:
+                    count = entry["metrics"].get("error_breakdown", {}).get(err_type, 0)
+                    row_cells.append(str(count))
+                lines.append("| " + err_type + " | " + " | ".join(row_cells) + " |")
+
+            lines.append("")
+
+    if len(entries) > 1:
+        lines.append("## Winner / Loser Summary")
+        lines.append("")
+
+        wins = {i: 0 for i in range(len(entries))}
+        losses = {i: 0 for i in range(len(entries))}
+
+        key_metrics = [
+            ("accuracy", True),
+            ("macro_f1", True),
+            ("critical_false_match_rate", False),
+            ("escalation_recall", True),
+            ("schema_validity", True),
+            ("latency.p50_ms", False),
+            ("latency.p95_ms", False),
+            ("estimated_cost.usd_per_1000_cases", False),
+            ("provider_error_rate", False),
+        ]
+
+        for key, higher_better in key_metrics:
+            valid_entries = [(i, resolve_metric(e, key)) for i, e in enumerate(entries) if resolve_metric(e, key) is not None]
+            if len(valid_entries) >= 2:
+                if higher_better:
+                    best = max(valid_entries, key=lambda x: x[1])[0]
+                    worst = min(valid_entries, key=lambda x: x[1])[0]
+                else:
+                    best = min(valid_entries, key=lambda x: x[1])[0]
+                    worst = max(valid_entries, key=lambda x: x[1])[0]
+                wins[best] += 1
+                losses[worst] += 1
+
+        lines.append("| Run | Model | Wins | Losses | Net Score | Verdict |")
+        lines.append("| --- | --- | ---: | ---: | ---: | --- |")
+
+        for i, entry in enumerate(entries):
+            manifest = entry["manifest"]
+            provider = manifest.get("provider", {})
+            model = provider.get("model", "unknown")
+            net = wins[i] - losses[i]
+
+            if i == 0:
+                verdict = "Baseline"
+            elif net > 0:
+                verdict = "WINNER"
+            elif net < 0:
+                verdict = "Loser"
+            else:
+                verdict = "Tied"
+
+            lines.append("| " + entry["run_id"] + " | `" + model + "` | " + str(wins[i]) + " | " + str(losses[i]) + " | " + str(net) + " | " + verdict + " |")
+
+        lines.append("")
+
+    lines.append(_LIMITATIONS)
+
     return "\n".join(lines)
-
 
 def load_run(run_dir: str) -> dict[str, Any]:
     """Load one run's manifest + metrics from disk (used by compare/report)."""
