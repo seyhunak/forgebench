@@ -22,10 +22,24 @@ class ExperimentSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]*$", max_length=60)
-    dataset: str
+    #: Either a versioned benchmark dataset (``dataset``) or a user-defined
+    #: custom task (``task``). Exactly one must be set.
+    dataset: str | None = None
     dataset_version: str | None = None
+    task: str | None = Field(default=None, max_length=60)
+    task_version: str | None = Field(default=None, max_length=20)
     split: str = "test"
     seed: int = 42
+
+    @model_validator(mode="after")
+    def _check_dataset_or_task(self) -> ExperimentSection:
+        has_dataset = self.dataset is not None
+        has_task = self.task is not None
+        if has_dataset == has_task:
+            raise ValueError(
+                "experiment must specify exactly one of 'dataset' or 'task'"
+            )
+        return self
 
 
 class ProviderSection(BaseModel):

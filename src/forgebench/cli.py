@@ -686,6 +686,38 @@ def run_cmd(
     if model:
         experiment.provider.model = model
 
+    # ``limit`` of 0 means "run the whole split" (no case cap).
+    if limit == 0:
+        limit = None
+
+    # Custom-task configs (``experiment.task``) run through the task engine
+    # instead of the dataset benchmark runner.
+    if experiment.experiment.task is not None:
+        from .task_runner import run_task_experiment
+
+        try:
+            result = run_task_experiment(
+                name=experiment.experiment.task,
+                split=experiment.experiment.split,
+                provider=experiment.provider.name,
+                model=experiment.provider.model or "",
+                limit=limit,
+                output_root=output_root,
+            )
+        except (FileNotFoundError, ValueError) as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+
+        metrics = result.metrics
+        typer.echo("")
+        typer.echo(f"run:     {result.run_id}")
+        typer.echo(f"task:    {result.manifest['task']}")
+        typer.echo(f"cases:   {metrics['n_cases']} ({metrics['n_valid']} valid)")
+        typer.echo(f"accuracy:                {metrics.get('accuracy', 0):.4f}")
+        typer.echo(f"per_rule:                {metrics.get('per_rule', {})}")
+        typer.echo(f"artifacts: {result.run_dir.resolve()}")
+        return
+
     def progress(done: int, total: int) -> None:
         if done % 25 == 0 or done == total:
             typer.echo(f"  {done}/{total} cases")
