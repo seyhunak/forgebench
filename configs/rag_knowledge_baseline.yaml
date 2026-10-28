@@ -1,0 +1,30 @@
+# RAG baseline run against the rag_knowledge task using the openrouter provider.
+# Provider/model match the benchmark default: openrouter + openai/gpt-4o-mini.
+experiment:
+  name: rag-knowledge-baseline
+  task: rag_knowledge
+  task_version: "1.0.0"
+  split: test
+  seed: 42
+provider:
+  name: openrouter
+  model: openai/gpt-4o-mini
+  options:
+    temperature: 0
+inference:
+  temperature: 0
+  max_retries: 2
+  timeout_seconds: 30
+  max_tokens: 1024
+prompt:
+  system: null
+  name: null
+  version: null
+  few_shot_count: 0
+evaluation:
+  metrics:
+    - accuracy
+    - schema_validity
+    - latency
+    - estimated_cost
+  judge: null

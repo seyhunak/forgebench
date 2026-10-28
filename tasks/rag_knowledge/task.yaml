@@ -1,0 +1,41 @@
+name: rag_knowledge
+version: "1.0.0"
+description: "RAG question-answering over a synthetic knowledge base. The model receives a question plus retrieved context chunks and must answer using only that context. Scores answer groundedness (guardrail), faithfulness to retrieved context, answer relevancy to the question, and contextual relevancy of retrieval — all deterministic, no LLM-as-judge required."
+input_fields:
+  - question
+  - retrieval_context
+output_schema:
+  - name: answer
+    type: string
+    description: "The answer, grounded only in the provided retrieval_context chunks."
+  - name: grounded
+    type: boolean
+    description: "Guardrail: whether the answer is supported by the retrieved context."
+  - name: citations
+    type: list[string]
+    description: "Chunk indices from retrieval_context used to support the answer."
+scoring_rules:
+  - field: grounded
+    method: boolean
+    weight: 2.0
+  - field: answer
+    method: faithfulness
+    weight: 2.0
+    threshold: 0.3
+    criteria: "Determine whether every claim in the answer is supported by the retrieval_context chunks."
+    evaluation_steps:
+      - "Split the answer into claims."
+      - "Check each claim against the retrieval_context."
+      - "Pass if at least threshold of claims are grounded in context."
+  - field: answer
+    method: answer_relevancy
+    weight: 1.0
+    threshold: 0.0
+  - field: answer
+    method: contextual_relevancy
+    weight: 1.0
+    threshold: 0.0
+system_prompt: |
+  You are a RAG assistant. Answer the user's question using ONLY the provided retrieval_context.
+  If the answer is not supported by the context, say you don't have enough information.
+  Return valid JSON with fields: answer (string), grounded (boolean), citations (list of chunk indices used).

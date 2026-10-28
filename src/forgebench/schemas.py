@@ -155,8 +155,9 @@ class ScoringRule(BaseModel):
 
     field: str = Field(description="Output field name this rule applies to.")
     method: str = Field(
-        pattern=r"^(exact_match|f1|contains|boolean|llm_judge)$",
-        description=("Scoring method: exact_match, f1, contains, boolean, or llm_judge."),
+        pattern=r"^(exact_match|f1|contains|boolean|llm_judge|faithfulness|answer_relevancy|contextual_relevancy)$",
+        description=("Scoring method: exact_match, f1, contains, boolean, llm_judge, "
+                     "faithfulness, answer_relevancy, or contextual_relevancy."),
     )
     weight: float = Field(default=1.0, ge=0.0, le=10.0)
     threshold: float | None = Field(
