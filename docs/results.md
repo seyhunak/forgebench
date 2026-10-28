@@ -62,8 +62,8 @@ Regeneration is deterministic: same seed, same predictions, same metrics.
 
 ## Not yet published
 
-- **Real Mistral baseline.** Requires `MISTRAL_API_KEY`. Run
-  `configs/mistral_baseline.yaml` (start with `--limit 5`), then add the run
+- **Real OpenRouter baseline.** Requires `OPENROUTER_API_KEY`. Run
+  `configs/baseline.yaml` (start with `--limit 5`), then add the run
   id, model id, timestamp, and full per-class table here. Do not publish a
   cost or latency number without its price basis and measurement date.
 - **Prompt-variant comparisons on a real model.** Same procedure, then one

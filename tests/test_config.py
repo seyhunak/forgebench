@@ -56,10 +56,9 @@ def test_unknown_top_level_keys_are_rejected(tmp_path: Path) -> None:
 def test_shipped_configs_are_valid() -> None:
     configs = [
         REPO_ROOT / "configs" / "baseline.yaml",
-        REPO_ROOT / "configs" / "mistral_baseline.yaml",
         *sorted((REPO_ROOT / "configs" / "experiments").glob("*.yaml")),
     ]
-    assert len(configs) >= 4
+    assert len(configs) >= 3
     for path in configs:
         env = {"MISTRAL_MODEL": "open-mistral-7b"}
         config = load_config(path, env=env)

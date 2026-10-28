@@ -149,8 +149,7 @@ def set_key_cmd(
         else:
             typer.echo(f"NOTE: {detail}", err=True)
     typer.echo(
-        "Run a smoke test: forgebench run --config configs/mistral_baseline.yaml "
-        "--limit 5 --run-id mistral-smoke"
+        "Run a smoke test: forgebench run --config configs/baseline.yaml --limit 5 --run-id smoke-test"
     )
 
 

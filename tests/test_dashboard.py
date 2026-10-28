@@ -15,7 +15,6 @@ def test_list_configs_finds_shipped_experiments() -> None:
     configs = list_configs(REPO_ROOT)
     labels = [str(path.relative_to(REPO_ROOT)) for path in configs]
     assert "configs/baseline.yaml" in labels
-    assert "configs/mistral_baseline.yaml" in labels
     assert any(label.startswith("configs/experiments/") for label in labels)
     assert len(configs) >= 4
     assert configs == sorted(configs)

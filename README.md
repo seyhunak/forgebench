@@ -133,7 +133,7 @@ forgebench models --provider openrouter --search claude
 forgebench models --provider openrouter --live   # straight from openrouter.ai
 
 # Run with a real provider
-forgebench run --config configs/mistral_baseline.yaml --provider mistral --run-id mistral-baseline
+forgebench run --config configs/baseline.yaml --provider openrouter --run-id baseline
 forgebench run --config configs/baseline.yaml --provider openai --model gpt-4o --run-id openai-baseline
 forgebench run --config configs/baseline.yaml --provider openrouter --model google/gemini-2.5-pro --run-id openrouter-run
 ```
@@ -437,11 +437,17 @@ forgebench/
 ├── .gitignore                   # Python, secrets, run artifacts
 ├── configs/                     # Experiment YAML configs
 │   ├── baseline.yaml            # OpenRouter reference baseline
-│   ├── legal_baseline.yaml      # OpenRouter baselines for the legal, payments,
-│   ├── payments_baseline.yaml   #   procurement and subscriptions datasets
+│   ├── ecommerce_baseline.yaml  # OpenRouter baselines for the ecommerce, healthcare,
+│   ├── healthcare_baseline.yaml #   insurance, legal, payments, procurement,
+│   ├── insurance_baseline.yaml  #   saas_billing, subscriptions, support, telecom
+│   ├── legal_baseline.yaml      #   and travel datasets
+│   ├── payments_baseline.yaml
 │   ├── procurement_baseline.yaml
+│   ├── saas_billing_baseline.yaml
 │   ├── subscriptions_baseline.yaml
-│   ├── mistral_baseline.yaml    # Mistral baseline
+│   ├── support_baseline.yaml
+│   ├── telecom_baseline.yaml
+│   ├── travel_baseline.yaml
 │   └── experiments/
 │       ├── prompt_v1.yaml       # Prompt variant
 │       └── fewshot_v1.yaml      # Few-shot variant
