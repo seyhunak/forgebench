@@ -9,9 +9,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
-<link rel="stylesheet" href="/static/style.css?v=8">
+<link rel="stylesheet" href="/static/style.css?v=9">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="shortcut icon" href="/static/favicon.svg">
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 <body>
 
 <a class="skip-link" href="#workspace">Skip to content</a>
@@ -299,7 +300,12 @@
         <div class="form-grid">
           <div class="form-field">
             <label class="form-label">Experiment config</label>
-            <select id="config-select"></select>
+            <div class="select-with-action">
+              <select id="config-select"></select>
+              <button class="button button--quiet button--icon" id="btn-preview-config" type="button" aria-label="Preview config">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
           </div>
           <div class="form-field">
             <label class="form-label">Provider (override)</label>
@@ -658,6 +664,23 @@
   </div>
 </div>
 
+<!-- ===== Config Preview Modal ===== -->
+<div class="modal config-preview-modal" id="config-preview-modal" role="dialog" aria-modal="true" aria-labelledby="config-preview-title" hidden>
+  <div class="modal-scrim" data-modal-close></div>
+  <div class="modal-panel" role="document">
+    <div class="modal-head">
+      <div class="modal-heading">
+        <p class="modal-kicker">Preview</p>
+        <h3 class="modal-title" id="config-preview-title">Config Preview</h3>
+      </div>
+      <button class="modal-close" id="btn-config-preview-close" type="button" aria-label="Close" data-modal-close>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="config-preview-body"></div>
+  </div>
+</div>
+
 <!-- ===== Command palette (⌘K) ===== -->
 <div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Jump to a section" hidden>
   <div class="palette-scrim" data-palette-close></div>
@@ -671,7 +694,7 @@
   </div>
 </div>
 
-<script src="/static/app.js?v=29"></script>
+<script src="/static/app.js?v=30"></script>
 <script src="/static/shell.js?v=4"></script>
 </body>
 </html>

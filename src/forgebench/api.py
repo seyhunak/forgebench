@@ -227,11 +227,25 @@ def _resolve_run_dir(run_id: str) -> Path | None:
 # ---------------------------------------------------------------------------
 
 
+def _format_config_name(path: Path) -> str:
+    """Format config filename to titlecase without .yaml extension."""
+    stem = path.stem
+    # Replace underscores and hyphens with spaces, then titlecase
+    return stem.replace("_", " ").replace("-", " ").title()
+
+
 @app.get("/api/configs")
 def list_configs() -> list[dict[str, str]]:
     """All experiment YAML configs under configs/."""
     paths = _list_configs(REPO_ROOT)
-    return [{"name": p.name, "path": str(p.relative_to(REPO_ROOT))} for p in paths]
+    return [
+        {
+            "name": _format_config_name(p),
+            "path": str(p.relative_to(REPO_ROOT)),
+            "raw_name": p.name,
+        }
+        for p in paths
+    ]
 
 
 @app.get("/api/configs/{config_path:path}")

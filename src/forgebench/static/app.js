@@ -63,6 +63,10 @@ const els = {
   setupValue: document.getElementById("setup-value"),
   btnSetupAdd: document.getElementById("btn-setup-add"),
   configSelect: document.getElementById("config-select"),
+  btnPreviewConfig: document.getElementById("btn-preview-config"),
+  configPreviewModal: document.getElementById("config-preview-modal"),
+  configPreviewBody: document.getElementById("config-preview-body"),
+  configPreviewTitle: document.getElementById("config-preview-title"),
   runProvider: document.getElementById("run-provider"),
   runModel: document.getElementById("run-model"),
   runLimit: document.getElementById("run-limit"),
@@ -738,6 +742,41 @@ async function loadConfigs() {
   } catch (err) {
     setMessage(els.runMessage, `Failed to load configs: ${err.message}`, "error");
   }
+}
+
+// ---------- Config Preview ----------
+
+async function showConfigPreview() {
+  const path = els.configSelect.value;
+  if (!path) return;
+  try {
+    const config = await fetchJSON(`/api/configs/${path}`);
+    // Format YAML for display
+    const yaml = jsyaml ? jsyaml.dump(config, { indent: 2, lineWidth: 120 }) : JSON.stringify(config, null, 2);
+    els.configPreviewBody.innerHTML = `<pre>${escapeHtml(yaml)}</pre>`;
+    const option = els.configSelect.querySelector(`option[value="${path}"]`);
+    const name = option ? option.textContent : path;
+    if (els.configPreviewTitle) els.configPreviewTitle.textContent = name;
+    showModal(els.configPreviewModal);
+  } catch (err) {
+    setMessage(els.runMessage, `Failed to preview config: ${err.message}`, "error");
+  }
+}
+
+// Helper to escape HTML
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Show a modal (uses existing modal logic from shell.js)
+function showModal(modal) {
+  if (!modal) return;
+  modal.hidden = false;
+  document.body.style.overflow = "hidden";
+  const focusable = modal.querySelector("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
+  if (focusable) focusable.focus();
 }
 
 // ---------- Datasets ----------
@@ -2489,6 +2528,7 @@ async function init() {
     dlog('Configs loaded');
     await refreshRunCaseCount();
     els.configSelect.addEventListener("change", refreshRunCaseCount);
+    els.btnPreviewConfig?.addEventListener("click", showConfigPreview);
     await loadPromptRegistry();
     dlog('Prompt registry loaded');
     await loadBaselines();

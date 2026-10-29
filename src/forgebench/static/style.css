@@ -623,6 +623,57 @@ select[multiple] {
   padding-right: 0.7rem;
 }
 
+/* ---------- Select with action button ---------- */
+.select-with-action {
+  display: flex;
+  gap: var(--space-2xs);
+  align-items: stretch;
+}
+
+.select-with-action select {
+  flex: 1;
+  min-width: 0;
+}
+
+.select-with-action .button--icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.select-with-action .button--icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---------- Config Preview Modal ---------- */
+.config-preview-modal {
+  max-width: 800px;
+  width: 90vw;
+}
+
+.config-preview-modal .modal-body {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.config-preview-modal pre {
+  margin: 0;
+  padding: var(--space-md);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ---------- Buttons ---------- */
 .button {
   display: inline-flex;

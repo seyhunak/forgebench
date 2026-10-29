@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/seyhunak/forgebench/actions/workflows/tests.yml/badge.svg)](https://github.com/seyhunak/forgebench/actions/workflows/tests.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Stripe: sandbox](https://img.shields.io/badge/stripe-sandbox-635bff.svg)](services/stripe_webhook/README.md)
@@ -9,6 +10,12 @@
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Tests: pytest](https://img.shields.io/badge/tests-pytest-0A0A0A.svg)](https://docs.pytest.org/)
 [![Contributor Covenant](https://img.shields.io/badge/contributor%20covenant-v2.1-ff69b4.svg)](CODE_OF_CONDUCT.md)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-ready-00BFFF.svg)](https://openrouter.ai/)
+[![Ollama](https://img.shields.io/badge/Ollama-supported-000000.svg)](https://ollama.com/)
+[![Mistral](https://img.shields.io/badge/Mistral-supported-FF6B35.svg)](https://mistral.ai/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-supported-412991.svg)](https://openai.com/)
+[![Anthropic](https://img.shields.io/badge/Anthropic-supported-000000.svg)](https://anthropic.com/)
+[![Google](https://img.shields.io/badge/Google%20Gemini-supported-4285F4.svg)](https://ai.google.dev/)
 
 **Measure domain adaptation, not just model intelligence.**
 
@@ -20,7 +27,37 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 
 **Status: MVP (v0.2.0).** Actively developed; expect breaking changes between versions. Monetization is credit-based ($0.10/credit, runs counted) with the Stripe loop wired in this repository — nothing billed until the Stripe account is configured ([Pricing](#%EF%B8%8F-pricing-credit-packs-stripe)).
 
+---
+
+## 📸 ForgeBench in Action
+
+### Dashboard — Provider & Model Selection
 ![ForgeBench dashboard — API key view with Mistral selected and its default model](docs/screenshots/dashboard.png)
+
+### Run Details & Trace Waterfall
+![Run detail view with per-case traces](docs/screenshots/run-detail.png)
+
+### Regression Comparison — Baseline vs. Experiment
+![Compare two runs side-by-side with metric deltas and case-level diff](docs/screenshots/compare.png)
+
+### Results Table with Evidence
+![Results table showing predictions and ground truth](docs/screenshots/results.png)
+
+### Datasets Explorer
+![Datasets view with splits and manifests](docs/screenshots/datasets.png)
+
+### Task Library
+![14 built-in evaluation tasks](docs/screenshots/tasks.png)
+
+### Light Theme & Mobile Responsive
+| Light Theme | Mobile Dashboard | Mobile Ollama |
+|-------------|------------------|---------------|
+| ![Light theme](docs/screenshots/theme-light.png) | ![Mobile dashboard](docs/screenshots/mobile.png) | ![Mobile Ollama](docs/screenshots/ollama-mobile.png) |
+
+### Setup Wizard
+![Setup wizard — provider configuration](docs/screenshots/setup.png)
+
+---
 
 ## ✨ Key Features
 
@@ -637,6 +674,29 @@ beyond a tolerance.
 ### Changelog
 
 See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each version.
+
+---
+
+## 📚 Documentation Index
+
+All linked markdown files in the [`docs/`](docs/) folder:
+
+| Document | Description |
+|----------|-------------|
+| [`architecture.md`](docs/architecture.md) | System architecture, data flow, and component design |
+| [`benchmark_protocol.md`](docs/benchmark_protocol.md) | Evaluation methodology, metric definitions, and denominator conventions |
+| [`forge_integration.md`](docs/forge_integration.md) | Integration guide for Forge platform |
+| [`OPPORTUNITY-FRAMEWORK.md`](docs/OPPORTUNITY-FRAMEWORK.md) | Strategic opportunity analysis and framework |
+| [`PITCH.md`](docs/PITCH.md) | Business case, value proposition, and commercial model |
+| [`results.md`](docs/results.md) | Benchmark results and analysis |
+| [`WORKFLOW.md`](docs/WORKFLOW.md) | Development workflow, CI/CD, and release process |
+| [`CHANGELOG.md`](docs/CHANGELOG.md) | Version history and release notes |
+| [`CODE_OF_CONDUCT.md`](docs/CODE_OF_CONDUCT.md) | Community code of conduct (Contributor Covenant v2.1) |
+| [`CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Contribution guidelines and development setup |
+| [`SECURITY.md`](docs/SECURITY.md) | Security policy and vulnerability reporting |
+| [`05_execute_rag.md`](docs/05_execute_rag.md) | RAG execution guide and examples |
+
+---
 
 ## 📜 License
 
