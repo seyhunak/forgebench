@@ -57,7 +57,9 @@ def _fmt_ms(value: float | None) -> str:
     return f"{value:.1f} ms"
 
 
-def _winner_badge(baseline_val: float | None, current_val: float | None, higher_is_better: bool = True) -> str:
+def _winner_badge(
+    baseline_val: float | None, current_val: float | None, higher_is_better: bool = True
+) -> str:
     """Return a badge indicating winner/loser."""
     if baseline_val is None or current_val is None:
         return ""
@@ -74,7 +76,9 @@ def _winner_badge(baseline_val: float | None, current_val: float | None, higher_
     return " ➖"
 
 
-def _delta_str(baseline_val: float | None, current_val: float | None, higher_is_better: bool = True) -> str:
+def _delta_str(
+    baseline_val: float | None, current_val: float | None, higher_is_better: bool = True
+) -> str:
     """Return formatted delta with direction indicator."""
     if baseline_val is None or current_val is None:
         return "—"
@@ -376,8 +380,19 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
         schema_str = _fmt_pct(schema_valid) if schema_valid else "--"
 
         lines.append(
-            "| " + entry["run_id"] + " | " + provider_name + " | `" + model + "` | "
-            + str(metrics.get("n_cases", "N/A")) + " | " + str(metrics.get("n_valid", "N/A")) + " | " + schema_str + " |"
+            "| "
+            + entry["run_id"]
+            + " | "
+            + provider_name
+            + " | `"
+            + model
+            + "` | "
+            + str(metrics.get("n_cases", "N/A"))
+            + " | "
+            + str(metrics.get("n_valid", "N/A"))
+            + " | "
+            + schema_str
+            + " |"
         )
     lines.append("")
     lines.append("## Accuracy Metrics")
@@ -391,7 +406,11 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
         ("schema_validity", "Schema Validity", True),
     ]
 
-    lines.append("| Metric | " + " | ".join([e["run_id"] for e in entries]) + " | Delta vs Baseline | Winner |")
+    lines.append(
+        "| Metric | "
+        + " | ".join([e["run_id"] for e in entries])
+        + " | Delta vs Baseline | Winner |"
+    )
     lines.append("| --- | " + " | ".join(["---:"] * len(entries)) + " | ---: | --- |")
 
     for key, label, higher_better in acc_metrics:
@@ -415,7 +434,11 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
             delta = _delta_str(baseline_val, current_val, higher_better)
 
         if len(entries) > 1:
-            valid_entries = [(i, e["metrics"].get(key)) for i, e in enumerate(entries) if e["metrics"].get(key) is not None]
+            valid_entries = [
+                (i, e["metrics"].get(key))
+                for i, e in enumerate(entries)
+                if e["metrics"].get(key) is not None
+            ]
             if len(valid_entries) > 1:
                 if higher_better:
                     best_idx = max(valid_entries, key=lambda x: x[1])[0]
@@ -423,7 +446,9 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
                     best_idx = min(valid_entries, key=lambda x: x[1])[0]
                 winner = "Run " + str(best_idx + 1)
 
-        lines.append("| **" + label + "** | " + " | ".join(row_cells) + " | " + delta + " | " + winner + " |")
+        lines.append(
+            "| **" + label + "** | " + " | ".join(row_cells) + " | " + delta + " | " + winner + " |"
+        )
 
     lines.append("")
     lines.append("*Winner badge: 🏆 = beats baseline | 📉 = worse than baseline | ➖ = tied*")
@@ -439,7 +464,11 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
         ("provider_error_rate", "Provider Error Rate", False),
     ]
 
-    lines.append("| Metric | " + " | ".join([e["run_id"] for e in entries]) + " | Delta vs Baseline | Winner |")
+    lines.append(
+        "| Metric | "
+        + " | ".join([e["run_id"] for e in entries])
+        + " | Delta vs Baseline | Winner |"
+    )
     lines.append("| --- | " + " | ".join(["---:"] * len(entries)) + " | ---: | --- |")
 
     for key, label, higher_better in perf_metrics:
@@ -448,7 +477,15 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
         for i, entry in enumerate(entries):
             val = resolve_metric(entry, key)
             if val is not None:
-                cell = _fmt_ms(val) if "latency" in key else (_fmt_pct(val) if key == "provider_error_rate" else (f"{val:.4f}" if isinstance(val, float) else str(val)))
+                cell = (
+                    _fmt_ms(val)
+                    if "latency" in key
+                    else (
+                        _fmt_pct(val)
+                        if key == "provider_error_rate"
+                        else (f"{val:.4f}" if isinstance(val, float) else str(val))
+                    )
+                )
                 if i > 0:
                     badge = _winner_badge(baseline_val, val, higher_better)
                     cell += badge
@@ -463,7 +500,11 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
 
         winner = ""
         if len(entries) > 1:
-            valid_entries = [(i, resolve_metric(e, key)) for i, e in enumerate(entries) if resolve_metric(e, key) is not None]
+            valid_entries = [
+                (i, resolve_metric(e, key))
+                for i, e in enumerate(entries)
+                if resolve_metric(e, key) is not None
+            ]
             if len(valid_entries) > 1:
                 if higher_better:
                     best_idx = max(valid_entries, key=lambda x: x[1])[0]
@@ -471,7 +512,9 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
                     best_idx = min(valid_entries, key=lambda x: x[1])[0]
                 winner = "Run " + str(best_idx + 1)
 
-        lines.append("| **" + label + "** | " + " | ".join(row_cells) + " | " + delta + " | " + winner + " |")
+        lines.append(
+            "| **" + label + "** | " + " | ".join(row_cells) + " | " + delta + " | " + winner + " |"
+        )
 
     lines.append("")
     lines.append("## Token Cost Analysis")
@@ -485,7 +528,11 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
         ("estimated_cost.usd_per_1000_cases", "Cost per 1K Cases (USD)", False),
     ]
 
-    lines.append("| Metric | " + " | ".join([e["run_id"] for e in entries]) + " | Delta vs Baseline | Winner |")
+    lines.append(
+        "| Metric | "
+        + " | ".join([e["run_id"] for e in entries])
+        + " | Delta vs Baseline | Winner |"
+    )
     lines.append("| --- | " + " | ".join(["---:"] * len(entries)) + " | ---: | --- |")
 
     for key, label, higher_better in cost_metrics:
@@ -497,7 +544,9 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
                 if "usd" in key.lower() or key.endswith("_usd"):
                     cell = _fmt_usd(val)
                 else:
-                    cell = f"{int(val):,}" if isinstance(val, float) and val == int(val) else str(val)
+                    cell = (
+                        f"{int(val):,}" if isinstance(val, float) and val == int(val) else str(val)
+                    )
                 if i > 0:
                     badge = _winner_badge(baseline_val, val, higher_better)
                     cell += badge
@@ -512,7 +561,11 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
 
         winner = ""
         if len(entries) > 1:
-            valid_entries = [(i, resolve_metric(e, key)) for i, e in enumerate(entries) if resolve_metric(e, key) is not None]
+            valid_entries = [
+                (i, resolve_metric(e, key))
+                for i, e in enumerate(entries)
+                if resolve_metric(e, key) is not None
+            ]
             if len(valid_entries) > 1:
                 if higher_better:
                     best_idx = max(valid_entries, key=lambda x: x[1])[0]
@@ -520,7 +573,9 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
                     best_idx = min(valid_entries, key=lambda x: x[1])[0]
                 winner = "Run " + str(best_idx + 1)
 
-        lines.append("| **" + label + "** | " + " | ".join(row_cells) + " | " + delta + " | " + winner + " |")
+        lines.append(
+            "| **" + label + "** | " + " | ".join(row_cells) + " | " + delta + " | " + winner + " |"
+        )
 
     cost_info = baseline_metrics.get("estimated_cost", {})
     if cost_info.get("price_basis"):
@@ -653,7 +708,11 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
         ]
 
         for key, higher_better in key_metrics:
-            valid_entries = [(i, resolve_metric(e, key)) for i, e in enumerate(entries) if resolve_metric(e, key) is not None]
+            valid_entries = [
+                (i, resolve_metric(e, key))
+                for i, e in enumerate(entries)
+                if resolve_metric(e, key) is not None
+            ]
             if len(valid_entries) >= 2:
                 if higher_better:
                     best = max(valid_entries, key=lambda x: x[1])[0]
@@ -682,13 +741,28 @@ def render_comparison(entries: list[dict[str, Any]]) -> str:
             else:
                 verdict = "Tied"
 
-            lines.append("| " + entry["run_id"] + " | `" + model + "` | " + str(wins[i]) + " | " + str(losses[i]) + " | " + str(net) + " | " + verdict + " |")
+            lines.append(
+                "| "
+                + entry["run_id"]
+                + " | `"
+                + model
+                + "` | "
+                + str(wins[i])
+                + " | "
+                + str(losses[i])
+                + " | "
+                + str(net)
+                + " | "
+                + verdict
+                + " |"
+            )
 
         lines.append("")
 
     lines.append(_LIMITATIONS)
 
     return "\n".join(lines)
+
 
 def load_run(run_dir: str) -> dict[str, Any]:
     """Load one run's manifest + metrics from disk (used by compare/report)."""

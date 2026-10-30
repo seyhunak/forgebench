@@ -7,18 +7,14 @@ contextual_relevancy, grounded guardrail) behave as expected.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-import pytest
-
-from forgebench.tasks import validate_task, load_task_with_cases
 from forgebench.metrics.rag import (
-    lexical_faithfulness,
-    lexical_answer_relevancy,
     contextual_relevancy,
+    lexical_answer_relevancy,
+    lexical_faithfulness,
 )
-from forgebench.schemas import TaskOutputField
+from forgebench.tasks import load_task_with_cases, validate_task
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,7 +25,12 @@ def test_rag_task_validates() -> None:
     assert report.ok, report.problems
     assert info.input_fields == ["question", "retrieval_context"]
     assert info.output_fields == ["answer", "grounded", "citations"]
-    assert info.scoring_methods == ["boolean", "faithfulness", "answer_relevancy", "contextual_relevancy"]
+    assert info.scoring_methods == [
+        "boolean",
+        "faithfulness",
+        "answer_relevancy",
+        "contextual_relevancy",
+    ]
     assert dict(info.n_cases) == {"train": 20, "dev": 10, "test": 15}
 
 
@@ -57,14 +58,18 @@ def test_rag_case_has_retrieval_context() -> None:
 def test_lexical_faithfulness_grounded() -> None:
     """An answer fully supported by context scores high faithfulness."""
     answer = "Refunds are allowed within 30 days with a receipt."
-    context = ["Refund policy: Customers may request a full refund within 30 days of purchase with original receipt."]
+    context = [
+        "Refund policy: Customers may request a full refund within 30 days of purchase with original receipt."
+    ]
     assert lexical_faithfulness(answer, context) > 0.5
 
 
 def test_lexical_faithfulness_ungrounded() -> None:
     """An answer not supported by context scores zero faithfulness."""
     answer = "The moon is made of green cheese."
-    context = ["Refund policy: Customers may request a full refund within 30 days of purchase with original receipt."]
+    context = [
+        "Refund policy: Customers may request a full refund within 30 days of purchase with original receipt."
+    ]
     assert lexical_faithfulness(answer, context) == 0.0
 
 
@@ -98,29 +103,35 @@ def test_grounded_true_case_passes_boolean() -> None:
     assert rule.method == "boolean"
     assert rule.weight == 2.0
     # Boolean scoring: expected and predicted must match.
-    assert (True == True) is True
-    assert (True == False) is False
+    assert (True) is True
+    assert (False) is False
 
 
 def test_rag_config_provider_matches_benchmark() -> None:
     """The RAG baseline config uses the same provider/model as the benchmark."""
-    from forgebench.config import load_config
 
     # Load as a plain YAML document to inspect provider/model without requiring
     # the ExperimentConfig dataset field (task configs are run via task-run).
     import yaml
+
     path = REPO_ROOT / "configs" / "rag_knowledge_baseline.yaml"
     data = yaml.safe_load(path.read_text())
     assert data["provider"]["name"] == "openrouter"
     assert data["provider"]["model"] == "openai/gpt-4o-mini"
     assert data["experiment"]["task"] == "rag_knowledge"
     assert data["experiment"]["split"] == "test"
-    assert data["evaluation"]["metrics"] == ["accuracy", "schema_validity", "latency", "estimated_cost"]
+    assert data["evaluation"]["metrics"] == [
+        "accuracy",
+        "schema_validity",
+        "latency",
+        "estimated_cost",
+    ]
 
 
 def test_output_schema_has_required_fields() -> None:
     """The task output schema declares answer, grounded, citations."""
     from forgebench.tasks import load_task
+
     task = load_task("rag_knowledge")
     names = {f.name for f in task.output_schema}
     assert names == {"answer", "grounded", "citations"}

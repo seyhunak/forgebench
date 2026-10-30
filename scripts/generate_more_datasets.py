@@ -34,12 +34,30 @@ CREATED_ON = "2026-10-16"
 SPLIT_SIZES = {"train": 42, "dev": 21, "test": 42}  # 105 total per dataset
 
 FAMILY_RATIOS = {
-    "train": {"matched": 0.25, "amount_mismatch": 0.20, "date_mismatch": 0.15,
-              "reference_mismatch": 0.15, "duplicate": 0.125, "ambiguous": 0.125},
-    "dev":   {"matched": 0.25, "amount_mismatch": 0.20, "date_mismatch": 0.15,
-              "reference_mismatch": 0.15, "duplicate": 0.125, "ambiguous": 0.125},
-    "test":  {"matched": 0.25, "amount_mismatch": 0.20, "date_mismatch": 0.1667,
-              "reference_mismatch": 0.1667, "duplicate": 0.10, "ambiguous": 0.1166},
+    "train": {
+        "matched": 0.25,
+        "amount_mismatch": 0.20,
+        "date_mismatch": 0.15,
+        "reference_mismatch": 0.15,
+        "duplicate": 0.125,
+        "ambiguous": 0.125,
+    },
+    "dev": {
+        "matched": 0.25,
+        "amount_mismatch": 0.20,
+        "date_mismatch": 0.15,
+        "reference_mismatch": 0.15,
+        "duplicate": 0.125,
+        "ambiguous": 0.125,
+    },
+    "test": {
+        "matched": 0.25,
+        "amount_mismatch": 0.20,
+        "date_mismatch": 0.1667,
+        "reference_mismatch": 0.1667,
+        "duplicate": 0.10,
+        "ambiguous": 0.1166,
+    },
 }
 
 DAYS = []
@@ -89,8 +107,9 @@ def base_fields(rng: random.Random, vendor: str, ref_prefix: str) -> dict[str, s
     }
 
 
-def build_cases(rng: random.Random, size: int, split: str, prefix: str,
-                vendors: list[str], ref_prefix: str) -> list[dict]:
+def build_cases(
+    rng: random.Random, size: int, split: str, prefix: str, vendors: list[str], ref_prefix: str
+) -> list[dict]:
     ratios = FAMILY_RATIOS[split]
     counts = {family: round(ratio * size) for family, ratio in ratios.items()}
     drift = size - sum(counts.values())
@@ -126,15 +145,18 @@ def build_cases(rng: random.Random, size: int, split: str, prefix: str,
                 else:
                     bank = (ledger / 2).quantize(Decimal("0.01"))
                 fields["bank_amount"] = f"${bank}"
-                explanation = (f"Bank amount {fields['bank_amount']} does not equal "
-                               f"ledger amount {fields['ledger_amount']}.")
+                explanation = (
+                    f"Bank amount {fields['bank_amount']} does not equal "
+                    f"ledger amount {fields['ledger_amount']}."
+                )
 
             elif family == "date_mismatch":
                 ledger_day = date.fromisoformat(fields["ledger_date"])
-                fields["bank_date"] = shift_day(ledger_day,
-                                                rng.choice([1, 1, 2, 3, 5])).isoformat()
-                explanation = (f"Bank date {fields['bank_date']} does not equal "
-                               f"ledger date {fields['ledger_date']}; amounts agree.")
+                fields["bank_date"] = shift_day(ledger_day, rng.choice([1, 1, 2, 3, 5])).isoformat()
+                explanation = (
+                    f"Bank date {fields['bank_date']} does not equal "
+                    f"ledger date {fields['ledger_date']}; amounts agree."
+                )
 
             elif family == "reference_mismatch":
                 reference = fields["ledger_reference"]
@@ -147,39 +169,47 @@ def build_cases(rng: random.Random, size: int, split: str, prefix: str,
                     fields["bank_reference"] = reference.replace("SUB", "SUBSCRIPTION")
                 else:
                     fields["bank_reference"] = reference.lower()
-                explanation = (f"Bank reference '{fields['bank_reference']}' does not equal "
-                               f"ledger reference '{reference}'; amounts agree.")
+                explanation = (
+                    f"Bank reference '{fields['bank_reference']}' does not equal "
+                    f"ledger reference '{reference}'; amounts agree."
+                )
 
             elif family == "duplicate":
                 fields["bank_occurrences"] = "2"
                 fields["ledger_occurrences"] = "1"
-                explanation = ("The bank shows the transaction twice while the ledger "
-                               "shows it once.")
+                explanation = "The bank shows the transaction twice while the ledger shows it once."
 
             else:  # ambiguous
                 if next_id % 2 == 0:
                     fields["bank_reference"] = typo_digit(rng, fields["ledger_reference"])
                     fields["bank_date"] = shift_day(
-                        date.fromisoformat(fields["ledger_date"]), 1).isoformat()
-                    explanation = ("Reference differs by one character and the bank posted "
-                                   "one day later; could be a corrected typo or a separate "
-                                   "invoice. Human review required.")
+                        date.fromisoformat(fields["ledger_date"]), 1
+                    ).isoformat()
+                    explanation = (
+                        "Reference differs by one character and the bank posted "
+                        "one day later; could be a corrected typo or a separate "
+                        "invoice. Human review required."
+                    )
                 else:
                     fields["bank_occurrences"] = "2"
                     fields["ledger_occurrences"] = "2"
-                    explanation = ("The transaction pair appears twice on both sides; "
-                                   "duplicates or two legitimate orders with identical terms "
-                                   "cannot be told apart here.")
+                    explanation = (
+                        "The transaction pair appears twice on both sides; "
+                        "duplicates or two legitimate orders with identical terms "
+                        "cannot be told apart here."
+                    )
 
-            cases.append({
-                "id": f"{prefix}-{next_id:04d}",
-                "task": "classification",
-                "input": fields,
-                "expected": {"category": category, "requires_review": requires_review},
-                "scenario_family": family,
-                "notes": None,
-                "reference_explanation": explanation,
-            })
+            cases.append(
+                {
+                    "id": f"{prefix}-{next_id:04d}",
+                    "task": "classification",
+                    "input": fields,
+                    "expected": {"category": category, "requires_review": requires_review},
+                    "scenario_family": family,
+                    "notes": None,
+                    "reference_explanation": explanation,
+                }
+            )
             next_id += 1
 
     rng.shuffle(cases)
@@ -193,13 +223,19 @@ def write_jsonl(path: Path, cases: list[dict]) -> None:
             f.write(json.dumps(c) + "\n")
 
 
-def write_card(out_dir: Path, name: str, task: str, total: int,
-               split_sizes: dict[str, int], distribution: dict[str, int]) -> None:
+def write_card(
+    out_dir: Path,
+    name: str,
+    task: str,
+    total: int,
+    split_sizes: dict[str, int],
+    distribution: dict[str, int],
+) -> None:
     lines = [
         f"# Dataset card: {name}",
         "",
         f"- **Name:** {name}  ",
-        f"- **Version:** 1.0.0  ",
+        "- **Version:** 1.0.0  ",
         f"- **Task:** {task}  ",
         f"- **Created:** {CREATED_ON} (fully synthetic; no customer data)  ",
         f"- **Total cases:** {total}  ",
@@ -260,9 +296,21 @@ def main() -> None:
             "task": "saas_subscription_billing_reconciliation",
             "prefix": "SB",
             "vendors": [
-                "Stripe", "Salesforce", "HubSpot", "Zoom", "Slack", "Notion",
-                "Figma", "Atlassian", "Dropbox", "Adobe", "Microsoft 365",
-                "Google Workspace", "AWS", "Snowflake", "Datadog",
+                "Stripe",
+                "Salesforce",
+                "HubSpot",
+                "Zoom",
+                "Slack",
+                "Notion",
+                "Figma",
+                "Atlassian",
+                "Dropbox",
+                "Adobe",
+                "Microsoft 365",
+                "Google Workspace",
+                "AWS",
+                "Snowflake",
+                "Datadog",
             ],
             "ref_prefix": "SUB-",
         },
@@ -271,8 +319,16 @@ def main() -> None:
             "task": "telecom_billing_reconciliation",
             "prefix": "TC",
             "vendors": [
-                "Verizon", "AT&T", "T-Mobile", "Comcast", "Cox", "Spectrum",
-                "Vodafone", "Orange", "Telefónica", "BT Group",
+                "Verizon",
+                "AT&T",
+                "T-Mobile",
+                "Comcast",
+                "Cox",
+                "Spectrum",
+                "Vodafone",
+                "Orange",
+                "Telefónica",
+                "BT Group",
             ],
             "ref_prefix": "ACCT-",
         },
@@ -281,14 +337,22 @@ def main() -> None:
             "task": "travel_expense_reconciliation",
             "prefix": "TR",
             "vendors": [
-                "Delta", "United", "American Airlines", "Marriott", "Hilton",
-                "Hyatt", "Expedia", "Booking.com", "Airbnb", "Hertz",
+                "Delta",
+                "United",
+                "American Airlines",
+                "Marriott",
+                "Hilton",
+                "Hyatt",
+                "Expedia",
+                "Booking.com",
+                "Airbnb",
+                "Hertz",
             ],
             "ref_prefix": "CONF-",
         },
     ]
 
-    rng = random.Random(SEED)
+    random.Random(SEED)
     for spec in specs:
         name = spec["name"]
         out_dir = DATASETS_ROOT / name
@@ -301,8 +365,9 @@ def main() -> None:
         for split, size in SPLIT_SIZES.items():
             # Re-seed per dataset+split so output is deterministic and stable.
             split_rng = random.Random(f"{SEED}-{name}-{split}")
-            records = build_cases(split_rng, size, split, spec["prefix"],
-                                  spec["vendors"], spec["ref_prefix"])
+            records = build_cases(
+                split_rng, size, split, spec["prefix"], spec["vendors"], spec["ref_prefix"]
+            )
             # Re-number ids sequentially across the whole dataset.
             for record in records:
                 record["id"] = f"{spec['prefix']}-{next_global_id:04d}"
@@ -323,8 +388,9 @@ def main() -> None:
             "license": LICENSE,
             "created_on": CREATED_ON,
             "families": FAMILIES,
-            "splits": {split: {"file": f"{split}.jsonl", "n": size}
-                       for split, size in SPLIT_SIZES.items()},
+            "splits": {
+                split: {"file": f"{split}.jsonl", "n": size} for split, size in SPLIT_SIZES.items()
+            },
             "generator": {
                 "script": "scripts/generate_more_datasets.py",
                 "seed": SEED,
@@ -332,8 +398,9 @@ def main() -> None:
             },
         }
         (out_dir / "dataset.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
-        write_card(out_dir, name, spec["task"], sum(SPLIT_SIZES.values()),
-                   SPLIT_SIZES, distribution)
+        write_card(
+            out_dir, name, spec["task"], sum(SPLIT_SIZES.values()), SPLIT_SIZES, distribution
+        )
         print(f"wrote {out_dir / 'dataset.json'} and dataset_card.md")
         print(f"class distribution: {dict(sorted(distribution.items()))}")
 

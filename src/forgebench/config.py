@@ -36,9 +36,7 @@ class ExperimentSection(BaseModel):
         has_dataset = self.dataset is not None
         has_task = self.task is not None
         if has_dataset == has_task:
-            raise ValueError(
-                "experiment must specify exactly one of 'dataset' or 'task'"
-            )
+            raise ValueError("experiment must specify exactly one of 'dataset' or 'task'")
         return self
 
 
