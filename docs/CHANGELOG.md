@@ -4,6 +4,25 @@ All notable changes to ForgeBench are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Task manifests pin their inputs**: `task_sha256`, `split_sha256`, `limit`,
+  `prompt`, `environment` (including git SHA), and `command`.
+- **Provider substitution is visible**: when a `mock` config runs on a real
+  provider, the CLI warns first, and the manifest (`provider_substitution`) and
+  report record it.
+- `make check-data` regenerates every dataset and task that has a generator and
+  fails on any difference. CI now runs it instead of checking only `finance_v1`.
+  `healthcare_v1` and `ecommerce_v1` have no generator, so a test pins their hashes.
+
+### Fixed
+- **Billing**: benchmark and task runs are charged only after the data loads and
+  the provider is built, so a bad dataset, provider, or missing key costs nothing.
+- **Judge reporting**: task manifests and reports no longer name a judge when
+  none was needed. A judge that could not be built is now recorded with the
+  reason in both pipelines, and the report no longer lists it as having run.
+
 ## [0.2.0] - 2026-10-18
 
 ### Added

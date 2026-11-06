@@ -921,8 +921,10 @@ def start_run(payload: RunRequest) -> dict[str, str]:
     # implicitly: an empty request uses the configured provider.
     requested_provider = (payload.provider or "").strip() or _configured_provider()
     # No run may end up on the mock provider: an explicit mock config or
-    # request is upgraded to the selected provider.
+    # request is upgraded to the selected provider, and the manifest records it.
+    replaced_mock = None
     if experiment.provider.name == "mock" or requested_provider == "mock":
+        replaced_mock = experiment.provider.model_copy(update={"name": "mock"})
         if requested_provider == "mock":
             requested_provider = _configured_provider()
     if requested_provider and requested_provider != experiment.provider.name:
@@ -969,6 +971,7 @@ def start_run(payload: RunRequest) -> dict[str, str]:
                 run_id=payload.run_id,
                 on_progress=reporter,
                 on_log=_on_log,
+                requested_provider=replaced_mock,
             )
             _run_state[run_id]["status"] = "done"
             _run_state[run_id]["result"] = {

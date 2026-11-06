@@ -6,8 +6,10 @@ drive the same loop so results are identical regardless of entry point.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,12 +21,13 @@ from .cli import _build_task_prompt, _score_task_output
 from .notify import post_run_webhook
 from .providers import build_provider, task_provider_options
 from .reporting import render_report
+from .runner import _effective_prompt_meta, environment_info
 from .schemas import (
     Category,
     JudgeConfig,
     PredictionRecord,
 )
-from .tasks import load_task_with_cases, summarize_rule_scores
+from .tasks import load_task_with_cases, summarize_rule_scores, task_file_hashes
 from .tracing import (
     SPAN_PROVIDER_CALL,
     SPAN_SCORE,
@@ -87,16 +90,7 @@ def run_task_experiment(
     if limit is not None:
         cases = cases[:limit]
 
-    # Metering is per model call: one case = one call = 1 credit ($0.10).
-    # Billed after the case list is known, before any inference happens —
-    # a task that fails to load or has no cases costs nothing.
-    if cases:
-        consume_run("task", run_credit_id(name), amount=len(cases) * TASK_CREDITS_PER_CASE)
-        _log(
-            f"task {name} · {len(cases)} cases · provider {provider}"
-            + (f"/{model}" if model else "")
-            + f" · charged {len(cases) * TASK_CREDITS_PER_CASE} credits"
-        )
+    task_sha256, split_sha256 = task_file_hashes(name, split, tasks_root)
 
     provider_inst = build_provider(
         provider,
@@ -108,8 +102,21 @@ def run_task_experiment(
         ),
     )
 
+    # Metering is per model call: one case = one call = 1 credit ($0.10).
+    # Billed before any inference, but only once the run can start — a task
+    # that fails to load, has no cases, or has no usable provider costs nothing.
+    if cases:
+        consume_run("task", run_credit_id(name), amount=len(cases) * TASK_CREDITS_PER_CASE)
+        _log(
+            f"task {name} · {len(cases)} cases · provider {provider}"
+            + (f"/{model}" if model else "")
+            + f" · charged {len(cases) * TASK_CREDITS_PER_CASE} credits"
+        )
+
     # Build a shared judge for llm_judge scoring rules (G-Eval style).
     judge_instance = None
+    judge_cfg: JudgeConfig | None = None
+    judge_warning: str | None = None
     needs_judge = any(r.method == "llm_judge" for r in task.scoring_rules)
     if needs_judge:
         # No implicit judge: use the provider/model the caller selected. A
@@ -120,8 +127,10 @@ def run_task_experiment(
         )
         try:
             judge_instance = build_provider(judge_cfg.provider, model=judge_cfg.model, options={})
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 - judging is advisory
             judge_instance = None
+            judge_warning = str(exc)
+            _log(f"judge unavailable ({exc})")
 
     records: list[PredictionRecord] = []
     rule_scores_by_case: list[dict[str, bool]] = []
@@ -256,21 +265,45 @@ def run_task_experiment(
     (run_dir / "predictions.jsonl").write_text(predictions_text, encoding="utf-8")
     recorder.write(run_dir)
     (run_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
-    manifest = {
+    system_prompt = task.system_prompt or ""
+    prompt_meta = (
+        {
+            "source": "task",
+            "sha256": hashlib.sha256(system_prompt.encode("utf-8")).hexdigest(),
+            "chars": len(system_prompt),
+        }
+        if system_prompt
+        else None
+    )
+    manifest: dict[str, Any] = {
         "run_id": run_id,
         "task": task.name,
         "task_version": task.version,
+        "task_sha256": task_sha256,
         "split": split,
+        "split_sha256": split_sha256,
+        "limit": limit,
         "provider": {"name": provider, "model": provider_inst.model or provider},
-        "judge": {
-            "name": judge_provider or provider,
-            "model": judge_model or (provider_inst.model or provider),
-        },
+        "prompt": _effective_prompt_meta(provider_inst, prompt_meta),
+        "environment": environment_info(),
+        "command": " ".join(sys.argv) or None,
         "n_cases": len(cases),
         "trace": {"file": TRACE_FILENAME, "n_cases": total},
         "created_at_utc": created_at.isoformat(timespec="seconds"),
         "duration_seconds": round(time.perf_counter() - start, 3),
     }
+    # Name a judge only if one was needed: a judge that ran, or why it could not.
+    if judge_instance is not None:
+        manifest["judge"] = {
+            "name": judge_cfg.provider,
+            "model": judge_instance.model or judge_cfg.model,
+        }
+    elif judge_warning:
+        manifest["judge"] = {
+            "name": judge_cfg.provider,
+            "model": judge_cfg.model,
+            "warning": judge_warning,
+        }
     (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     # Test data next to the predictions so the Markdown report can show inputs.

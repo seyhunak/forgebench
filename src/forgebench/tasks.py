@@ -90,6 +90,12 @@ def load_task_with_cases(
     return task, cases
 
 
+def task_file_hashes(name: str, split: str, root: Path | None = None) -> tuple[str, str]:
+    """SHA-256 of a task's ``task.yaml`` and of one split's case file."""
+    directory = _task_dir(name, root)
+    return sha256_file(directory / "task.yaml"), sha256_file(directory / f"{split}.jsonl")
+
+
 @dataclass(frozen=True)
 class TaskInfo:
     name: str
@@ -199,6 +205,7 @@ __all__ = [
     "load_task",
     "load_cases",
     "load_task_with_cases",
+    "task_file_hashes",
     "validate_task",
     "TaskInfo",
     "TaskValidationReport",

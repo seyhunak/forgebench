@@ -219,7 +219,6 @@ def test_task_run_engine_offline_artifacts(tmp_path: Path) -> None:
     assert "Per-rule results" in report
     assert "Per-case results" in report
     assert "case text" in report  # the input data is in the report
-    assert "judge" in result.manifest
 
 
 def test_task_run_with_judge_rule_online_judge(tmp_path: Path) -> None:

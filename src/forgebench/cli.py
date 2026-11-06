@@ -40,7 +40,7 @@ from .providers import DEFAULT_PROVIDER, PROVIDER_ENV_VARS
 from .providers.verify import verify_provider_key
 from .registry import default_datasets_root, list_datasets, validate_dataset
 from .reporting import load_run, render_comparison, render_report
-from .runner import run_experiment
+from .runner import provider_substitution, run_experiment
 from .schemas import PredictionRecord, ScoringRule, TaskCase, TaskDefinition
 from .tasks import (
     list_tasks,
@@ -721,6 +721,16 @@ def run_cmd(
     def progress(done: int, total: int) -> None:
         if done % 25 == 0 or done == total:
             typer.echo(f"  {done}/{total} cases")
+
+    substitution = provider_substitution(experiment)
+    if substitution:
+        resolved = substitution["resolved"]
+        typer.echo(
+            f"warning: config asks for {substitution['requested']['name']}; "
+            f"running on {resolved['name']} / {resolved['model']}. "
+            "This makes real provider calls.",
+            err=True,
+        )
 
     try:
         result = run_experiment(

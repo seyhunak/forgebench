@@ -108,6 +108,13 @@ def render_report(
     lines.append(f"- **Task / experiment:** {experiment}")
     provider_name = provider.get("name", "unknown").title()
     lines.append(f"- **Provider / model:** {provider_name} / `{provider.get('model')}`")
+    substitution = manifest.get("provider_substitution")
+    if substitution:
+        requested = substitution["requested"]
+        lines.append(
+            f"- **Provider substituted:** the config asked for {requested['name']} / "
+            f"`{requested['model']}`"
+        )
     comparison_model = manifest.get("comparison_model")
     if comparison_model:
         lines.append(f"- **Comparison model:** `{comparison_model}`")
@@ -121,7 +128,13 @@ def render_report(
     judge = manifest.get("judge", {}) or {}
     if judge.get("model"):
         judge_name = (judge.get("name") or "unknown").title()
-        lines.append(f"- **Judge:** {judge_name} / `{judge.get('model')}`")
+        if judge.get("warning"):
+            lines.append(
+                f"- **Judge unavailable:** {judge_name} / `{judge.get('model')}` "
+                f"({judge['warning']})"
+            )
+        else:
+            lines.append(f"- **Judge:** {judge_name} / `{judge.get('model')}`")
     if dataset.get("name"):
         sha = str(dataset.get("split_sha256", ""))[:12]
         lines.append(

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
-from .config import ExperimentConfig
+from .config import ExperimentConfig, ProviderSection
 from .evidence import default_evidence_fields
 from .metrics import compute_metrics
 from .notify import post_run_webhook
@@ -108,6 +108,25 @@ def _resolve_provider_and_model(config: ExperimentConfig) -> tuple[str, str]:
     return name, model
 
 
+def provider_substitution(
+    config: ExperimentConfig,
+    requested: ProviderSection | None = None,
+) -> dict[str, dict[str, str]] | None:
+    """What the run will use instead of what was asked for, if they differ.
+
+    ``requested`` is for callers that already rewrote ``config.provider``; it
+    defaults to the config's own provider section.
+    """
+    asked = requested or config.provider
+    name, model = _resolve_provider_and_model(config)
+    if (asked.name, asked.model) == (name, model):
+        return None
+    return {
+        "requested": {"name": asked.name, "model": asked.model},
+        "resolved": {"name": name, "model": model},
+    }
+
+
 def _make_provider(
     config: ExperimentConfig,
     examples: list[dict[str, Any]],
@@ -172,6 +191,16 @@ def _git_sha(cwd: Path) -> str | None:
     except (OSError, subprocess.SubprocessError):
         return None
     return completed.stdout.strip() or None if completed.returncode == 0 else None
+
+
+def environment_info() -> dict[str, Any]:
+    """The software a run executed on, for its manifest."""
+    return {
+        "forgebench_version": __version__,
+        "python_version": platform.python_version(),
+        "platform": platform.platform(),
+        "git_sha": _git_sha(Path(__file__).resolve().parents[2]),
+    }
 
 
 def score_case(
@@ -292,20 +321,22 @@ def run_experiment(
     run_id: str | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     on_log: Callable[[str], None] | None = None,
+    requested_provider: ProviderSection | None = None,
 ) -> RunResult:
     """Execute one experiment end to end and persist all artifacts.
 
     ``on_log`` receives human-readable milestone lines (config loaded,
     provider ready, per-case results, metrics) so callers such as the
     dashboard can stream an execution log while the run is in flight.
+
+    ``requested_provider`` names the provider originally asked for when the
+    caller already replaced it in ``config``, so the manifest can still record
+    the substitution.
     """
     started = time.perf_counter()
     _log = on_log or (lambda _msg: None)
     from .credits import BENCHMARK_RUN_CREDITS, consume_run, run_credit_id
 
-    # Metering: one benchmark run = one flat price (30 credits = $3.00),
-    # charged before any dataset load or inference.
-    consume_run("benchmark", run_credit_id(config.experiment.name), amount=BENCHMARK_RUN_CREDITS)
     root = datasets_root or default_datasets_root()
 
     cases, info = load_dataset(config.experiment.dataset, config.experiment.split, root)
@@ -335,6 +366,17 @@ def run_experiment(
     prompt_build_ms = (time.perf_counter() - build_started) * 1000.0
     prompt_meta = _effective_prompt_meta(provider, prompt_meta)
     _log(f"provider {provider.name} · model {provider.model}")
+
+    substitution = provider_substitution(config, requested_provider)
+    if substitution:
+        _log(
+            f"warning: config asks for {substitution['requested']['name']}; "
+            f"running on {substitution['resolved']['name']}"
+        )
+
+    # Metering: one benchmark run = one flat price (30 credits = $3.00), charged
+    # only once the run can start, so a bad dataset or provider costs nothing.
+    consume_run("benchmark", run_credit_id(config.experiment.name), amount=BENCHMARK_RUN_CREDITS)
 
     # Optional LLM-as-judge on top of the rule-based metrics. Built once; a
     # judge that cannot be constructed disables judging with a loud warning
@@ -480,25 +522,26 @@ def run_experiment(
             "n_cases": total,
         },
         "config": config.model_dump(),
-        "environment": {
-            "forgebench_version": __version__,
-            "python_version": platform.python_version(),
-            "platform": platform.platform(),
-            "git_sha": _git_sha(Path(__file__).resolve().parents[2]),
-        },
+        "environment": environment_info(),
         "few_shot_examples": len(examples),
         "prompt": prompt_meta,
         "prompt_build_ms": round(prompt_build_ms, 3),
         "trace": {"file": TRACE_FILENAME, "n_cases": total},
         "command": " ".join(sys.argv) or None,
     }
+    if substitution:
+        manifest["provider_substitution"] = substitution
     if judge_instance is not None:
         manifest["judge"] = {
             "name": judge_section.provider,
             "model": judge_instance.model or judge_section.model,
         }
-        if judge_warning:
-            manifest["judge"]["warning"] = judge_warning
+    elif judge_warning:
+        manifest["judge"] = {
+            "name": judge_section.provider,
+            "model": judge_section.model,
+            "warning": judge_warning,
+        }
 
     # Per-case test data so the Markdown report can show the inputs alongside
     # the predictions instead of bare case ids.
@@ -526,6 +569,8 @@ def run_experiment(
 __all__ = [
     "RunResult",
     "run_experiment",
+    "provider_substitution",
+    "environment_info",
     "score_case",
     "build_few_shot_examples",
     "Category",

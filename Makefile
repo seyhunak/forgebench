@@ -1,4 +1,4 @@
-.PHONY: install test lint format data demo dashboard clean
+.PHONY: install test lint format data check-data demo dashboard clean
 
 install:
 	python -m pip install -e ".[dev]"
@@ -15,6 +15,16 @@ format:
 # Regenerate the synthetic dataset deterministically (same seed, same data).
 data:
 	python scripts/generate_dataset.py --seed 42 --train 100 --dev 40 --test 60
+
+# Regenerate everything that has a generator and fail if committed data differs.
+# healthcare_v1 and ecommerce_v1 have no generator; tests/test_run_integrity.py pins them.
+check-data:
+	python scripts/generate_dataset.py --seed 42 --train 100 --dev 40 --test 60
+	python scripts/generate_multi_dataset.py
+	python scripts/generate_more_datasets.py
+	python scripts/generate_rag_task.py
+	python scripts/generate_guardrails_task.py
+	@test -z "$$(git status --porcelain -- datasets tasks)" || { git status --short -- datasets tasks; echo "regenerated data differs from the committed data"; exit 1; }
 
 # End-to-end pipeline using the deterministic mock provider. No API key needed.
 demo:
