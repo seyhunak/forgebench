@@ -16,12 +16,13 @@
 [![OpenAI](https://img.shields.io/badge/OpenAI-supported-412991.svg)](https://openai.com/)
 [![Anthropic](https://img.shields.io/badge/Anthropic-supported-000000.svg)](https://anthropic.com/)
 [![Google](https://img.shields.io/badge/Google%20Gemini-supported-4285F4.svg)](https://ai.google.dev/)
+[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-D97757.svg)](https://claude.com/claude-code)
 
 **Measure domain adaptation, not just model intelligence.**
 
 ForgeBench is a reproducible, provider-agnostic benchmark harness for answering one question: did customizing a model — a better prompt, few-shot examples, structured output, a fine-tune — actually improve performance on a specific domain task, or did it just make the pipeline more complicated?
 
-The first benchmark domain is **financial and transaction operations**: synthetic banking, accounting, claims, and e-commerce scenarios (transaction exception classification and reconciliation triage). No private data, no GPU, no API key required to run the pipeline.
+The first benchmark domain is **financial and transaction operations**: synthetic banking, accounting, claims, and e-commerce scenarios (transaction exception classification and reconciliation triage). No private data and no GPU required. Benchmark runs need a provider key or a local Ollama daemon; custom tasks can validate the pipeline offline with `--provider mock`.
 
 **Who it's for:** teams shipping AI in finance, healthcare, legal, insurance, payments, procurement and support operations — anyone who needs "we think the new prompt is better" replaced with a pinned, auditable, cost-measured comparison on a fixed test set. See [PITCH.md](PITCH.md) for the full business case: value proposition, problems solved, commercial model.
 
@@ -67,14 +68,14 @@ The first benchmark domain is **financial and transaction operations**: syntheti
 | **Pluggable provider interface** | Mistral, OpenAI, Anthropic, Google, OpenRouter and Ollama adapters share one contract, plus a deterministic rule engine used only by the offline unit tests. OpenRouter — one key, every hosted model — is the default in the dashboard and CLI. |
 | **Strict output validation** | A plausible explanation is not a correct answer. Unknown categories, malformed JSON, and invalid evidence fields are rejected. |
 | **Risk-aware metrics** | Critical false-match rate and escalation recall are tracked separately — accuracy alone hides the expensive errors. |
-| **Full run manifests** | Dataset hash, config, model id, versions, timestamps, git SHA, and environment are captured for every run — including the prompt that actually ran (`name@version`, SHA-256, provider default vs. registry vs. inline). |
+| **Full run manifests** | Dataset hash, config, model id, versions, timestamps, git SHA, and environment are captured for every run — including the prompt that actually ran (`name@version`, SHA-256, provider default vs. registry vs. inline). Task runs also pin the SHA-256 of `task.yaml` and the case file, plus the case limit. If a run uses a different provider than its config asked for, or a judge could not be built, the manifest and report say so. |
 | **Regression view** | Pin a run per dataset as its baseline, then open any later run and choose **Vs baseline**: metric deltas plus the exact cases that improved or regressed — the number that moves and the cases that moved it. |
 | **Per-case trace waterfall** | Every run writes `trace.jsonl`: wall-clock spans per case (provider call with token counts, parse & score, judge). The run modal's *View trace* tab renders it, so "which step cost the time" is an answer, not a guess. |
 | **Versioned prompt registry** | Prompts live in `prompts/<name>/vN.md` with immutable versions and labels (`production`). Pin one from a config with `prompt: {name: …, version: …}` or from the dashboard, and the run records the exact bytes it used. |
 | **Machine-readable + human-readable results** | `predictions.jsonl`, `metrics.json`, `manifest.json`, `trace.jsonl`, and `report.md` per run. |
 | **Bring-your-own-key (BYOK)** | API keys saved to a git-ignored `.env` (chmod 600), verified against the provider API, never committed, never in run artifacts. |
 | **Local dashboard** | FastAPI-served, Hallmark-designed UI with a dark-first Cobalt theme, side-rail navigation, and a ⌘K jump palette — environment setup with per-provider key entry, key management, dataset browsing, run launching, and results browsing where every run opens a detail modal (report, predictions, downloadable artifacts) plus cross-run comparison. |
-| **Deterministic dataset generator** | Same seed, byte-identical files. Regenerate `finance_v1` or add new datasets with `scripts/generate_dataset.py`. |
+| **Deterministic dataset generator** | Same seed, byte-identical files. Regenerate `finance_v1` or add new datasets with `scripts/generate_dataset.py`. CI regenerates all generated data with `make check-data` and fails on any difference. |
 | **User-defined tasks** | Define any evaluation task in YAML — input fields, output schema, weighted scoring rules — and run it with `forgebench task-run`. No code required. |
 
 ## 💼 Why ForgeBench for business
@@ -92,7 +93,7 @@ The tool itself is proprietary (see [LICENSE](LICENSE)): the **Community tier is
 
 ## 🏷️ Pricing: credit packs (Stripe)
 
-Credits are the unit of purchase: **$0.10 per credit.** Metering: a benchmark run costs **30 credits ($3.00) flat** — one price whatever the case limit — and a custom-task run costs **1 credit ($0.10) per case** (each case is one model call). Runs are counted, not seats. A **dataset pack** can be bought from the same wallet. The Stripe fulfillment loop is wired end-to-end in this repository: checkout → webhook (`services/stripe_webhook`) → single-use voucher code → `forgebench redeem FB-…` → local credit ledger (`.forgebench/credits.json`, git-ignored).
+Credits are the unit of purchase: **$0.10 per credit.** Metering: a benchmark run costs **30 credits ($3.00) flat** — one price whatever the case limit — and a custom-task run costs **1 credit ($0.10) per case** (each case is one model call). Runs are counted, not seats. Credits are charged after the data loads and the provider is built, so a run that cannot start costs nothing. A **dataset pack** can be bought from the same wallet. The Stripe fulfillment loop is wired end-to-end in this repository: checkout → webhook (`services/stripe_webhook`) → single-use voucher code → `forgebench redeem FB-…` → local credit ledger (`.forgebench/credits.json`, git-ignored).
 
 | Package | Credits | Price |
 |---------|--------:|------:|
@@ -254,7 +255,7 @@ All providers implement the same `predict(case) -> ProviderResponse` contract:
 
 | Provider | Adapter | Models | API key |
 |----------|---------|--------|---------|
-| **Mock** | `providers/mock.py` | `rule-mock-v1` | None — offline deterministic rule engine, used by unit tests only. Any run that names it is upgraded to the selected provider, and `task-run` rejects it. |
+| **Mock** | `providers/mock.py` | `rule-mock-v1` | None — offline deterministic rule engine, used by unit tests only. A benchmark run that names it is upgraded to the selected provider, with a CLI warning and a `provider_substitution` entry in the manifest. `task-run --provider mock` stays offline, for validating the pipeline only. |
 | **Mistral** | `providers/mistral.py` | `ministral-8b`, `ministral-3b`, `ministral-14b`, `mistral-small-4`, `mistral-large`, `mistral-medium` | `MISTRAL_API_KEY` |
 | **OpenAI** | `providers/openai.py` | GPT-5, GPT-4.1, GPT-4o, o1, o3-mini families | `OPENAI_API_KEY` |
 | **Anthropic** | `providers/anthropic.py` | Claude 4 Opus, Claude 4 Sonnet, Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku | `ANTHROPIC_API_KEY` |
@@ -328,7 +329,15 @@ python scripts/generate_dataset.py --seed 42 --train 100 --dev 40 --test 60
 
 # legal_v1, insurance_v1, support_v1, payments_v1, procurement_v1, subscriptions_v1 (fixed seed 2026)
 python scripts/generate_multi_dataset.py
+
+# saas_billing_v1, telecom_v1, travel_v1
+python scripts/generate_more_datasets.py
+
+# Regenerate everything with a generator, and fail if the committed data differs
+make check-data
 ```
+
+`healthcare_v1` and `ecommerce_v1` have no generator in this repository, so a test pins their split hashes instead.
 
 ## 📈 Metrics
 
