@@ -23,8 +23,6 @@ make check-data    # rewrites datasets/ and tasks/ in place, fails if git sees a
 
 Run it with a clean `datasets/` and `tasks/`, because it fails on any uncommitted change there.
 
-`ruff check` currently fails on existing `E501` errors, mostly in `scripts/generate_guardrails_task.py` and `scripts/generate_rag_task.py`. Check that your change adds none rather than expecting a clean exit.
-
 ### Commands that spend money
 
 The docs are out of date here. `Makefile`, `CONTRIBUTING.md`, and `docs/architecture.md` describe mock runs as free and offline, but **benchmark runs never use the mock provider**. `runner._resolve_provider_and_model` (and `/api/run` in `api.py`) replaces `mock` with the first provider that has a key, defaulting to OpenRouter. The CLI warns when this happens, and the manifest records it as `provider_substitution`.

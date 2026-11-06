@@ -59,7 +59,8 @@ def test_lexical_faithfulness_grounded() -> None:
     """An answer fully supported by context scores high faithfulness."""
     answer = "Refunds are allowed within 30 days with a receipt."
     context = [
-        "Refund policy: Customers may request a full refund within 30 days of purchase with original receipt."
+        "Refund policy: Customers may request a full refund within 30 days of purchase "
+        "with original receipt."
     ]
     assert lexical_faithfulness(answer, context) > 0.5
 
@@ -68,7 +69,8 @@ def test_lexical_faithfulness_ungrounded() -> None:
     """An answer not supported by context scores zero faithfulness."""
     answer = "The moon is made of green cheese."
     context = [
-        "Refund policy: Customers may request a full refund within 30 days of purchase with original receipt."
+        "Refund policy: Customers may request a full refund within 30 days of purchase "
+        "with original receipt."
     ]
     assert lexical_faithfulness(answer, context) == 0.0
 

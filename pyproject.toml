@@ -76,3 +76,6 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 # typer's documented CLI pattern puts Option/Argument calls in defaults.
 "src/forgebench/cli.py" = ["B008"]
+# These generators are mostly long literal dataset text; wrapping it hurts more than it helps.
+"scripts/generate_guardrails_task.py" = ["E501"]
+"scripts/generate_rag_task.py" = ["E501"]
