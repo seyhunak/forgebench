@@ -22,10 +22,25 @@ contributions are small, tested, and documented by default.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-make test        # pytest — fully offline, uses the mock provider
+make test        # pytest — offline, except one live test (see below)
 make lint        # ruff check
 make data        # regenerate the dataset (deterministic; must be a no-op diff)
-make demo        # end-to-end mock run + comparison
+make demo        # end-to-end run + comparison — calls a real provider (see below)
+```
+
+**Which commands spend money.** Benchmark runs never use the mock provider:
+when a config names `mock`, the runner substitutes the first provider with a
+key (OpenRouter by default), warns, and records `provider_substitution` in the
+manifest. So `make demo` and `forgebench run` call a real model. `pytest`
+includes `test_live_run_produces_a_real_trace`, which runs when
+`OPENROUTER_API_KEY` is set (including from `.env`). Deselect it with
+`--deselect tests/test_runner.py::test_live_run_produces_a_real_trace`.
+
+The offline path is custom tasks, from the CLI or the dashboard's Tasks page
+(**Mock (offline)**):
+
+```bash
+forgebench task-run sentiment_analysis --provider mock --limit 2 --output-root /tmp/fb-runs
 ```
 
 ## Adding things

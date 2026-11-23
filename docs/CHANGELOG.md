@@ -15,6 +15,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `make check-data` regenerates every dataset and task that has a generator and
   fails on any difference. CI now runs it instead of checking only `finance_v1`.
   `healthcare_v1` and `ecommerce_v1` have no generator, so a test pins their hashes.
+- **Mock on the dashboard Tasks page**: the provider and judge selectors offer
+  **Mock (offline)** with the `mock` model, so a custom task can validate the
+  pipeline from the UI without calling a real model. It is not added to
+  `/api/providers` or the Run view, where benchmark runs substitute it.
+  In `enforce` credit mode, mock task runs are still metered per case.
 
 ### Fixed
 - **Billing**: benchmark and task runs are charged only after the data loads and
@@ -22,6 +27,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Judge reporting**: task manifests and reports no longer name a judge when
   none was needed. A judge that could not be built is now recorded with the
   reason in both pipelines, and the report no longer lists it as having run.
+- **Dashboard Tasks form**: finishing a task run no longer resets the provider
+  and judge back to the saved default. Only the Task runs list and the
+  header's credit balance refresh, so the balance now updates right after a
+  metered run.
 
 ## [0.2.0] - 2026-10-18
 

@@ -1,21 +1,24 @@
 # ForgeBench
 
 [![CI](https://github.com/seyhunak/forgebench/actions/workflows/tests.yml/badge.svg)](https://github.com/seyhunak/forgebench/actions/workflows/tests.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](CHANGELOG.md)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python 3.11 | 3.12](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](.github/workflows/tests.yml)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](docs/CHANGELOG.md)
+[![License](https://img.shields.io/github/license/seyhunak/forgebench.svg)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/seyhunak/forgebench/main.svg)](https://github.com/seyhunak/forgebench/commits/main)
+[![Open issues](https://img.shields.io/github/issues/seyhunak/forgebench.svg)](https://github.com/seyhunak/forgebench/issues)
+[![Pull requests](https://img.shields.io/github/issues-pr/seyhunak/forgebench.svg)](https://github.com/seyhunak/forgebench/pulls)
 [![Stripe: sandbox](https://img.shields.io/badge/stripe-sandbox-635bff.svg)](services/stripe_webhook/README.md)
-[![Status: MVP](https://img.shields.io/badge/status-MVP-informational.svg)](LICENSE)
+[![Status: MVP](https://img.shields.io/badge/status-MVP-informational.svg)](docs/CHANGELOG.md)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Tests: pytest](https://img.shields.io/badge/tests-pytest-0A0A0A.svg)](https://docs.pytest.org/)
-[![Contributor Covenant](https://img.shields.io/badge/contributor%20covenant-v2.1-ff69b4.svg)](CODE_OF_CONDUCT.md)
+[![Contributor Covenant](https://img.shields.io/badge/contributor%20covenant-v2.1-ff69b4.svg)](docs/CODE_OF_CONDUCT.md)
 [![OpenRouter](https://img.shields.io/badge/OpenRouter-ready-00BFFF.svg)](https://openrouter.ai/)
 [![Ollama](https://img.shields.io/badge/Ollama-supported-000000.svg)](https://ollama.com/)
 [![Mistral](https://img.shields.io/badge/Mistral-supported-FF6B35.svg)](https://mistral.ai/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-supported-412991.svg)](https://openai.com/)
 [![Anthropic](https://img.shields.io/badge/Anthropic-supported-000000.svg)](https://anthropic.com/)
 [![Google](https://img.shields.io/badge/Google%20Gemini-supported-4285F4.svg)](https://ai.google.dev/)
+[![Mock: offline tasks](https://img.shields.io/badge/mock-offline%20tasks-6c757d.svg)](#local-dashboard-optional-ui)
 [![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-D97757.svg)](https://claude.com/claude-code)
 
 **Measure domain adaptation, not just model intelligence.**
@@ -24,7 +27,7 @@ ForgeBench is a reproducible, provider-agnostic benchmark harness for answering 
 
 The first benchmark domain is **financial and transaction operations**: synthetic banking, accounting, claims, and e-commerce scenarios (transaction exception classification and reconciliation triage). No private data and no GPU required. Benchmark runs need a provider key or a local Ollama daemon; custom tasks can validate the pipeline offline with `--provider mock`.
 
-**Who it's for:** teams shipping AI in finance, healthcare, legal, insurance, payments, procurement and support operations — anyone who needs "we think the new prompt is better" replaced with a pinned, auditable, cost-measured comparison on a fixed test set. See [PITCH.md](PITCH.md) for the full business case: value proposition, problems solved, commercial model.
+**Who it's for:** teams shipping AI in finance, healthcare, legal, insurance, payments, procurement and support operations — anyone who needs "we think the new prompt is better" replaced with a pinned, auditable, cost-measured comparison on a fixed test set. See [PITCH.md](docs/PITCH.md) for the full business case: value proposition, problems solved, commercial model.
 
 **Status: MVP (v0.2.0).** Actively developed; expect breaking changes between versions. Monetization is credit-based ($0.10/credit, runs counted) with the Stripe loop wired in this repository — nothing billed until the Stripe account is configured ([Pricing](#%EF%B8%8F-pricing-credit-packs-stripe)).
 
@@ -110,7 +113,7 @@ forgebench redeem FB-SCALE-250-AB12CD34   # one-time redemption → local balanc
 ```
 
 Status: the catalog, webhook listener, voucher store and redeem flow are **implemented and tested** in this repository; checkout goes live as soon as the Stripe account is configured (payment links + `STRIPE_WEBHOOK_SECRET`/`STRIPE_PRICE_MAP` — see `services/stripe_webhook/README.md`). Until then nothing is billed. Enterprise
-also covers SSO/on-prem priorities and shapes the shared-backend roadmap; the fuller business case is in [PITCH.md](PITCH.md).
+also covers SSO/on-prem priorities and shapes the shared-backend roadmap; the fuller business case is in [PITCH.md](docs/PITCH.md).
 
 ## 🚀 Quickstart
 
@@ -182,7 +185,7 @@ An exported `MISTRAL_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_AP
 
 ```bash
 pip install -e ".[ui]"
-forgebench dashboard   # http://127.0.0.1:8502
+forgebench dashboard   # http://127.0.0.1:8501 (change with --port)
 ```
 
 The dashboard is a single-page app served by FastAPI. Navigate with the left rail, or press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> to jump straight to any view:
@@ -193,7 +196,7 @@ The dashboard is a single-page app served by FastAPI. Navigate with the left rai
 - **04 Config** — edit experiment YAML, validated before saving.
 - **05 Run** — pick a config, optional case limit, live progress bar, run id.
 - **06 Results** — run cards that open a detail modal: metrics, the full Markdown report, a predictions table, and Markdown/JSON downloads. Plus N-way comparison with colour-coded deltas and a **History** view (every run over time, grouped by task/dataset, with per-group deltas).
-- **07 Tasks** — validate and run user-defined evaluation tasks; provider defaults to OpenRouter with a model prefilled. Each task run writes the same artifacts as a benchmark run (predictions, metrics, manifest, report, trace).
+- **07 Tasks** — validate and run user-defined evaluation tasks; provider defaults to OpenRouter with a model prefilled. Each task run writes the same artifacts as a benchmark run (predictions, metrics, manifest, report, trace). The provider and judge lists also offer **Mock (offline)** (model `mock`), which validates the pipeline without calling a real model. Mock exists only on this page, because benchmark runs from **05 Run** replace it with a real provider. Mock output isn't meant to score well, and in `enforce` credit mode a mock task run is still metered at 1 credit per case. After a run finishes, the form keeps your task, provider, judge and limit. Only the Task runs list and the credit balance in the header refresh.
 
 #### Sharing the dashboard safely
 
@@ -316,9 +319,9 @@ Dataset files live under `datasets/<name>/`:
 View any dataset in the dashboard's **Datasets** view, or via the API:
 
 ```bash
-curl http://localhost:8502/api/datasets
-curl http://localhost:8502/api/datasets/healthcare_v1
-curl http://localhost:8502/api/datasets/finance_v1/splits/test
+curl http://localhost:8501/api/datasets
+curl http://localhost:8501/api/datasets/healthcare_v1
+curl http://localhost:8501/api/datasets/finance_v1/splits/test
 ```
 
 Regenerate datasets deterministically:
@@ -565,7 +568,7 @@ The suite runs offline: tests that exercise the run pipeline inject a determinis
 
 ## 🤝 Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Good first contributions:
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md). Good first contributions:
 
 - Additional provider adapters (Cohere, Cohere Command, xAI Grok, etc.)
 - Synthetic datasets for new domains (legal, insurance, supply chain)
@@ -573,11 +576,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Good first contributions:
 - Independently reproduced runs with published `report.md` outputs
 - Dashboard improvements (light/dark theme refinements, export formats)
 
-All contributions follow the [Contributor Covenant](CODE_OF_CONDUCT.md).
+All contributions follow the [Contributor Covenant](docs/CODE_OF_CONDUCT.md).
 
 ## 🔒 Security
 
-API keys are never stored in the repository. See [SECURITY.md](SECURITY.md) for the full policy, including how keys are stored (git-ignored `.env`, chmod 600), verified against provider APIs, and excluded from run artifacts.
+API keys are never stored in the repository. See [SECURITY.md](docs/SECURITY.md) for the full policy, including how keys are stored (git-ignored `.env`, chmod 600), verified against provider APIs, and excluded from run artifacts.
 
 ---
 
@@ -682,7 +685,7 @@ beyond a tolerance.
 
 ### Changelog
 
-See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each version.
+See [`CHANGELOG.md`](docs/CHANGELOG.md) for what shipped in each version.
 
 ---
 

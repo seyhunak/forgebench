@@ -7,7 +7,7 @@ CLI / Python API
 Benchmark runner ──► load → validate → infer → score → record
       │
       ├── Dataset registry      cases, labels, splits, versions, SHA-256 hashes
-      ├── Provider adapters     Mistral API, deterministic mock, (future: local)
+      ├── Provider adapters     OpenRouter, Mistral, OpenAI, Anthropic, Google, Ollama; mock (tests + custom tasks)
       ├── Metric engine         task quality, validity, latency, estimated cost
       └── Experiment recorder   config, versions, predictions, failures
                                         │
@@ -36,7 +36,7 @@ Benchmark runner ──► load → validate → infer → score → record
 | `schemas.py` | The only contracts: `BenchmarkCase`, `Prediction`, `PredictionRecord`, `ProviderResponse` |
 | `parsing.py` | Raw model text → validated `Prediction` or a structured error kind |
 | `providers/base.py` | `ModelProvider` protocol + `ProviderError` |
-| `providers/mock.py` | Deterministic rule engine; optional seeded defect/invalid injection |
+| `providers/mock.py` | Deterministic rule engine; optional seeded defect/invalid injection. Used by offline tests and custom tasks (CLI `--provider mock`, dashboard Tasks page). Benchmark runs substitute a real provider for it. |
 | `providers/mistral.py` | Official SDK adapter: retries, timeouts, token usage, prompt variants |
 | `metrics/` | classification, reliability, performance, pricing registry |
 | `registry.py` | Dataset discovery, loading, hashing, validation; `ModelArtifact` for future adapters |
