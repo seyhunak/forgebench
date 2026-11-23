@@ -68,13 +68,13 @@ reaches production.
 
 | Cost item | What it looks like |
 |---|---|
-| ForgeBench itself | Community tier is free for internal evaluation; the product is proprietary — paid usage is credits ($0.10/run): packs of 50–500, dataset pack, Enterprise Unlimited $5,000. |
+| ForgeBench itself | Open source under the MIT License; paid usage is credits ($0.10/run): packs of 50–500, dataset pack, Enterprise Unlimited $5,000. |
 | Model spend | Bring-your-own-key; you pay the provider you configured, for exactly the tokens used. Cloud model defaults (e.g. Ollama `beam:cloud`) run on cloud-served hardware with no local GPU. Sub-dollar runs are normal with `--limit N` sampling during iteration. |
 | Fully local path | $0 marginal spend — the Ollama adapter runs the whole harness on internal hardware with zero egress to third parties. |
 | Cost per 1,000 cases | Reported directly in every run, comparison and history view from actual token usage with dated model pricing — so budget conversations have numbers attached. |
 | Infrastructure | Flat JSONL/JSON files under `runs/` — nothing to provision, back up or migrate. A run directory is the deployment unit. |
 
-**Commercial model (built in-repo, live when the Stripe account is configured):** the repo is closed-source; the Community tier is free for internal evaluation and **monetization is credits, not seats —
+**Commercial model (built in-repo, live when the Stripe account is configured):** the code is MIT-licensed open source, and **monetization is credits, not seats —
 
 - **1 credit = $0.10.** Benchmark runs cost **30 credits ($3.00) flat** per run (one price whatever the case limit); custom-task runs cost **1 credit ($0.10) per case** (each case is one model call). Runs are counted by the local ledger (`.forgebench/credits.json`).
 - **Packs — Starter 50/$5, Growth 100/$10, Scale 250/$25, Max 500/$50.** Stripe checkout → webhook voucher → `forgebench redeem` → local balance.
