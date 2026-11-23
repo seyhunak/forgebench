@@ -2009,6 +2009,7 @@ async function taskModelMap(providerId) {
     }
     return models;
   }
+  if (providerId === "mock") return { mock: { id: "mock", name: "mock" } };
   const provider = modelsData && modelsData[providerId];
   return (provider && provider.models) || {};
 }
@@ -2067,6 +2068,13 @@ async function loadTasks() {
       els.taskProvider.appendChild(opt.cloneNode(true));
       els.taskJudgeProvider.appendChild(opt.cloneNode(true));
     }
+    // Custom tasks still run on the mock (benchmark runs substitute it, so
+    // it stays out of /api/providers and the Run view). Offline, no key.
+    const mockOpt = document.createElement("option");
+    mockOpt.value = "mock";
+    mockOpt.textContent = "Mock (offline)";
+    els.taskProvider.appendChild(mockOpt.cloneNode(true));
+    els.taskJudgeProvider.appendChild(mockOpt.cloneNode(true));
     // Credentials section drives the default provider/model selection.
     let defaultProvider = "openrouter";
     let defaultModel = "";
