@@ -2169,7 +2169,10 @@ async function pollTaskProgress(runId) {
       if (state.status === "done") {
         hide(els.taskProgress);
         showResult(state.result);
-        await loadTasks();
+        // Refresh only the run list and balance: loadTasks() rebuilds the
+        // form and would reset the provider/judge the user just picked.
+        await loadTaskRuns();
+        await loadCredits();
         return;
       }
       if (state.status === "error") {
